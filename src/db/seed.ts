@@ -2,9 +2,7 @@
  * Idempotent seed: owners, vehicle classes and the admin user.
  * Run with `npm run db:seed` (requires SEED_ADMIN_PASSWORD for the admin user).
  */
-import { config } from "dotenv";
-config({ path: ".env.local" });
-config({ path: ".env" });
+import "./load-env";
 
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";

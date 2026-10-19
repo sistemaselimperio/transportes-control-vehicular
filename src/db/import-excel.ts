@@ -2,9 +2,7 @@
  * CLI importer: `npm run db:import -- "<path>.xlsx" [--dry]`.
  * Internal tool for loading or re-syncing data from the source Excel.
  */
-import { config } from "dotenv";
-config({ path: ".env.local" });
-config({ path: ".env" });
+import "./load-env";
 
 import { readFile } from "node:fs/promises";
 import {
