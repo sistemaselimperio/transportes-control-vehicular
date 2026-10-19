@@ -1,15 +1,16 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
-import { LOCAL_DATABASE_URL } from "./src/db/local-url";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
 
-// DATABASE_URL set   -> hosted Supabase Postgres.
-// DATABASE_URL unset -> local pglite-server (start it with `npm run db:server`).
+// Migrations run against Neon's direct (unpooled) endpoint when available.
+const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+if (!url) throw new Error("DATABASE_URL is not set (see .env.example).");
+
 export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
-  dbCredentials: { url: process.env.DATABASE_URL || LOCAL_DATABASE_URL },
+  dbCredentials: { url },
 });

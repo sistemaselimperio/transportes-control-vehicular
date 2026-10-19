@@ -1,17 +1,16 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { LOCAL_DATABASE_URL } from "./local-url";
 import * as schema from "./schema";
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
 function createClient() {
-  // DATABASE_URL set   -> hosted Supabase Postgres.
-  // DATABASE_URL unset -> local pglite-server (npm run dev / db:server).
-  const url = process.env.DATABASE_URL || LOCAL_DATABASE_URL;
+  // Hosted Neon Postgres; there is no local database.
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set (see .env.example).");
   return postgres(url, {
-    // Required by the Supabase transaction pooler (port 6543); harmless elsewhere.
+    // Neon's pooled endpoint (PgBouncer) does not support prepared statements.
     prepare: false,
     max: process.env.NODE_ENV === "production" ? 5 : 1,
   });

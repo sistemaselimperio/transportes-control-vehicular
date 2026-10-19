@@ -1,5 +1,5 @@
 /**
- * Portable PostgreSQL schema (local Supabase / PGlite / hosted Supabase).
+ * PostgreSQL schema (hosted on Neon).
  * Only standard Postgres features: no provider-specific extensions or RLS.
  * Calendar dates use `date` in string mode ("YYYY-MM-DD") to match the domain.
  */
