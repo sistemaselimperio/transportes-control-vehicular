@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792251845034,
+      "tag": "0000_fresh_blue_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792256022871,
+      "tag": "0001_sales_date_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792266752871,
+      "tag": "0002_blushing_wild_pack",
+      "breakpoints": true
+    }
+  ]
+}
