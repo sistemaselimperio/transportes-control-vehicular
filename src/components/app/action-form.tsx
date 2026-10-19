@@ -18,8 +18,8 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-1">
-      <Label htmlFor={htmlFor} className="text-sm">
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="text-sm text-foreground">
         {label}
       </Label>
       {children}
@@ -52,7 +52,7 @@ export function ActionForm({
 
   return (
     <form
-      className="space-y-3"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -70,11 +70,11 @@ export function ActionForm({
           {error}
         </p>
       )}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" className="h-10 px-4" onClick={onCancel} disabled={pending}>
+      <div className="flex justify-end gap-2 border-t pt-4">
+        <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>
-        <Button type="submit" className="h-10 px-4" disabled={pending}>
+        <Button type="submit" className="h-11 px-4 md:h-10" disabled={pending}>
           {pending ? pendingLabel : submitLabel}
         </Button>
       </div>

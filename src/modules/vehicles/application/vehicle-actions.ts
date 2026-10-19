@@ -12,6 +12,7 @@ import { requireSession } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { RuleError } from "../domain/vehicle-rules";
 import { vehicleCommandRepository } from "../infrastructure/vehicle-command-repository";
+import { getVehicleActionContext, type VehicleActionContext } from "./vehicle-queries";
 import {
   assignDriverSchema,
   oilChangeSchema,
@@ -40,8 +41,9 @@ async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
   try {
     await requireSession();
     const result = await fn();
-    revalidatePath("/vehiculos");
-    revalidatePath("/vehiculos/[placa]", "page");
+    revalidatePath("/flota");
+    revalidatePath("/flota/[placa]", "page");
+    revalidatePath("/reportes");
     revalidatePath("/");
     return { ok: true, message: result.message };
   } catch (e) {
@@ -54,6 +56,20 @@ async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
     }
     console.error("vehicle action failed", e);
     return { ok: false, error: "No se pudo guardar. Intenta de nuevo." };
+  }
+}
+
+/**
+ * Read-only: what the action forms need for one vehicle. Lets the "Hoy" quick
+ * actions open a form for any plate without loading every vehicle's context.
+ */
+export async function loadActionContextAction(plate: string): Promise<VehicleActionContext | null> {
+  try {
+    await requireSession();
+    return await getVehicleActionContext(parse(plateSchema, plate));
+  } catch (e) {
+    console.error("action context failed", e);
+    return null;
   }
 }
 

@@ -6,17 +6,17 @@ import { cn } from "@/lib/utils";
 const STYLES: Record<AlertStatus, { className: string; label: string }> = {
   expired: {
     className:
-      "bg-red-100 text-red-900 ring-red-300 dark:bg-red-950 dark:text-red-100 dark:ring-red-800",
+      "bg-danger text-danger-foreground ring-danger-foreground/25",
     label: "Vencido",
   },
   warning: {
     className:
-      "bg-amber-100 text-amber-950 ring-amber-300 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-800",
+      "bg-warn text-warn-foreground ring-warn-foreground/25",
     label: "Por vencer o sin dato",
   },
   ok: {
     className:
-      "bg-green-100 text-green-900 ring-green-300 dark:bg-green-950 dark:text-green-100 dark:ring-green-800",
+      "bg-ok text-ok-foreground ring-ok-foreground/25",
     label: "Vigente",
   },
   not_applicable: {
@@ -57,7 +57,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset",
+        "relative inline-flex max-w-full items-center gap-1 rounded-[5px] px-2 py-1 text-xs leading-none font-medium whitespace-nowrap tabular-nums ring-1 ring-inset",
         style.className,
         className,
       )}

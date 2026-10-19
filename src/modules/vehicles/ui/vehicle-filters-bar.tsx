@@ -1,35 +1,13 @@
 "use client";
 
 import { Download, Search, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { cn } from "@/lib/utils";
-import {
-  DEFAULT_FILTERS,
-  type GroupFilter,
-  type StatusFilter,
-  type VehicleFilters,
-} from "../domain/vehicle-filters";
-
-const GROUPS: Array<{ value: GroupFilter; label: string }> = [
-  { value: "", label: "Todos los grupos" },
-  { value: "IMPERIO", label: "Imperio" },
-  { value: "PAEZ", label: "Páez" },
-  { value: "THIRD_PARTY", label: "Terceros" },
-  { value: "NONE", label: "Sin propietario" },
-];
-
-const STATUSES: Array<{ value: StatusFilter; label: string }> = [
-  { value: "NOT_SOLD", label: "Todos menos vendidos" },
-  { value: "ACTIVE", label: "Activos" },
-  { value: "IDLE", label: "Quietas" },
-  { value: "IN_WORKSHOP", label: "En taller" },
-  { value: "SOLD", label: "Vendidos" },
-  { value: "ALL", label: "Todos (con vendidos)" },
-];
+import type { VehicleFilters } from "../domain/vehicle-filters";
 
 export const SORT_OPTIONS = [
   { value: "status:desc", label: "Más urgentes primero" },
@@ -40,45 +18,105 @@ export const SORT_OPTIONS = [
   { value: "tecno:asc", label: "Tecno que vence primero" },
 ] as const;
 
+type EditableFilters = Pick<VehicleFilters, "search" | "owner" | "className">;
+
 interface Props {
-  filters: VehicleFilters;
-  onChange: (next: VehicleFilters) => void;
+  filters: EditableFilters;
+  onChange: (next: Partial<EditableFilters>) => void;
+  onClear: () => void;
   owners: string[];
   classes: string[];
-  shown: number;
-  total: number;
-  /** Mobile sort control (the table sorts with its headers). */
   sortValue: string;
   onSortChange: (value: string) => void;
   onExport: () => void;
   exporting: boolean;
   exportError: string | null;
+  canExport: boolean;
 }
 
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="micro-label">
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+/** Compact bar: search always, the rest inline from `md` and in a sheet on phones. */
 export function VehicleFiltersBar({
   filters,
   onChange,
+  onClear,
   owners,
   classes,
-  shown,
-  total,
   sortValue,
   onSortChange,
   onExport,
   exporting,
   exportError,
+  canExport,
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const set = <K extends keyof VehicleFilters>(key: K, value: VehicleFilters[K]) =>
-    onChange({ ...filters, [key]: value });
-  const dirty = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const dirty = Boolean(filters.search || filters.owner || filters.className);
+
+  const selects = (suffix: string) => (
+    <>
+      <Field label="Clase" htmlFor={`filter-class${suffix}`}>
+        <NativeSelect
+          id={`filter-class${suffix}`}
+          value={filters.className}
+          onChange={(e) => onChange({ className: e.target.value })}
+          className="h-11 md:h-9"
+        >
+          <option value="">Todas</option>
+          {classes.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Propietario" htmlFor={`filter-owner${suffix}`}>
+        <NativeSelect
+          id={`filter-owner${suffix}`}
+          value={filters.owner}
+          onChange={(e) => onChange({ owner: e.target.value })}
+          className="h-11 md:h-9"
+        >
+          <option value="">Todos</option>
+          {owners.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+      <Field label="Ordenar por" htmlFor={`filter-sort${suffix}`}>
+        <NativeSelect
+          id={`filter-sort${suffix}`}
+          value={sortValue}
+          onChange={(e) => onSortChange(e.target.value)}
+          className="h-11 md:h-9"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </NativeSelect>
+      </Field>
+    </>
+  );
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="relative min-w-0 flex-1 md:max-w-xs md:flex-none md:basis-72">
           <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Label htmlFor="vehicle-search" className="sr-only">
@@ -88,136 +126,68 @@ export function VehicleFiltersBar({
             id="vehicle-search"
             type="search"
             value={filters.search}
-            onChange={(e) => set("search", e.target.value)}
+            onChange={(e) => onChange({ search: e.target.value })}
             placeholder="Buscar placa o conductor"
-            className="h-10 pl-8 md:h-8"
+            className="h-11 pl-9 md:h-9"
             autoComplete="off"
           />
         </div>
+
+        {/* Inline from md */}
+        <div className="hidden items-end gap-2 md:flex [&_select]:min-w-40">{selects("")}</div>
+
         <Button
           type="button"
           variant="outline"
-          className="h-10 px-3 md:hidden"
-          aria-expanded={open}
-          aria-controls="vehicle-filters"
-          onClick={() => setOpen((v) => !v)}
+          className="h-11 px-3 md:hidden"
+          aria-haspopup="dialog"
+          onClick={() => setSheetOpen(true)}
         >
           <SlidersHorizontal aria-hidden />
           Filtros
         </Button>
+        {dirty && (
+          <Button type="button" variant="ghost" className="hidden h-9 px-3 md:inline-flex" onClick={onClear}>
+            Limpiar
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
-          className="h-10 px-3 md:h-8"
+          className="h-11 px-3 md:ml-auto md:h-9"
           onClick={onExport}
-          disabled={exporting || shown === 0}
+          disabled={exporting || !canExport}
         >
           <Download aria-hidden />
           <span className="hidden sm:inline">{exporting ? "Exportando…" : "Exportar Excel"}</span>
           <span className="sm:hidden">{exporting ? "…" : "Excel"}</span>
         </Button>
       </div>
-
-      <div
-        id="vehicle-filters"
-        className={cn(
-          "grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] md:items-end",
-          open ? "grid" : "hidden md:grid",
-        )}
-      >
-        <Field label="Grupo">
-          <NativeSelect
-            value={filters.group}
-            onChange={(e) => set("group", e.target.value as GroupFilter)}
-          >
-            {GROUPS.map((g) => (
-              <option key={g.value} value={g.value}>
-                {g.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Propietario">
-          <NativeSelect value={filters.owner} onChange={(e) => set("owner", e.target.value)}>
-            <option value="">Todos</option>
-            {owners.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Clase">
-          <NativeSelect
-            value={filters.className}
-            onChange={(e) => set("className", e.target.value)}
-          >
-            <option value="">Todas</option>
-            {classes.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Estado">
-          <NativeSelect
-            value={filters.status}
-            onChange={(e) => set("status", e.target.value as StatusFilter)}
-          >
-            {STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <label className="flex min-h-10 items-center gap-2 text-sm md:min-h-8">
-          <input
-            type="checkbox"
-            checked={filters.onlyAlerts}
-            onChange={(e) => set("onlyAlerts", e.target.checked)}
-            className="size-5 md:size-4"
-          />
-          Solo con alertas
-        </label>
-        <div className="md:hidden">
-          <Field label="Ordenar por">
-            <NativeSelect value={sortValue} onChange={(e) => onSortChange(e.target.value)}>
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span aria-live="polite">
-          {shown} de {total} vehículos
-        </span>
-        {dirty && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange(DEFAULT_FILTERS)}>
-            Limpiar filtros
-          </Button>
-        )}
-      </div>
       {exportError && (
         <p role="alert" className="text-sm text-destructive">
           {exportError}
         </p>
       )}
-    </div>
-  );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
+      <SlideOver open={sheetOpen} onOpenChange={setSheetOpen} title="Filtros y orden">
+        <div className="space-y-4">
+          {selects("-sheet")}
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 px-4"
+              onClick={onClear}
+              disabled={!dirty}
+            >
+              Limpiar filtros
+            </Button>
+            <Button type="button" className="h-11 px-4" onClick={() => setSheetOpen(false)}>
+              Listo
+            </Button>
+          </div>
+        </div>
+      </SlideOver>
     </div>
   );
 }

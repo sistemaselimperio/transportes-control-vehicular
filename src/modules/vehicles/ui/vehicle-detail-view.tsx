@@ -1,83 +1,153 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { HistoryItem, VehicleDetail } from "../application/vehicle-queries";
-import { formatKm } from "../domain/vehicle-row";
-import { VehicleActionsBar } from "./vehicle-actions-bar";
+import type { FileTab } from "../domain/file-tabs";
+import type { TimelineKind } from "../domain/vehicle-timeline";
+import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
+import { ActionButtons, FileActions, OverflowMenu, SoldNotice } from "./vehicle-file-actions";
+import { VehicleFileTabs } from "./vehicle-file-tabs";
+
+function Panel({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count?: number;
+  children: ReactNode;
+}) {
+  return (
+    <section className="panel">
+      <div className="plate-head">
+        <h2 className="micro-label text-foreground">{title}</h2>
+        {count !== undefined && <span className="num ml-auto text-sm text-muted-foreground">{count}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-sm break-words">{children}</dd>
+      <dt className="micro-label">{label}</dt>
+      <dd className="mt-1.5 text-sm font-medium break-words">{children}</dd>
     </div>
   );
 }
 
+const FactGrid = ({ children, cols = "md:grid-cols-3" }: { children: ReactNode; cols?: string }) => (
+  <dl className={`grid grid-cols-2 gap-x-4 gap-y-4 p-4 ${cols}`}>{children}</dl>
+);
+
 function History({ title, items }: { title: string; items: HistoryItem[] }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin registros.</p>
-        ) : (
-          <ul className="divide-y text-sm">
-            {items.map((item, i) => (
-              <li key={i} className="flex flex-wrap justify-between gap-x-3 py-1.5">
-                <span className="font-medium">{item.title}</span>
-                <span className="text-muted-foreground">{item.detail}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <Panel title={title} count={items.length}>
+      {items.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-muted-foreground">Sin registros.</p>
+      ) : (
+        <ul className="divide-y text-sm">
+          {items.map((item, i) => (
+            <li key={i} className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-4 py-2.5">
+              <span className="font-medium">{item.title}</span>
+              <span className="num text-muted-foreground">{item.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
-/** Vehicle detail: facts, due dates, actions and history timelines. */
-export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
-  const r = detail.row;
-  return (
-    <div className="space-y-4">
-      <Link
-        href="/vehiculos"
-        className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        Vehículos
-      </Link>
+const KIND_LABELS: Record<TimelineKind, string> = {
+  owner: "Propietario",
+  driver: "Conductor",
+  document: "Documento",
+  oil: "Aceite",
+  sale: "Venta",
+};
 
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="font-mono text-2xl font-semibold">{r.plate}</h1>
-          <p className="text-sm text-muted-foreground">
+function ExpirationStrip({ r }: { r: VehicleGridRow }) {
+  const cells = [
+    { label: "SOAT", cell: r.soat },
+    { label: "Tecno", cell: r.tecno },
+    { label: "Póliza", cell: r.policy },
+    { label: "Impuesto", cell: r.tax },
+    { label: "Aceite", cell: r.nextChange },
+  ];
+  return (
+    <ul
+      aria-label="Vencimientos"
+      className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-5"
+    >
+      {cells.map(({ label, cell }, i) => (
+        <li
+          key={label}
+          className={`min-w-0 bg-card px-3 py-2 ${i === cells.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
+        >
+          <span className="micro-label block">{label}</span>
+          <StatusPill status={cell.status} className="mt-1.5">
+            {cell.text || "—"}
+          </StatusPill>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FileHeader({ r }: { r: VehicleGridRow }) {
+  return (
+    <header className="space-y-3">
+      <Link
+        href="/flota"
+        className="group/back inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground md:min-h-9"
+      >
+        <ArrowLeft
+          className="size-4 transition-transform duration-150 group-hover/back:-translate-x-0.5"
+          aria-hidden
+        />
+        Flota
+      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h1 className="plate plate-lg">{r.plate}</h1>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
             {[r.className, r.brandLine].filter(Boolean).join(" · ")}
           </p>
+          <StatusPill status={r.overall} className="mt-1.5">
+            {r.statusLabel}
+          </StatusPill>
         </div>
-        <StatusPill status={r.overall} className="text-sm">
-          {r.statusLabel}
-        </StatusPill>
-      </header>
+        <OverflowMenu />
+      </div>
+      <ExpirationStrip r={r} />
+    </header>
+  );
+}
 
-      <VehicleActionsBar plate={r.plate} status={r.vehicleStatus} ctx={detail.actions} />
+/** Vehicle file: sticky identity header and five tabs, actions in a side panel. */
+export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
+  const r = detail.row;
+  const sold = r.vehicleStatus === "SOLD";
 
-      <Card size="sm">
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4">
+  const panels: Record<FileTab, ReactNode> = {
+    resumen: (
+      <>
+        <Panel title="Datos">
+          <FactGrid>
             <Fact label="Propietario">{r.ownerName ?? "Sin propietario"}</Fact>
             <Fact label="Conductor">
               {r.driverName ?? "—"}
               {r.driverPhone && (
                 <>
                   {" · "}
-                  <a href={`tel:${r.driverPhone}`} className="underline">
+                  <a
+                    href={`tel:${r.driverPhone}`}
+                    className="num underline decoration-primary decoration-2 underline-offset-4"
+                  >
                     {r.driverPhone}
                   </a>
                 </>
@@ -86,21 +156,18 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
             <Fact label="Municipio">{r.municipality ?? "—"}</Fact>
             <Fact label="Servicio">{r.serviceLabel}</Fact>
             <Fact label="Kilometraje">
-              {r.km != null ? formatKm(r.km) : r.odometerWorking ? "—" : "Odómetro dañado"}
+              <span className="num">
+                {r.km != null ? formatKm(r.km) : r.odometerWorking ? "—" : "Odómetro dañado"}
+              </span>
             </Fact>
             <Fact label="Último cambio de aceite">
-              {r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}
+              <span className="num">{r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}</span>
             </Fact>
-          </dl>
-        </CardContent>
-      </Card>
+          </FactGrid>
+        </Panel>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Vencimientos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-5">
+        <Panel title="Vencimientos">
+          <FactGrid cols="md:grid-cols-5">
             <Fact label="SOAT">
               <StatusPill status={r.soat.status}>{r.soat.text || "—"}</StatusPill>
             </Fact>
@@ -116,39 +183,131 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
             <Fact label="Próximo cambio de aceite">
               <StatusPill status={r.nextChange.status}>{r.nextChange.text || "—"}</StatusPill>
             </Fact>
-          </dl>
-        </CardContent>
-      </Card>
+          </FactGrid>
+        </Panel>
 
-      {r.notes && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Notas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-line">{r.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+        {r.notes && (
+          <Panel title="Notas">
+            <p className="p-4 text-sm whitespace-pre-line">{r.notes}</p>
+          </Panel>
+        )}
 
-      {detail.sale && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Venta</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <span className="font-medium">{detail.sale.title}</span>
-            <span className="text-muted-foreground"> · {detail.sale.detail}</span>
-          </CardContent>
-        </Card>
-      )}
+        {detail.sale && (
+          <Panel title="Venta">
+            <p className="p-4 text-sm">
+              <span className="font-medium">{detail.sale.title}</span>
+              <span className="text-muted-foreground"> · {detail.sale.detail}</span>
+            </p>
+          </Panel>
+        )}
+        {sold && <SoldNotice />}
+      </>
+    ),
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <History title="Propietarios" items={detail.ownerships} />
-        <History title="Conductores" items={detail.drivers} />
-        <History title="Documentos" items={detail.documents} />
+    documentos: (
+      <>
+        <ActionButtons keys={["document", "tax"]} />
+        <Panel title="Vencimientos">
+          <FactGrid cols="md:grid-cols-4">
+            <Fact label="SOAT">
+              <StatusPill status={r.soat.status}>{r.soat.text || "—"}</StatusPill>
+            </Fact>
+            <Fact label="Tecnomecánica">
+              <StatusPill status={r.tecno.status}>{r.tecno.text || "—"}</StatusPill>
+            </Fact>
+            <Fact label="Póliza">
+              <StatusPill status={r.policy.status}>{r.policy.text || "—"}</StatusPill>
+            </Fact>
+            <Fact label="Impuesto">
+              <StatusPill status={r.tax.status}>{r.tax.text || "—"}</StatusPill>
+            </Fact>
+          </FactGrid>
+        </Panel>
+        <History title="Historial de documentos" items={detail.documents} />
+      </>
+    ),
+
+    mantenimiento: (
+      <>
+        <ActionButtons keys={["oil", "km", "status"]} />
+        <Panel title="Estado">
+          <FactGrid>
+            <Fact label="Kilometraje">
+              <span className="num">
+                {r.km != null ? formatKm(r.km) : r.odometerWorking ? "—" : "Odómetro dañado"}
+              </span>
+            </Fact>
+            <Fact label="Último cambio de aceite">
+              <span className="num">{r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}</span>
+            </Fact>
+            <Fact label="Próximo cambio de aceite">
+              <StatusPill status={r.nextChange.status}>{r.nextChange.text || "—"}</StatusPill>
+            </Fact>
+          </FactGrid>
+        </Panel>
         <History title="Cambios de aceite" items={detail.oilChanges} />
-      </div>
-    </div>
+      </>
+    ),
+
+    personas: (
+      <>
+        <ActionButtons keys={["driver", "owner"]} />
+        <Panel title="Actuales">
+          <FactGrid cols="md:grid-cols-2">
+            <Fact label="Propietario">{r.ownerName ?? "Sin propietario"}</Fact>
+            <Fact label="Conductor">
+              {r.driverName ?? "—"}
+              {r.driverPhone && (
+                <>
+                  {" · "}
+                  <a
+                    href={`tel:${r.driverPhone}`}
+                    className="num underline decoration-primary decoration-2 underline-offset-4"
+                  >
+                    {r.driverPhone}
+                  </a>
+                </>
+              )}
+            </Fact>
+          </FactGrid>
+        </Panel>
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+          <History title="Propietarios" items={detail.ownerships} />
+          <History title="Conductores" items={detail.drivers} />
+        </div>
+      </>
+    ),
+
+    historial: (
+      <Panel title="Todo el historial" count={detail.timeline.length}>
+        {detail.timeline.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-muted-foreground">Sin registros.</p>
+        ) : (
+          <ol className="divide-y text-sm">
+            {detail.timeline.map((entry, i) => (
+              <li
+                key={i}
+                className="grid grid-cols-[6.5rem_1fr] items-baseline gap-x-4 gap-y-0.5 px-4 py-3 sm:grid-cols-[6.5rem_6.5rem_1fr]"
+              >
+                <time className="num text-muted-foreground" dateTime={entry.date ?? undefined}>
+                  {entry.date ? formatDisplayDate(entry.date) : "Sin fecha"}
+                </time>
+                <span className="micro-label">{KIND_LABELS[entry.kind]}</span>
+                <span className="col-span-2 min-w-0 sm:col-span-1">
+                  <span className="font-medium">{entry.title}</span>
+                  {entry.detail && <span className="num text-muted-foreground"> · {entry.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Panel>
+    ),
+  };
+
+  return (
+    <FileActions plate={r.plate} status={r.vehicleStatus} ctx={detail.actions}>
+      <VehicleFileTabs header={<FileHeader r={r} />} panels={panels} />
+    </FileActions>
   );
 }

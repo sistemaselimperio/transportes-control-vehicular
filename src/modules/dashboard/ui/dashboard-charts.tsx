@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { Bar, BarChart, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -10,17 +9,17 @@ import {
 } from "@/components/ui/chart";
 import type { OwnerGroup } from "../domain/dashboard-metrics";
 
-/* Theme-aware series colors (light / dark). */
-const BLUE = { light: "oklch(0.55 0.18 255)", dark: "oklch(0.72 0.14 255)" };
-const GROUP_COLORS: Record<OwnerGroup | "NONE", { light: string; dark: string }> = {
-  IMPERIO: BLUE,
-  PAEZ: { light: "oklch(0.62 0.15 55)", dark: "oklch(0.78 0.13 70)" },
-  THIRD_PARTY: { light: "oklch(0.55 0.13 165)", dark: "oklch(0.75 0.12 165)" },
-  NONE: { light: "oklch(0.6 0 0)", dark: "oklch(0.65 0 0)" },
+/* Series colors come from the theme tokens: amber is the main data hue, rose the second. */
+const ACCENT = "var(--chart-1)";
+const GROUP_COLORS: Record<OwnerGroup | "NONE", string> = {
+  IMPERIO: "var(--chart-1)",
+  PAEZ: "var(--chart-2)",
+  THIRD_PARTY: "var(--chart-3)",
+  NONE: "var(--chart-5)",
 };
 
 const countConfig = {
-  count: { label: "Vehículos", theme: BLUE },
+  count: { label: "Vehículos", color: ACCENT },
 } satisfies ChartConfig;
 
 const ROW_HEIGHT = 34;
@@ -47,7 +46,7 @@ export function FleetByClassChart({ data }: { data: Array<{ name: string; count:
           tick={{ fontSize: 12 }}
         />
         <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-        <Bar dataKey="count" fill="var(--color-count)" radius={4} barSize={18}>
+        <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} barSize={18}>
           <LabelList dataKey="count" position="right" className="fill-foreground" fontSize={12} />
         </Bar>
       </BarChart>
@@ -67,7 +66,7 @@ export function SoldByYearChart({ data }: { data: Array<{ year: string; count: n
       <BarChart data={data} margin={{ top: 18, left: 0, right: 0, bottom: 0 }}>
         <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
         <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-        <Bar dataKey="count" fill="var(--color-count)" radius={4} maxBarSize={48}>
+        <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={48}>
           <LabelList dataKey="count" position="top" className="fill-foreground" fontSize={12} />
         </Bar>
       </BarChart>
@@ -82,7 +81,7 @@ export function FleetByGroupChart({
 }) {
   if (data.length === 0) return <EmptyChart />;
   const config: ChartConfig = Object.fromEntries(
-    data.map((d) => [d.group, { label: d.label, theme: GROUP_COLORS[d.group] }]),
+    data.map((d) => [d.group, { label: d.label, color: GROUP_COLORS[d.group] }]),
   );
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
@@ -108,17 +107,12 @@ export function FleetByGroupChart({
           <li key={d.group} className="flex items-center gap-2">
             <span
               aria-hidden
-              className="size-3 shrink-0 rounded-sm bg-(--sw-light) dark:bg-(--sw-dark)"
-              style={
-                {
-                  "--sw-light": GROUP_COLORS[d.group].light,
-                  "--sw-dark": GROUP_COLORS[d.group].dark,
-                } as CSSProperties
-              }
+              className="size-3 shrink-0 rounded-[3px] border border-foreground/10"
+              style={{ backgroundColor: GROUP_COLORS[d.group] }}
             />
             <span className="min-w-0 flex-1 truncate">{d.label}</span>
-            <span className="font-medium tabular-nums">{d.count}</span>
-            <span className="w-10 text-right text-muted-foreground tabular-nums">
+            <span className="num font-medium">{d.count}</span>
+            <span className="num w-10 text-right text-muted-foreground">
               {Math.round((d.count / total) * 100)}%
             </span>
           </li>

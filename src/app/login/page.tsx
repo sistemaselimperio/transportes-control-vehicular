@@ -8,7 +8,7 @@ export default async function LoginPage() {
   if (session) redirect("/");
 
   return (
-    <main className="flex flex-1 items-center justify-center p-4">
+    <main className="brand-texture flex min-h-dvh flex-1 items-center justify-center p-4">
       <LoginForm />
     </main>
   );

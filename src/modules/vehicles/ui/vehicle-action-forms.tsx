@@ -32,8 +32,15 @@ const toNumber = (text: string): number | null => {
   return /^\d{1,10}$/.test(digits) ? Number(digits) : null;
 };
 
-export function RenewDocumentForm({ plate, onDone, onCancel }: FormProps) {
-  const [type, setType] = useState("SOAT");
+export type DocumentType = "SOAT" | "TECNO" | "POLICY";
+
+export function RenewDocumentForm({
+  plate,
+  onDone,
+  onCancel,
+  initialType = "SOAT",
+}: Omit<FormProps, "ctx"> & { initialType?: DocumentType }) {
+  const [type, setType] = useState<string>(initialType);
   const [notApplicable, setNotApplicable] = useState(false);
 
   return (

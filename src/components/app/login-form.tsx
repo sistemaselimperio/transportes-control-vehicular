@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { BrandMark } from "@/components/app/brand-mark";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,19 +39,21 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-300 [--card-spacing:--spacing(6)]">
       <CardHeader>
-        <CardTitle>Control de Flota</CardTitle>
+        <BrandMark className="mb-3 size-10" />
+        <CardTitle className="text-xl">Control de Flota</CardTitle>
         <CardDescription>
           Ingresa con tu usuario y contraseña para continuar.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="mt-1 flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="username">Usuario</Label>
             <Input
               id="username"
+              className="h-11"
               name="username"
               autoComplete="username"
               autoCapitalize="none"
@@ -61,6 +64,7 @@ export function LoginForm() {
             <Label htmlFor="password">Contraseña</Label>
             <Input
               id="password"
+              className="h-11"
               name="password"
               type="password"
               autoComplete="current-password"
@@ -68,11 +72,11 @@ export function LoginForm() {
             />
           </div>
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" size="lg" className="mt-1 h-11" disabled={pending}>
             {pending ? "Ingresando…" : "Ingresar"}
           </Button>
         </form>
