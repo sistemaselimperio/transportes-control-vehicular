@@ -33,6 +33,11 @@ export const vehicleStatusEnum = pgEnum("vehicle_status", [
   "IN_WORKSHOP",
   "SOLD",
 ]);
+export const driverStatusEnum = pgEnum("driver_status", [
+  "ACTIVE",
+  "IN_WORKSHOP",
+  "INACTIVE",
+]);
 export const oilModeEnum = pgEnum("oil_mode", ["date", "km", "both"]);
 export const documentTypeEnum = pgEnum("document_type", [
   "SOAT",
@@ -118,6 +123,9 @@ export const drivers = pgTable("drivers", {
   name: text().notNull(),
   nationalId: text("national_id"),
   phone: text(),
+  /** Company the driver works for (same groups as vehicle owners). */
+  company: ownerGroupEnum(),
+  status: driverStatusEnum().notNull().default("ACTIVE"),
 });
 
 export const driverAssignments = pgTable(
