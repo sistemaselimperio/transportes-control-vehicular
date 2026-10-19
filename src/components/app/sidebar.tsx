@@ -6,6 +6,7 @@ import {
   LogOut,
   Menu,
   Truck,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +21,7 @@ import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/das
 const ITEMS: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Hoy", icon: CalendarCheck },
   { href: "/flota", label: "Flota", icon: Truck },
+  { href: "/conductores", label: "Conductores", icon: Users },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
