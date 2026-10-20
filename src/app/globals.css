@@ -139,6 +139,11 @@
   p {
     text-wrap: pretty;
   }
+  /* Native checkboxes and radios take the olive ink so the tick stays readable on white. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--brand);
+  }
   ::selection {
     background: #ffff6a;
     color: #1b1d10;
