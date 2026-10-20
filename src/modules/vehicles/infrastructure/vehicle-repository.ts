@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
-import type { PgColumn } from "drizzle-orm/pg-core";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { alias, type PgColumn } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import type { DocumentData, VehicleRowInput } from "../domain/vehicle-row";
@@ -159,4 +159,40 @@ export async function loadVehicleHistory(vehicleId: number) {
     db.select().from(schema.sales).where(eq(schema.sales.vehicleId, vehicleId)),
   ]);
   return { ownerships, assignments, documents, oilChanges, sale: sales[0] ?? null };
+}
+
+/** Vehicle classes and the plates that can tow, for the create / edit forms. */
+export async function loadVehicleFormLists() {
+  const [classes, plates] = await Promise.all([
+    db
+      .select({ id: schema.vehicleClasses.id, name: schema.vehicleClasses.name })
+      .from(schema.vehicleClasses)
+      .orderBy(asc(schema.vehicleClasses.name)),
+    db
+      .select({ plate: schema.vehicles.plate })
+      .from(schema.vehicles)
+      .where(ne(schema.vehicles.status, "SOLD"))
+      .orderBy(asc(schema.vehicles.plate)),
+  ]);
+  return { classes, plates: plates.map((p) => p.plate) };
+}
+
+/** Current editable data of one vehicle (prefills the edit form). */
+export async function loadVehicleEditValues(plate: string) {
+  const towing = alias(schema.vehicles, "towing");
+  const [row] = await db
+    .select({
+      plate: schema.vehicles.plate,
+      classId: schema.vehicles.classId,
+      brandLine: schema.vehicles.brandLine,
+      notes: schema.vehicles.notes,
+      municipality: schema.vehicles.municipality,
+      serviceType: schema.vehicles.serviceType,
+      oilMode: schema.vehicles.oilMode,
+      towingPlate: towing.plate,
+    })
+    .from(schema.vehicles)
+    .leftJoin(towing, eq(schema.vehicles.towingVehicleId, towing.id))
+    .where(eq(schema.vehicles.plate, plate));
+  return row ?? null;
 }

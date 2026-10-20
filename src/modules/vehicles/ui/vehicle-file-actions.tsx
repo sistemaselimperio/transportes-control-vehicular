@@ -9,6 +9,7 @@ import {
   Gauge,
   HandCoins,
   MoreHorizontal,
+  Pencil,
   Power,
   Receipt,
   UserRound,
@@ -23,7 +24,7 @@ import {
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
-import type { VehicleActionContext } from "../application/vehicle-queries";
+import type { VehicleActionContext, VehicleDetail } from "../application/vehicle-queries";
 import {
   ChangeStatusForm,
   OilChangeForm,
@@ -31,14 +32,25 @@ import {
   UpdateKmForm,
   UpdateTaxForm,
 } from "./vehicle-action-forms";
+import { EditVehicleForm } from "./vehicle-form";
 import { AssignDriverForm, SellForm, TransferOwnerForm } from "./vehicle-people-forms";
 
-export type ActionKey = "document" | "tax" | "oil" | "km" | "status" | "driver" | "owner" | "sell";
+export type ActionKey =
+  | "edit"
+  | "document"
+  | "tax"
+  | "oil"
+  | "km"
+  | "status"
+  | "driver"
+  | "owner"
+  | "sell";
 
 const ACTIONS: Record<
   ActionKey,
   { label: string; title: string; icon: ComponentType<{ className?: string }> }
 > = {
+  edit: { label: "Editar datos", title: "Editar datos del vehículo", icon: Pencil },
   document: { label: "Renovar documento", title: "Renovar documento", icon: CalendarClock },
   tax: { label: "Impuesto", title: "Actualizar impuesto", icon: Receipt },
   oil: { label: "Cambio de aceite", title: "Registrar cambio de aceite", icon: Droplets },
@@ -71,11 +83,13 @@ export function FileActions({
   plate,
   status,
   ctx,
+  edit,
   children,
 }: {
   plate: string;
   status: VehicleStatus;
   ctx: VehicleActionContext;
+  edit: VehicleDetail["edit"];
   children: ReactNode;
 }) {
   const [active, setActive] = useState<ActionKey | null>(null);
@@ -123,6 +137,14 @@ export function FileActions({
         title={active ? ACTIONS[active].title : ""}
         description={`Vehículo ${plate}`}
       >
+        {active === "edit" && (
+          <EditVehicleForm
+            values={edit.values}
+            options={edit.options}
+            onCancel={close}
+            onDone={common.onDone}
+          />
+        )}
         {active === "document" && <RenewDocumentForm {...common} />}
         {active === "tax" && <UpdateTaxForm {...common} />}
         {active === "oil" && <OilChangeForm {...common} />}
@@ -173,6 +195,19 @@ export function SoldNotice() {
     <p className="rounded-xl border border-dashed bg-card/60 px-4 py-3 text-sm text-muted-foreground">
       Vehículo vendido: ya no admite cambios.
     </p>
+  );
+}
+
+/** Header button for editing the vehicle's own data; hidden once sold. */
+export function EditDataButton() {
+  const { sold, open } = useFileActions();
+  if (sold) return null;
+  const { label, icon: Icon } = ACTIONS.edit;
+  return (
+    <Button type="button" variant="outline" className="h-11 px-3.5 md:h-9" onClick={() => open("edit")}>
+      <Icon aria-hidden />
+      {label}
+    </Button>
   );
 }
 

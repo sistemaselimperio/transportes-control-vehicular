@@ -158,6 +158,49 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
   findOwnerId: (target) => resolveOwnerId(db, target, false),
   findDriverId: (target) => resolveDriverId(db, target, false),
 
+  async findClass(id) {
+    const [cls] = await db
+      .select({
+        id: schema.vehicleClasses.id,
+        oilIntervalMonths: schema.vehicleClasses.oilIntervalMonths,
+        oilIntervalKm: schema.vehicleClasses.oilIntervalKm,
+      })
+      .from(schema.vehicleClasses)
+      .where(eq(schema.vehicleClasses.id, id));
+    return cls ?? null;
+  },
+
+  async createVehicle({ vehicle, owner, driver, documents, tax, oilChange }) {
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(schema.vehicles)
+        .values(vehicle)
+        .returning({ id: schema.vehicles.id });
+      const vehicleId = row.id;
+
+      if (owner) {
+        const ownerId = (await resolveOwnerId(tx, owner.target, true))!;
+        await tx.insert(schema.ownerships).values({ vehicleId, ownerId, fromDate: owner.fromDate });
+      }
+      if (driver) {
+        const driverId = (await resolveDriverId(tx, driver.target, true))!;
+        await tx
+          .insert(schema.driverAssignments)
+          .values({ vehicleId, driverId, fromDate: driver.fromDate });
+      }
+      if (documents.length > 0) {
+        await tx.insert(schema.vehicleDocuments).values(documents.map((d) => ({ vehicleId, ...d })));
+      }
+      if (tax) await tx.insert(schema.vehicleTaxes).values({ vehicleId, ...tax });
+      if (oilChange) await tx.insert(schema.oilChanges).values({ vehicleId, ...oilChange });
+      return vehicleId;
+    });
+  },
+
+  async updateVehicle(vehicleId, fields) {
+    await db.update(schema.vehicles).set(fields).where(eq(schema.vehicles.id, vehicleId));
+  },
+
   async addDocument(vehicleId, doc) {
     await db.insert(schema.vehicleDocuments).values({ vehicleId, ...doc });
   },

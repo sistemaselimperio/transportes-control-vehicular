@@ -7,7 +7,7 @@ import type { HistoryItem, VehicleDetail } from "../application/vehicle-queries"
 import type { FileTab } from "../domain/file-tabs";
 import type { TimelineKind } from "../domain/vehicle-timeline";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
-import { ActionButtons, FileActions, OverflowMenu, SoldNotice } from "./vehicle-file-actions";
+import { ActionButtons, EditDataButton, FileActions, OverflowMenu, SoldNotice } from "./vehicle-file-actions";
 import { VehicleFileTabs } from "./vehicle-file-tabs";
 
 function Panel({
@@ -121,6 +121,7 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
             {r.statusLabel}
           </StatusPill>
         </div>
+        <EditDataButton />
         <OverflowMenu />
       </div>
       <ExpirationStrip r={r} />
@@ -306,7 +307,7 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
   };
 
   return (
-    <FileActions plate={r.plate} status={r.vehicleStatus} ctx={detail.actions}>
+    <FileActions plate={r.plate} status={r.vehicleStatus} ctx={detail.actions} edit={detail.edit}>
       <VehicleFileTabs header={<FileHeader r={r} />} panels={panels} />
     </FileActions>
   );

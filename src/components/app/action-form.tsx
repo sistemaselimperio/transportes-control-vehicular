@@ -70,7 +70,8 @@ export function ActionForm({
           {error}
         </p>
       )}
-      <div className="flex justify-end gap-2 border-t pt-4">
+      {/* Sticks to the panel bottom so long forms keep Save in view. */}
+      <div className="sticky -bottom-5 -mx-5 flex justify-end gap-2 border-t bg-popover px-5 pt-4 pb-5">
         <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={onCancel} disabled={pending}>
           Cancelar
         </Button>

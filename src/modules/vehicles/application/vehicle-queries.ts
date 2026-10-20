@@ -4,6 +4,8 @@ import { buildVehicleRow, formatKm, type VehicleGridRow, type VehicleRowInput } 
 import { mergeTimeline, type TimelineEntry } from "../domain/vehicle-timeline";
 import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
+  loadVehicleEditValues,
+  loadVehicleFormLists,
   loadVehicleHistory,
   loadVehicleRowInputs,
 } from "../infrastructure/vehicle-repository";
@@ -31,9 +33,38 @@ export interface VehicleActionContext {
   imperioOwnerId: number | null;
 }
 
+/** Pickers for the create / edit vehicle forms. */
+export interface VehicleFormOptions {
+  today: IsoDate;
+  classes: Array<{ id: number; name: string }>;
+  /** Plates that can tow (not sold). */
+  plates: string[];
+  owners: Array<{ id: number; name: string }>;
+  drivers: Array<{ id: number; name: string; nationalId: string | null }>;
+  imperioOwnerId: number | null;
+}
+
+/** Current values of the edit form. */
+export interface VehicleEditValues {
+  plate: string;
+  classId: number;
+  brandLine: string | null;
+  notes: string | null;
+  municipality: string | null;
+  serviceType: "PARTICULAR" | "PUBLICO";
+  oilMode: OilMode;
+  towingPlate: string | null;
+}
+
+export async function getVehicleFormOptions(): Promise<VehicleFormOptions> {
+  const [lists, people] = await Promise.all([loadVehicleFormLists(), loadPeople()]);
+  return { today: todayInBogota(), ...lists, ...people };
+}
+
 export interface VehicleDetail {
   row: VehicleGridRow;
   actions: VehicleActionContext;
+  edit: { values: VehicleEditValues; options: VehicleFormOptions };
   ownerships: HistoryItem[];
   drivers: HistoryItem[];
   documents: HistoryItem[];
@@ -75,9 +106,11 @@ export async function getVehicleActionContext(plate: string): Promise<VehicleAct
 export async function getVehicleDetail(plate: string): Promise<VehicleDetail | null> {
   const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
   if (!input) return null;
-  const [history, people] = await Promise.all([
+  const [history, people, editValues, lists] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),
     loadPeople(),
+    loadVehicleEditValues(plate),
+    loadVehicleFormLists(),
   ]);
 
   const ownerships = history.ownerships.map((o) => ({
@@ -157,6 +190,10 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
   return {
     row: buildVehicleRow(input),
     actions: buildActionContext(input, people),
+    edit: {
+      values: editValues!,
+      options: { today: input.today, ...lists, ...people },
+    },
     ownerships,
     drivers,
     documents,

@@ -61,6 +61,51 @@ export interface SaleRecord {
   notes: string | null;
 }
 
+/** Class defaults a new vehicle needs (oil interval for its first change). */
+export interface VehicleClassInfo {
+  id: number;
+  oilIntervalMonths: number | null;
+  oilIntervalKm: number | null;
+}
+
+/** Everything written when a vehicle is created, already validated. */
+export interface NewVehicleRecord {
+  vehicle: {
+    plate: string;
+    classId: number;
+    brandLine: string | null;
+    notes: string | null;
+    municipality: string | null;
+    serviceType: "PARTICULAR" | "PUBLICO";
+    status: Exclude<VehicleStatus, "SOLD">;
+    oilMode: OilMode;
+    odometerWorking: boolean;
+    currentKm: number | null;
+    currentKmAt: IsoDate | null;
+    towingVehicleId: number | null;
+  };
+  owner: { target: OwnerTarget; fromDate: IsoDate } | null;
+  driver: { target: DriverTarget; fromDate: IsoDate } | null;
+  documents: DocumentRecord[];
+  tax: TaxRecord | null;
+  oilChange: OilChangeRecord | null;
+}
+
+/** Editable vehicle fields; absent keys stay as they are. */
+export type VehicleUpdate = Partial<
+  Pick<
+    NewVehicleRecord["vehicle"],
+    | "plate"
+    | "classId"
+    | "brandLine"
+    | "notes"
+    | "municipality"
+    | "serviceType"
+    | "oilMode"
+    | "towingVehicleId"
+  >
+>;
+
 /**
  * Port for the vehicle commands. Every method that writes more than one row
  * must be atomic (one DB transaction) in the adapter.
@@ -70,6 +115,11 @@ export interface VehicleCommandRepository {
   /** Id of an owner when it already exists (null when it would be created). */
   findOwnerId(target: OwnerTarget): Promise<number | null>;
   findDriverId(target: DriverTarget): Promise<number | null>;
+  findClass(id: number): Promise<VehicleClassInfo | null>;
+
+  /** Inserts the vehicle with its owner, driver, documents, tax and oil change; returns its id. */
+  createVehicle(record: NewVehicleRecord): Promise<number>;
+  updateVehicle(vehicleId: number, fields: VehicleUpdate): Promise<void>;
 
   addDocument(vehicleId: number, doc: DocumentRecord): Promise<void>;
   addTax(vehicleId: number, tax: TaxRecord): Promise<void>;

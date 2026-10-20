@@ -31,6 +31,9 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99) {
     findOwnerId: async (t) =>
       t.kind === "existing" ? t.id : t.kind === "imperio" ? imperioId : null,
     findDriverId: async (t) => (t.kind === "existing" ? t.id : null),
+    findClass: async () => null,
+    createVehicle: async () => 0,
+    updateVehicle: async () => {},
     addDocument: async (id, doc) => void calls.push({ op: "addDocument", args: { id, doc } }),
     addTax: async (id, tax) => void calls.push({ op: "addTax", args: { id, tax } }),
     addOilChange: async (id, oil, km) =>
