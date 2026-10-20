@@ -11,7 +11,7 @@ export interface TabItem<K extends string> {
 }
 
 /**
- * Tabs with an amber underline on a neutral track (md+), or scrolling chips
+ * Tabs with an olive underline on a neutral track (md+), or scrolling chips
  * on phones when `chips` is set. Arrow keys / Home / End move between tabs.
  * Pair every tab with a `role="tabpanel"` whose id is `panelId`.
  */
@@ -78,8 +78,8 @@ export function TabBar<K extends string>({
               chips && "max-md:mb-0 max-md:rounded-full max-md:border max-md:bg-card",
               selected &&
                 (chips
-                  ? "border-primary font-medium text-foreground max-md:bg-muted"
-                  : "border-primary font-medium text-foreground"),
+                  ? "border-brand font-semibold text-foreground max-md:border-foreground/20 max-md:bg-primary max-md:text-primary-foreground"
+                  : "border-brand font-semibold text-foreground"),
             )}
           >
             {item.label}
@@ -87,7 +87,7 @@ export function TabBar<K extends string>({
               <span
                 className={cn(
                   "num min-w-6 rounded-[5px] px-1.5 py-1 text-center text-xs leading-none",
-                  selected ? "bg-primary/25 text-foreground" : "bg-muted",
+                  selected ? "bg-primary text-primary-foreground ring-1 ring-foreground/20" : "bg-muted",
                 )}
               >
                 {item.count}

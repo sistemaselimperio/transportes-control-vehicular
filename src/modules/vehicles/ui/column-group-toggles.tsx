@@ -29,7 +29,7 @@ export function ColumnGroupToggles({
             className={cn(
               "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98]",
               shown
-                ? "border-primary/60 bg-muted text-foreground"
+                ? "border-brand bg-secondary text-secondary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >

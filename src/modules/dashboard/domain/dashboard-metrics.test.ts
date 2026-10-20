@@ -180,7 +180,7 @@ describe("fleetByGroup", () => {
     ];
     expect(fleetByGroup(rows)).toEqual([
       { group: "IMPERIO", label: "Transportes El Imperio", count: 2 },
-      { group: "PAEZ", label: "Fabián y Sandra Páez", count: 1 },
+      { group: "PAEZ", label: "Fabián Páez", count: 1 },
       { group: "NONE", label: "Sin propietario", count: 1 },
     ]);
   });

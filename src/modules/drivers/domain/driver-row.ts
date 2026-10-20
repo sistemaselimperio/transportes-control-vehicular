@@ -21,7 +21,7 @@ export const DRIVER_STATUS_LABELS: Record<DriverStatus, string> = {
 
 export const COMPANY_LABELS: Record<OwnerGroup, string> = {
   IMPERIO: "Transportes El Imperio",
-  PAEZ: "Fabián y Sandra Páez",
+  PAEZ: "Fabián Páez",
   THIRD_PARTY: "Terceros",
 };
 

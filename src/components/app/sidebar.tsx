@@ -28,7 +28,7 @@ const ITEMS: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> = 
 const GROUPS: ReadonlyArray<{ value: OwnerGroup | null; label: string; code: string }> = [
   { value: null, label: "Todos", code: "ALL" },
   { value: "IMPERIO", label: "Transportes El Imperio", code: "IMP" },
-  { value: "PAEZ", label: "Fabián y Sandra Páez", code: "PAE" },
+  { value: "PAEZ", label: "Fabián Páez", code: "PAE" },
   { value: "THIRD_PARTY", label: "Terceros", code: "TER" },
 ];
 
@@ -83,7 +83,7 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
                 "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99]",
                 focus,
                 active &&
-                  "bg-secondary font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary hover:bg-secondary",
+                  "bg-primary font-semibold text-primary-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--foreground),transparent_85%)] hover:bg-primary hover:text-primary-foreground",
               )}
             >
               <Icon className="size-[1.125rem] shrink-0" aria-hidden />
@@ -113,7 +113,7 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
                 aria-hidden
                 className={cn(
                   "size-1.5 shrink-0 border border-muted-foreground/50",
-                  selected && "border-primary bg-primary",
+                  selected && "border-brand bg-brand",
                 )}
               />
               <span className="min-w-0 leading-tight">{g.label}</span>

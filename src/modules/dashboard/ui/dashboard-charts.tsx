@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/chart";
 import type { OwnerGroup } from "../domain/dashboard-metrics";
 
-/* Series colors come from the theme tokens: amber is the main data hue, rose the second. */
+/* Series colors come from the theme tokens: olive is the main data hue, then blue and orange. */
 const ACCENT = "var(--chart-1)";
 const GROUP_COLORS: Record<OwnerGroup | "NONE", string> = {
   IMPERIO: "var(--chart-1)",

@@ -16,8 +16,10 @@
   --color-warn-foreground: var(--warn-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
-  --shadow-soft: 0 1px 2px oklch(0.3 0.02 40 / 0.06), 0 8px 24px -8px oklch(0.3 0.03 40 / 0.16);
+  --shadow-soft: 0 1px 2px oklch(0.3 0.02 105 / 0.06), 0 8px 24px -8px oklch(0.3 0.03 105 / 0.16);
   --color-rose: var(--rose);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-plate: var(--plate);
   --color-plate-foreground: var(--plate-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -60,52 +62,61 @@
 
 :root {
   color-scheme: light;
-  /* Warm paper with a faint rose undertone (hue 20-40, chroma <= 0.012). */
-  --background: oklch(0.972 0.007 38);
-  --foreground: oklch(0.2 0.01 40);
-  --card: oklch(0.993 0.003 38);
-  --card-foreground: oklch(0.2 0.01 40);
-  --popover: oklch(0.996 0.002 38);
-  --popover-foreground: oklch(0.2 0.01 40);
-  /* Signal amber: primary action, active marks, focus ring. Dark ink on top for AA. */
-  --primary: oklch(0.79 0.165 78);
-  --primary-foreground: oklch(0.2 0.03 60);
-  /* Dusty rose: selected rows, tab track, soft highlights. Never used for alerts. */
-  --secondary: oklch(0.94 0.02 14);
-  --secondary-foreground: oklch(0.3 0.04 14);
-  --rose: oklch(0.7 0.08 12);
-  --muted: oklch(0.955 0.007 38);
-  --muted-foreground: oklch(0.47 0.012 40);
-  --accent: oklch(0.955 0.035 85);
-  --accent-foreground: oklch(0.3 0.04 60);
-  --destructive: oklch(0.53 0.19 27);
-  --border: oklch(0.905 0.008 38);
-  --input: oklch(0.86 0.01 38);
-  --ring: oklch(0.7 0.16 70);
-  --ok: oklch(0.95 0.04 155);
-  --ok-foreground: oklch(0.38 0.08 155);
-  --warn: oklch(0.96 0.05 85);
-  --warn-foreground: oklch(0.4 0.08 70);
-  --danger: oklch(0.955 0.03 25);
-  --danger-foreground: oklch(0.42 0.14 27);
-  --chart-1: oklch(0.76 0.16 76);
-  --chart-2: oklch(0.7 0.08 12);
-  --chart-3: oklch(0.4 0.012 40);
-  --chart-4: oklch(0.82 0.03 30);
-  --chart-5: oklch(0.9 0.01 38);
+  /*
+   * Brand palette: #ffff00 (yellow), #ffff6a, #ffffa2 (tints), #c1c700, #879200 (olive ink).
+   * Yellow only fills surfaces with dark ink on top; lines and marks on light
+   * surfaces use the olive `--brand`, since yellow on white has almost no contrast.
+   */
+  --background: #f6f6f0;
+  --foreground: #1b1d10;
+  --card: #ffffff;
+  --card-foreground: #1b1d10;
+  --popover: #ffffff;
+  --popover-foreground: #1b1d10;
+  --primary: #ffff00;
+  --primary-foreground: #1b1d10;
+  /* Olive ink: underlines, markers, links and focus on light surfaces (3.6:1 on white). */
+  --brand: #879200;
+  --brand-foreground: #ffffff;
+  /* Pale yellow: selected rows, tab track, soft highlights. Never used for alerts. */
+  --secondary: #ffffa2;
+  --secondary-foreground: #3b4100;
+  /* Second accent for "plate-head" strips that are not alerts (blue reads as info). */
+  --rose: #2563eb;
+  --muted: #ecece2;
+  --muted-foreground: #565a44;
+  --accent: #ffff6a;
+  --accent-foreground: #1b1d10;
+  --destructive: #c81e1e;
+  --border: #dcdccc;
+  --input: #c6c6b0;
+  --ring: #879200;
+  /* Status: green ok, orange warn (kept apart from the brand yellow), red danger. */
+  --ok: #dcf5e3;
+  --ok-foreground: #166534;
+  --warn: #ffead2;
+  --warn-foreground: #9a3412;
+  --danger: #ffe2dc;
+  --danger-foreground: #b42318;
+  /* Owner series: olive Imperio, blue Páez, orange third parties, gray none. */
+  --chart-1: #879200;
+  --chart-2: #2563eb;
+  --chart-3: #ea580c;
+  --chart-4: #c1c700;
+  --chart-5: #a8a894;
   /* Inner controls stay tight; containers use the larger steps. */
   --radius: 0.5rem;
-  --sidebar: oklch(0.985 0.004 38);
-  --sidebar-foreground: oklch(0.2 0.01 40);
-  --sidebar-primary: oklch(0.79 0.165 78);
-  --sidebar-primary-foreground: oklch(0.2 0.03 60);
-  --sidebar-accent: oklch(0.94 0.02 14);
-  --sidebar-accent-foreground: oklch(0.3 0.04 14);
-  --sidebar-border: oklch(0.905 0.008 38);
-  --sidebar-ring: oklch(0.7 0.16 70);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1b1d10;
+  --sidebar-primary: #ffff00;
+  --sidebar-primary-foreground: #1b1d10;
+  --sidebar-accent: #ffffa2;
+  --sidebar-accent-foreground: #3b4100;
+  --sidebar-border: #dcdccc;
+  --sidebar-ring: #879200;
   /* Colombian plates are yellow: the plate chip borrows that. */
-  --plate: oklch(0.9 0.13 92);
-  --plate-foreground: oklch(0.22 0.03 70);
+  --plate: #ffff00;
+  --plate-foreground: #1b1d10;
 }
 
 @layer base {
@@ -129,7 +140,8 @@
     text-wrap: pretty;
   }
   ::selection {
-    background: oklch(0.79 0.165 78 / 0.35);
+    background: #ffff6a;
+    color: #1b1d10;
   }
   @media (prefers-reduced-motion: reduce) {
     html {
@@ -164,13 +176,13 @@
   }
   .plate-head::before {
     content: "";
-    @apply size-1.5 shrink-0 bg-primary;
+    @apply size-2 shrink-0 bg-primary ring-1 ring-foreground/70;
   }
   .plate-head[data-tone="danger"]::before {
-    @apply bg-danger-foreground;
+    @apply bg-danger-foreground ring-0;
   }
   .plate-head[data-tone="rose"]::before {
-    @apply bg-rose;
+    @apply bg-rose ring-0;
   }
   /* License plate chip. */
   .plate {
@@ -180,7 +192,7 @@
     @apply rounded-md border-2 px-2.5 py-1.5 text-2xl tracking-widest sm:text-3xl;
   }
   .brand-texture {
-    background-image: radial-gradient(oklch(0.3 0.02 40 / 0.1) 1px, transparent 1px);
+    background-image: radial-gradient(oklch(0.3 0.02 105 / 0.1) 1px, transparent 1px);
     background-size: 18px 18px;
   }
   /* Skeleton block for loading.tsx files. */

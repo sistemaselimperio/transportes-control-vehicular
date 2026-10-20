@@ -24,7 +24,7 @@ export interface DashboardRow {
 
 export const GROUP_LABELS: Record<OwnerGroup | "NONE", string> = {
   IMPERIO: "Transportes El Imperio",
-  PAEZ: "Fabián y Sandra Páez",
+  PAEZ: "Fabián Páez",
   THIRD_PARTY: "Terceros",
   NONE: "Sin propietario",
 };
