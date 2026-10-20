@@ -41,3 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 !.env.example
+
+# ai tooling
+.agents/
+.atl/
+.claude/
+graphify-out/
+skills-lock.json
