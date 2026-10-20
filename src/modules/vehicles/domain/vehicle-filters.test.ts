@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_FILTERS,
   filterVehicleRows,
+  ownerOptions,
+  NO_OWNER,
+  THIRD_PARTY_OWNER,
   parseFilterParams,
+  titleCase,
   type FilterableRow,
 } from "./vehicle-filters";
 
@@ -57,6 +61,16 @@ describe("filterVehicleRows", () => {
     ).toEqual(["JVK-590"]);
   });
 
+  it("groups every third-party owner under one owner option", () => {
+    expect(
+      plates(filterVehicleRows(rows, { ...DEFAULT_FILTERS, owner: THIRD_PARTY_OWNER })),
+    ).toEqual(["S88490"]);
+  });
+
+  it("finds vehicles without owner through the owner filter", () => {
+    expect(plates(filterVehicleRows(rows, { ...DEFAULT_FILTERS, owner: NO_OWNER }))).toEqual(["R18936"]);
+  });
+
   it("shows only vehicles with alerts when asked", () => {
     expect(plates(filterVehicleRows(rows, { ...DEFAULT_FILTERS, onlyAlerts: true }))).toEqual([
       "XJA-347",
@@ -67,6 +81,39 @@ describe("filterVehicleRows", () => {
   it("searches plate (ignoring hyphen and case) and driver", () => {
     expect(plates(filterVehicleRows(rows, { ...DEFAULT_FILTERS, search: "jvk590" }))).toEqual(["JVK-590"]);
     expect(plates(filterVehicleRows(rows, { ...DEFAULT_FILTERS, search: "montano" }))).toEqual(["JVK-590"]);
+  });
+});
+
+describe("ownerOptions", () => {
+  it("lists only the company's own owners, sorted and without repeats", () => {
+    const rows = [
+      { ownerName: "TRANSPORTES EL IMPERIO", ownerGroup: "IMPERIO" as const },
+      { ownerName: "BANCOLOMBIA", ownerGroup: "THIRD_PARTY" as const },
+      { ownerName: "FABIÁN PÁEZ", ownerGroup: "PAEZ" as const },
+      { ownerName: "FABIÁN PÁEZ", ownerGroup: "PAEZ" as const },
+      { ownerName: null, ownerGroup: null },
+    ];
+    expect(ownerOptions(rows).map((o) => o.value)).toEqual(["FABIÁN PÁEZ", "TRANSPORTES EL IMPERIO"]);
+  });
+
+  it("leaves Sandra Páez out of the options", () => {
+    const rows = [
+      { ownerName: "SANDRA MARCELA PÁEZ PORRAS", ownerGroup: "PAEZ" as const },
+      { ownerName: "FABIÁN PÁEZ", ownerGroup: "PAEZ" as const },
+    ];
+    expect(ownerOptions(rows).map((o) => o.value)).toEqual(["FABIÁN PÁEZ"]);
+  });
+
+  it("labels each owner in title case and keeps the stored name as the value", () => {
+    const rows = [{ ownerName: "TRANSPORTES EL IMPERIO", ownerGroup: "IMPERIO" as const }];
+    expect(ownerOptions(rows)).toEqual([{ value: "TRANSPORTES EL IMPERIO", label: "Transportes El Imperio" }]);
+  });
+});
+
+describe("titleCase", () => {
+  it("capitalizes the first letter of each word and lowers the rest", () => {
+    expect(titleCase("FABIÁN PÁEZ")).toBe("Fabián Páez");
+    expect(titleCase("sin  propietario")).toBe("Sin  Propietario");
   });
 });
 

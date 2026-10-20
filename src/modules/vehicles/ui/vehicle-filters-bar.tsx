@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import type { VehicleFilters } from "../domain/vehicle-filters";
+import { NO_OWNER, THIRD_PARTY_OWNER, type OwnerOption, type VehicleFilters } from "../domain/vehicle-filters";
 
 export const SORT_OPTIONS = [
   { value: "status:desc", label: "Más urgentes primero" },
@@ -24,7 +24,7 @@ interface Props {
   filters: EditableFilters;
   onChange: (next: Partial<EditableFilters>) => void;
   onClear: () => void;
-  owners: string[];
+  owners: OwnerOption[];
   classes: string[];
   sortValue: string;
   onSortChange: (value: string) => void;
@@ -88,10 +88,12 @@ export function VehicleFiltersBar({
         >
           <option value="">Todos</option>
           {owners.map((o) => (
-            <option key={o} value={o}>
-              {o}
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
+          <option value={THIRD_PARTY_OWNER}>Terceros</option>
+          <option value={NO_OWNER}>Sin propietario</option>
         </NativeSelect>
       </Field>
       <Field label="Ordenar por" htmlFor={`filter-sort${suffix}`}>

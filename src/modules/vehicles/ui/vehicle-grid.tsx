@@ -23,7 +23,7 @@ import {
   parseViewParam,
   type FleetView,
 } from "../domain/fleet-views";
-import { filterVehicleRows, type GroupFilter, type VehicleFilters } from "../domain/vehicle-filters";
+import { filterVehicleRows, ownerOptions, type GroupFilter, type VehicleFilters } from "../domain/vehicle-filters";
 import type { VehicleGridRow } from "../domain/vehicle-row";
 import { ColumnGroupToggles } from "./column-group-toggles";
 import { FleetViewTabs } from "./fleet-view-tabs";
@@ -58,10 +58,7 @@ export function VehicleGrid({
   const [storedHidden, setStoredHidden] = useStoredString(STORAGE_KEY);
   const hidden = useMemo(() => parseHiddenGroups(storedHidden), [storedHidden]);
 
-  const owners = useMemo(
-    () => [...new Set(rows.map((r) => r.ownerName).filter((n): n is string => !!n))].sort(),
-    [rows],
-  );
+  const owners = useMemo(() => ownerOptions(rows), [rows]);
   const classes = useMemo(() => [...new Set(rows.map((r) => r.className))].sort(), [rows]);
   const counts = useMemo(() => countByView(rows, group), [rows, group]);
   const filtered = useMemo(
