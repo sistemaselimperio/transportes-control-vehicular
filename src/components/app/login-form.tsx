@@ -39,11 +39,16 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-300 [--card-spacing:--spacing(6)]">
-      <CardHeader>
-        <BrandMark className="mx-auto mb-3 h-24" />
-        <CardTitle className="text-xl">Control de Flota</CardTitle>
-        <CardDescription>
+    <Card className="w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 shadow-[inset_0_5px_0_var(--primary)] duration-300 [--card-spacing:--spacing(6)]">
+      <CardHeader className="text-center">
+        <BrandMark decorative className="mx-auto mb-3 h-28" />
+        <CardTitle className="text-xl">Transportes El Imperio</CardTitle>
+        <span className="mt-1 flex items-center justify-center gap-2">
+          <span aria-hidden className="h-px w-4 bg-brand" />
+          <span className="micro-label">Control de Flota</span>
+          <span aria-hidden className="h-px w-4 bg-brand" />
+        </span>
+        <CardDescription className="mt-2">
           Ingresa con tu usuario y contraseña para continuar.
         </CardDescription>
       </CardHeader>
