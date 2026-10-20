@@ -39,7 +39,7 @@ export function SlideOver({
           className={cn(
             "fixed z-50 flex flex-col bg-popover text-popover-foreground shadow-soft outline-none transition-transform duration-200 ease-out motion-reduce:transition-none",
             side === "right"
-              ? "inset-x-0 bottom-0 max-h-[92dvh] translate-y-0 rounded-t-2xl border-t data-ending-style:translate-y-full data-starting-style:translate-y-full md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:max-h-none md:w-[28rem] md:translate-x-0 md:rounded-none md:rounded-l-2xl md:border-t-0 md:border-l md:data-ending-style:translate-x-full md:data-ending-style:translate-y-0 md:data-starting-style:translate-x-full md:data-starting-style:translate-y-0"
+              ? "inset-x-0 bottom-0 max-h-[92dvh] translate-y-0 rounded-t-2xl border-t data-ending-style:translate-y-full data-starting-style:translate-y-full md:inset-y-0 md:right-0 md:left-auto md:max-h-none md:w-[28rem] md:translate-x-0 md:rounded-none md:rounded-l-2xl md:border-t-0 md:border-l md:data-ending-style:translate-x-full md:data-ending-style:translate-y-0 md:data-starting-style:translate-x-full md:data-starting-style:translate-y-0"
               : "inset-y-0 left-0 w-[17.5rem] max-w-[85vw] translate-x-0 border-r data-ending-style:-translate-x-full data-starting-style:-translate-x-full",
             side === "right" && wide && "md:w-[36rem]",
           )}
@@ -62,7 +62,16 @@ export function SlideOver({
               <X className="size-5" aria-hidden />
             </Dialog.Close>
           </header>
-          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", bodyClassName)}>{children}</div>
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+              bodyClassName,
+              // An ActionForm scrolls its own fields and pins its action bar: hand it the whole body.
+              "has-[>[data-slot=action-form]]:flex has-[>[data-slot=action-form]]:flex-col has-[>[data-slot=action-form]]:overflow-hidden has-[>[data-slot=action-form]]:p-0",
+            )}
+          >
+            {children}
+          </div>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

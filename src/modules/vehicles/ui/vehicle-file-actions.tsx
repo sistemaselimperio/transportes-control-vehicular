@@ -136,6 +136,7 @@ export function FileActions({
         onOpenChange={setOpen}
         title={active ? ACTIONS[active].title : ""}
         description={`Vehículo ${plate}`}
+        wide={active === "edit"}
       >
         {active === "edit" && (
           <EditVehicleForm
@@ -143,6 +144,7 @@ export function FileActions({
             options={edit.options}
             onCancel={close}
             onDone={common.onDone}
+            otherActions={<EditShortcuts onOpen={setActive} />}
           />
         )}
         {active === "document" && <RenewDocumentForm {...common} />}
@@ -162,6 +164,31 @@ export function FileActions({
         {active === "sell" && <SellForm {...common} />}
       </SlideOver>
     </Ctx.Provider>
+  );
+}
+
+const EDIT_SHORTCUTS: readonly ActionKey[] = ["owner", "driver", "document", "tax", "km", "oil", "status"];
+
+/** Inside "Editar datos": jumps the open panel straight to another action. */
+function EditShortcuts({ onOpen }: { onOpen: (key: ActionKey) => void }) {
+  return (
+    <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+      {EDIT_SHORTCUTS.map((key) => {
+        const { label, icon: Icon } = ACTIONS[key];
+        return (
+          <Button
+            key={key}
+            type="button"
+            variant="outline"
+            className="h-11 justify-start px-3.5"
+            onClick={() => onOpen(key)}
+          >
+            <Icon aria-hidden />
+            {label}
+          </Button>
+        );
+      })}
+    </div>
   );
 }
 

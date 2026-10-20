@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
@@ -50,22 +50,92 @@ async function sendVehicle(
   }
 }
 
-/** Titled block of the form; every block after the first gets a divider. */
-function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+/**
+ * Titled block of the form; every block after the first gets a divider.
+ * `step` numbers the blocks of the long create form.
+ */
+function Section({
+  title,
+  hint,
+  step,
+  optional,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  step?: number;
+  optional?: boolean;
+  children: ReactNode;
+}) {
+  const headingId = useId();
   return (
-    <section className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0">
-      <div className="space-y-1">
-        <h3 className="text-base leading-tight font-semibold tracking-tight">{title}</h3>
-        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+    <section
+      aria-labelledby={headingId}
+      className="space-y-4 border-t pt-6 first:border-t-0 first:pt-0"
+    >
+      <div className="flex items-start gap-3">
+        {step != null ? (
+          <span
+            aria-hidden
+            className="num flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--foreground),transparent_85%)]"
+          >
+            {step}
+          </span>
+        ) : (
+          <span aria-hidden className="mt-0.5 h-5 w-1 shrink-0 rounded-full bg-primary" />
+        )}
+        <div className="min-w-0 space-y-1 pt-0.5">
+          <h3 id={headingId} className="flex items-center gap-2 text-base leading-tight font-semibold tracking-tight">
+            {title}
+            {optional && <span className="micro-label">Opcional</span>}
+          </h3>
+          {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+        </div>
       </div>
       {children}
     </section>
   );
 }
 
-/** Two columns whose controls line up even when one label wraps. */
+/** Small caption that splits a section into named groups of fields. */
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-xl border bg-muted/40 p-3">
+      <p className="micro-label">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/** Two columns whose controls line up even when one label wraps; stacks on narrow phones. */
 function Row({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 items-end gap-3">{children}</div>;
+  return <div className="grid grid-cols-1 items-end gap-3 min-[400px]:grid-cols-2">{children}</div>;
+}
+
+/** Checkbox row with a 44px touch target. */
+function CheckboxField({
+  name,
+  label,
+  checked,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm select-none">
+      <input
+        type="checkbox"
+        name={name}
+        className="size-5 shrink-0 cursor-pointer"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {label}
+    </label>
+  );
 }
 
 /** Plate, class, brand, municipality, service, oil mode, towing and notes: shared by create and edit. */
@@ -73,79 +143,94 @@ function VehicleDataFields({
   options,
   values,
   idPrefix,
+  step,
 }: {
   options: VehicleFormOptions;
   values?: VehicleEditValues;
   idPrefix: string;
+  step?: number;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
   const towingCandidates = options.plates.filter((p) => p !== values?.plate);
   return (
-    <Section title="Vehículo">
-      <Row>
-        <Field label="Placa" htmlFor={id("plate")}>
+    <Section title="Vehículo" step={step}>
+      <Group label="Identificación">
+        <Row>
+          <Field label="Placa" htmlFor={id("plate")} required>
+            <Input
+              id={id("plate")}
+              name="plate"
+              className={`${FIELD} num uppercase`}
+              defaultValue={values?.plate}
+              placeholder="ABC123"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              required
+            />
+          </Field>
+          <Field label="Clase" htmlFor={id("class")} required>
+            <NativeSelect id={id("class")} name="classId" className={SELECT} defaultValue={values?.classId ?? ""} required>
+              <option value="" disabled>
+                Selecciona…
+              </option>
+              {options.classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        </Row>
+        <Field label="Marca y línea" htmlFor={id("brand")}>
           <Input
-            id={id("plate")}
-            name="plate"
-            className={`${FIELD} uppercase`}
-            defaultValue={values?.plate}
-            autoComplete="off"
-            required
+            id={id("brand")}
+            name="brandLine"
+            className={FIELD}
+            placeholder="Ej. Kenworth T800"
+            defaultValue={values?.brandLine ?? ""}
           />
         </Field>
-        <Field label="Clase" htmlFor={id("class")}>
-          <NativeSelect id={id("class")} name="classId" className={SELECT} defaultValue={values?.classId ?? ""} required>
-            <option value="" disabled>
-              Selecciona…
+      </Group>
+
+      <Group label="Matrícula">
+        <Row>
+          <MunicipalityPicker idPrefix={id("place")} defaultValue={values?.municipality} selectClassName={SELECT} />
+        </Row>
+        <Row>
+          <Field label="Servicio" htmlFor={id("service")}>
+            <NativeSelect id={id("service")} name="serviceType" className={SELECT} defaultValue={values?.serviceType ?? "PARTICULAR"}>
+              <option value="PARTICULAR">Particular</option>
+              <option value="PUBLICO">Público</option>
+            </NativeSelect>
+          </Field>
+          <Field label="Remolcado por" htmlFor={id("towing")}>
+            <NativeSelect
+              id={id("towing")}
+              name="towingPlate"
+              className={SELECT}
+              defaultValue={values?.towingPlate ?? ""}
+            >
+              <option value="">No es remolque</option>
+              {towingCandidates.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        </Row>
+      </Group>
+
+      <Field label="Controlar el aceite por" htmlFor={id("oilmode")} hint="Define cuándo se avisa el próximo cambio.">
+        <NativeSelect id={id("oilmode")} name="oilMode" className={SELECT} defaultValue={values?.oilMode ?? "both"}>
+          {Object.entries(OIL_MODE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
-            {options.classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-      </Row>
-      <Field label="Marca y línea" htmlFor={id("brand")}>
-        <Input id={id("brand")} name="brandLine" className={FIELD} defaultValue={values?.brandLine ?? ""} />
+          ))}
+        </NativeSelect>
       </Field>
-      <Row>
-        <MunicipalityPicker idPrefix={id("place")} defaultValue={values?.municipality} selectClassName={SELECT} />
-      </Row>
-      <Row>
-        <Field label="Servicio" htmlFor={id("service")}>
-          <NativeSelect id={id("service")} name="serviceType" className={SELECT} defaultValue={values?.serviceType ?? "PARTICULAR"}>
-            <option value="PARTICULAR">Particular</option>
-            <option value="PUBLICO">Público</option>
-          </NativeSelect>
-        </Field>
-      </Row>
-      <Row>
-        <Field label="Aceite por" htmlFor={id("oilmode")}>
-          <NativeSelect id={id("oilmode")} name="oilMode" className={SELECT} defaultValue={values?.oilMode ?? "both"}>
-            {Object.entries(OIL_MODE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Remolcado por" htmlFor={id("towing")}>
-          <NativeSelect
-            id={id("towing")}
-            name="towingPlate"
-            className={SELECT}
-            defaultValue={values?.towingPlate ?? ""}
-          >
-            <option value="">No es remolque</option>
-            {towingCandidates.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-      </Row>
       <Field label="Notas" htmlFor={id("notes")}>
         <Textarea id={id("notes")} name="notes" rows={2} defaultValue={values?.notes ?? ""} />
       </Field>
@@ -153,15 +238,14 @@ function VehicleDataFields({
   );
 }
 
-function OwnerFields({ options }: { options: VehicleFormOptions }) {
+function OwnerFields({ options, step }: { options: VehicleFormOptions; step?: number }) {
   const [choice, setChoice] = useState("");
   return (
-    <Section title="Propietario" hint="Opcional. Puedes asignarlo después con Traspasar.">
-      <div>
+    <Section title="Propietario" step={step} optional hint="Puedes asignarlo después con Traspasar.">
+      <Field label="¿A nombre de quién está?" htmlFor="nv-owner">
         <NativeSelect
           id="nv-owner"
           name="ownerChoice"
-          aria-label="Propietario"
           className={SELECT}
           value={choice}
           onChange={(e) => setChoice(e.target.value)}
@@ -175,19 +259,21 @@ function OwnerFields({ options }: { options: VehicleFormOptions }) {
           ))}
           <option value="NEW">Otro propietario (nuevo)…</option>
         </NativeSelect>
-      </div>
+      </Field>
       {choice === "NEW" && (
-        <Row>
-          <Field label="Nombre" htmlFor="nv-owner-name">
-            <Input id="nv-owner-name" name="ownerName" className={FIELD} autoComplete="off" required />
-          </Field>
-          <Field label="Documento" htmlFor="nv-owner-doc">
-            <Input id="nv-owner-doc" name="ownerDocument" inputMode="numeric" className={FIELD} />
-          </Field>
-        </Row>
+        <Group label="Nuevo propietario">
+          <Row>
+            <Field label="Nombre" htmlFor="nv-owner-name" required>
+              <Input id="nv-owner-name" name="ownerName" className={FIELD} autoComplete="off" required />
+            </Field>
+            <Field label="Documento" htmlFor="nv-owner-doc">
+              <Input id="nv-owner-doc" name="ownerDocument" inputMode="numeric" className={FIELD} />
+            </Field>
+          </Row>
+        </Group>
       )}
       {choice !== "" && (
-        <Field label="Propietario desde" htmlFor="nv-owner-date">
+        <Field label="Propietario desde" htmlFor="nv-owner-date" required>
           <Input
             id="nv-owner-date"
             name="ownerDate"
@@ -203,15 +289,14 @@ function OwnerFields({ options }: { options: VehicleFormOptions }) {
   );
 }
 
-function DriverFields({ options }: { options: VehicleFormOptions }) {
+function DriverFields({ options, step }: { options: VehicleFormOptions; step?: number }) {
   const [choice, setChoice] = useState("");
   return (
-    <Section title="Conductor" hint="Opcional. Puedes asignarlo después.">
-      <div>
+    <Section title="Conductor" step={step} optional hint="Puedes asignarlo después.">
+      <Field label="¿Quién lo maneja?" htmlFor="nv-driver">
         <NativeSelect
           id="nv-driver"
           name="driverChoice"
-          aria-label="Conductor"
           className={SELECT}
           value={choice}
           onChange={(e) => setChoice(e.target.value)}
@@ -225,10 +310,10 @@ function DriverFields({ options }: { options: VehicleFormOptions }) {
           ))}
           <option value="NEW">Crear conductor nuevo…</option>
         </NativeSelect>
-      </div>
+      </Field>
       {choice === "NEW" && (
-        <>
-          <Field label="Nombre completo" htmlFor="nv-driver-name">
+        <Group label="Nuevo conductor">
+          <Field label="Nombre completo" htmlFor="nv-driver-name" required>
             <Input id="nv-driver-name" name="driverName" className={FIELD} autoComplete="off" required />
           </Field>
           <Row>
@@ -236,13 +321,13 @@ function DriverFields({ options }: { options: VehicleFormOptions }) {
               <Input id="nv-driver-id" name="driverNationalId" inputMode="numeric" className={FIELD} />
             </Field>
             <Field label="Celular" htmlFor="nv-driver-phone">
-              <Input id="nv-driver-phone" name="driverPhone" type="tel" className={FIELD} />
+              <Input id="nv-driver-phone" name="driverPhone" type="tel" autoComplete="off" className={FIELD} />
             </Field>
           </Row>
-        </>
+        </Group>
       )}
       {choice !== "" && (
-        <Field label="Maneja desde" htmlFor="nv-driver-date">
+        <Field label="Maneja desde" htmlFor="nv-driver-date" required>
           <Input
             id="nv-driver-date"
             name="driverDate"
@@ -261,7 +346,7 @@ function DriverFields({ options }: { options: VehicleFormOptions }) {
 function DocumentDateField({ prefix, label }: { prefix: "soat" | "tecno"; label: string }) {
   const [notApplicable, setNotApplicable] = useState(false);
   return (
-    <div className="space-y-1">
+    <div>
       <Field label={`${label} vence`} htmlFor={`nv-${prefix}`}>
         <Input
           id={`nv-${prefix}`}
@@ -271,41 +356,41 @@ function DocumentDateField({ prefix, label }: { prefix: "soat" | "tecno"; label:
           disabled={notApplicable}
         />
       </Field>
-      <label className="flex min-h-10 items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name={`${prefix}NotApplicable`}
-          className="size-5"
-          checked={notApplicable}
-          onChange={(e) => setNotApplicable(e.target.checked)}
-        />
-        No aplica
-      </label>
+      <CheckboxField
+        name={`${prefix}NotApplicable`}
+        label="No aplica"
+        checked={notApplicable}
+        onChange={setNotApplicable}
+      />
     </div>
   );
 }
 
-function DocumentFields({ options }: { options: VehicleFormOptions }) {
+function DocumentFields({ options, step }: { options: VehicleFormOptions; step?: number }) {
   const [taxKind, setTaxKind] = useState("");
   return (
-    <Section title="Documentos e impuesto" hint="Deja en blanco lo que no tengas a mano.">
+    <Section title="Documentos e impuesto" step={step} optional hint="Deja en blanco lo que no tengas a mano.">
+      <Group label="Obligatorios">
+        <Row>
+          <DocumentDateField prefix="soat" label="SOAT" />
+          <DocumentDateField prefix="tecno" label="Tecnomecánica" />
+        </Row>
+      </Group>
+      <Group label="Póliza">
+        <Row>
+          <Field label="Tipo" htmlFor="nv-policy-kind">
+            <NativeSelect id="nv-policy-kind" name="policyKind" className={SELECT} defaultValue="TR">
+              <option value="TR">Todo riesgo</option>
+              <option value="RC">Responsabilidad civil</option>
+            </NativeSelect>
+          </Field>
+          <Field label="Vence" htmlFor="nv-policy-date">
+            <Input id="nv-policy-date" name="policyExpiresOn" type="date" className={FIELD} />
+          </Field>
+        </Row>
+      </Group>
       <Row>
-        <DocumentDateField prefix="soat" label="SOAT" />
-        <DocumentDateField prefix="tecno" label="Tecnomecánica" />
-      </Row>
-      <Row>
-        <Field label="Póliza" htmlFor="nv-policy-kind">
-          <NativeSelect id="nv-policy-kind" name="policyKind" className={SELECT} defaultValue="TR">
-            <option value="TR">Todo riesgo</option>
-            <option value="RC">Responsabilidad civil</option>
-          </NativeSelect>
-        </Field>
-        <Field label="Póliza vence" htmlFor="nv-policy-date">
-          <Input id="nv-policy-date" name="policyExpiresOn" type="date" className={FIELD} />
-        </Field>
-      </Row>
-      <Row>
-        <Field label="Impuesto" htmlFor="nv-tax">
+        <Field label="Impuesto vehicular" htmlFor="nv-tax">
           <NativeSelect
             id="nv-tax"
             name="taxKind"
@@ -320,7 +405,7 @@ function DocumentFields({ options }: { options: VehicleFormOptions }) {
           </NativeSelect>
         </Field>
         {taxKind === "PAID_YEAR" && (
-          <Field label="Año pagado" htmlFor="nv-tax-year">
+          <Field label="Año pagado" htmlFor="nv-tax-year" required>
             <Input
               id="nv-tax-year"
               name="taxYear"
@@ -336,42 +421,42 @@ function DocumentFields({ options }: { options: VehicleFormOptions }) {
   );
 }
 
-function MaintenanceFields({ options }: { options: VehicleFormOptions }) {
+function MaintenanceFields({ options, step }: { options: VehicleFormOptions; step?: number }) {
   const [broken, setBroken] = useState(false);
   return (
-    <Section title="Estado y mantenimiento">
-      <Row>
-        <Field label="Estado" htmlFor="nv-status">
-          <NativeSelect id="nv-status" name="status" className={SELECT} defaultValue="ACTIVE">
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Kilometraje actual" htmlFor="nv-km">
-          <Input id="nv-km" name="currentKm" inputMode="numeric" className={FIELD} disabled={broken} />
-        </Field>
-      </Row>
-      <label className="flex min-h-10 items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+    <Section title="Estado y mantenimiento" step={step}>
+      <Group label="Estado actual">
+        <Row>
+          <Field label="Estado" htmlFor="nv-status">
+            <NativeSelect id="nv-status" name="status" className={SELECT} defaultValue="ACTIVE">
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Kilometraje actual" htmlFor="nv-km" hint={broken ? "Sin odómetro." : "En km."}>
+            <Input id="nv-km" name="currentKm" inputMode="numeric" className={`${FIELD} num`} disabled={broken} />
+          </Field>
+        </Row>
+        <CheckboxField
           name="odometerBroken"
-          className="size-5"
+          label="El odómetro no funciona"
           checked={broken}
-          onChange={(e) => setBroken(e.target.checked)}
+          onChange={setBroken}
         />
-        El odómetro no funciona
-      </label>
-      <Row>
-        <Field label="Último cambio de aceite" htmlFor="nv-oil-date">
-          <Input id="nv-oil-date" name="oilDate" type="date" className={FIELD} max={options.today} />
-        </Field>
-        <Field label="Km del cambio" htmlFor="nv-oil-km">
-          <Input id="nv-oil-km" name="oilKm" inputMode="numeric" className={FIELD} disabled={broken} />
-        </Field>
-      </Row>
+      </Group>
+      <Group label="Último cambio de aceite">
+        <Row>
+          <Field label="Fecha" htmlFor="nv-oil-date">
+            <Input id="nv-oil-date" name="oilDate" type="date" className={FIELD} max={options.today} />
+          </Field>
+          <Field label="Kilometraje" htmlFor="nv-oil-km">
+            <Input id="nv-oil-km" name="oilKm" inputMode="numeric" className={`${FIELD} num`} disabled={broken} />
+          </Field>
+        </Row>
+      </Group>
     </Section>
   );
 }
@@ -403,11 +488,11 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         >
-          <VehicleDataFields options={options} idPrefix="nv" />
-          <OwnerFields options={options} />
-          <DriverFields options={options} />
-          <DocumentFields options={options} />
-          <MaintenanceFields options={options} />
+          <VehicleDataFields options={options} idPrefix="nv" step={1} />
+          <OwnerFields options={options} step={2} />
+          <DriverFields options={options} step={3} />
+          <DocumentFields options={options} step={4} />
+          <MaintenanceFields options={options} step={5} />
         </ActionForm>
       </SlideOver>
     </>
@@ -420,11 +505,14 @@ export function EditVehicleForm({
   options,
   onDone,
   onCancel,
+  otherActions,
 }: {
   values: VehicleEditValues;
   options: VehicleFormOptions;
   onDone: (message: string) => void;
   onCancel: () => void;
+  /** Shortcuts to the history-keeping actions (owner, driver, documents…), shown after the vehicle data. */
+  otherActions?: ReactNode;
 }) {
   const router = useRouter();
   return (
@@ -448,11 +536,15 @@ export function EditVehicleForm({
       onDone={onDone}
       onCancel={onCancel}
     >
-      <p className="text-sm text-muted-foreground">
-        Propietario, conductor, documentos, kilometraje y estado se cambian con sus propias acciones
-        para conservar el historial.
-      </p>
       <VehicleDataFields options={options} values={values} idPrefix="ev" />
+      {otherActions && (
+        <Section
+          title="Otros datos"
+          hint="Propietario, conductor, documentos, kilometraje y estado tienen su propia acción para conservar el historial."
+        >
+          {otherActions}
+        </Section>
+      )}
     </ActionForm>
   );
 }

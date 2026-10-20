@@ -10,17 +10,25 @@ export function Field({
   label,
   htmlFor,
   hint,
+  required,
   children,
 }: {
   label: string;
   htmlFor: string;
   hint?: string;
+  /** Visual marker only; the control itself still carries `required`. */
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-sm text-foreground">
+      <Label htmlFor={htmlFor} className="gap-1 text-sm text-foreground">
         {label}
+        {required && (
+          <span aria-hidden className="text-destructive">
+            *
+          </span>
+        )}
       </Label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -52,7 +60,8 @@ export function ActionForm({
 
   return (
     <form
-      className="space-y-4"
+      data-slot="action-form"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -64,20 +73,26 @@ export function ActionForm({
         });
       }}
     >
-      {children}
-      {error && (
-        <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {/* Sticks to the panel bottom so long forms keep Save in view. */}
-      <div className="sticky -bottom-5 -mx-5 flex justify-end gap-2 border-t bg-popover px-5 pt-4 pb-5">
-        <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={onCancel} disabled={pending}>
-          Cancelar
-        </Button>
-        <Button type="submit" className="h-11 px-4 md:h-10" disabled={pending}>
-          {pending ? pendingLabel : submitLabel}
-        </Button>
+      {/* Only the fields scroll; the panel body drops its own padding and scroll for us (see SlideOver). */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5">{children}</div>
+      {/*
+        Action bar outside the scroll area, so Save is always in view. The
+        error lives here too: at the end of a long form it would sit off-screen.
+      */}
+      <div className="shrink-0 space-y-3 border-t bg-popover px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        {error && (
+          <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={onCancel} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button type="submit" className="h-11 px-4 md:h-10" disabled={pending}>
+            {pending ? pendingLabel : submitLabel}
+          </Button>
+        </div>
       </div>
     </form>
   );
