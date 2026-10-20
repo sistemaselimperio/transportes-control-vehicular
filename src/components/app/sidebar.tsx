@@ -2,11 +2,16 @@
 
 import {
   BarChart3,
+  Bell,
+  Building2,
   CalendarCheck,
+  FileText,
   LogOut,
   Menu,
+  Receipt,
   Truck,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,18 +23,41 @@ import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
 
-const ITEMS: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> = [
-  { href: "/", label: "Hoy", icon: CalendarCheck },
-  { href: "/flota", label: "Flota", icon: Truck },
-  { href: "/conductores", label: "Conductores", icon: Users },
-  { href: "/reportes", label: "Reportes", icon: BarChart3 },
+type NavItem = { href: string; label: string; icon: LucideIcon };
+
+const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
+  {
+    label: "Operación",
+    items: [
+      { href: "/", label: "Hoy", icon: CalendarCheck },
+      { href: "/alertas", label: "Alertas", icon: Bell },
+      { href: "/flota", label: "Flota", icon: Truck },
+      { href: "/conductores", label: "Conductores", icon: Users },
+      { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
+      { href: "/documentos", label: "Documentos", icon: FileText },
+    ],
+  },
+  {
+    label: "Administración",
+    items: [
+      { href: "/propietarios", label: "Propietarios", icon: Building2 },
+      { href: "/ventas", label: "Ventas", icon: Receipt },
+      { href: "/reportes", label: "Reportes", icon: BarChart3 },
+    ],
+  },
 ];
 
-const GROUPS: ReadonlyArray<{ value: OwnerGroup | null; label: string; code: string }> = [
-  { value: null, label: "Todos", code: "ALL" },
-  { value: "IMPERIO", label: "Transportes El Imperio", code: "IMP" },
-  { value: "PAEZ", label: "Fabián Páez", code: "PAE" },
-  { value: "THIRD_PARTY", label: "Terceros", code: "TER" },
+const GROUPS: ReadonlyArray<{
+  value: OwnerGroup | null;
+  label: string;
+  /** Fits a half-width chip; the full label goes in the tooltip. */
+  short: string;
+  code: string;
+}> = [
+  { value: null, label: "Todos", short: "Todos", code: "ALL" },
+  { value: "IMPERIO", label: "Transportes El Imperio", short: "Imperio", code: "IMP" },
+  { value: "PAEZ", label: "Fabián Páez", short: "Páez", code: "PAE" },
+  { value: "THIRD_PARTY", label: "Terceros", short: "Terceros", code: "TER" },
 ];
 
 interface BodyProps {
@@ -69,60 +97,69 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
 
   return (
     <>
-      <nav aria-label="Principal" className="flex flex-col gap-1 p-3">
-        {ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={navHref(item.href, grupo)}
-              aria-current={active ? "page" : undefined}
-              onClick={onNavigate}
-              className={cn(
-                "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99]",
-                focus,
-                active &&
-                  "bg-primary font-semibold text-primary-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--foreground),transparent_85%)] hover:bg-primary hover:text-primary-foreground",
-              )}
-            >
-              <Icon className="size-[1.125rem] shrink-0" aria-hidden />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
+        {SECTIONS.map((section) => (
+          <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
+            <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
+            {section.items.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={navHref(item.href, grupo)}
+                  aria-current={active ? "page" : undefined}
+                  onClick={onNavigate}
+                  className={cn(
+                    "relative flex h-11 items-center gap-3 md:h-9 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99]",
+                    focus,
+                    active &&
+                      "bg-primary font-semibold text-primary-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--foreground),transparent_85%)] hover:bg-primary hover:text-primary-foreground",
+                  )}
+                >
+                  <Icon className="size-[1.125rem] shrink-0" aria-hidden />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      <nav aria-label="Filtrar por propietario" className="flex flex-col gap-1 border-t p-3">
-        <span className="micro-label px-3 pt-1 pb-2">Propietario</span>
-        {GROUPS.map((g) => {
-          const selected = g.value === grupo;
-          return (
-            <Link
-              key={g.code}
-              href={groupHref(pathname, currentQuery, g.value)}
-              aria-current={selected ? "true" : undefined}
-              onClick={onNavigate}
-              className={cn(
-                "flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99]",
-                focus,
-                selected && "bg-secondary font-medium text-foreground hover:bg-secondary",
-              )}
-            >
-              <span
-                aria-hidden
+      <nav aria-label="Filtrar por propietario" className="border-t p-3 md:py-2.5">
+        <span className="micro-label block px-3 pt-1 pb-2 md:pb-1.5">Propietario</span>
+        <div className="grid grid-cols-2 gap-1">
+          {GROUPS.map((g) => {
+            const selected = g.value === grupo;
+            return (
+              <Link
+                key={g.code}
+                href={groupHref(pathname, currentQuery, g.value)}
+                aria-current={selected ? "true" : undefined}
+                aria-label={g.label}
+                title={g.label}
+                onClick={onNavigate}
                 className={cn(
-                  "size-1.5 shrink-0 border border-muted-foreground/50",
-                  selected && "border-brand bg-brand",
+                  "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99] md:min-h-8 md:px-2.5",
+                  focus,
+                  selected && "bg-secondary font-medium text-foreground hover:bg-secondary",
                 )}
-              />
-              <span className="min-w-0 leading-tight">{g.label}</span>
-            </Link>
-          );
-        })}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-1.5 shrink-0 border border-muted-foreground/50",
+                    selected && "border-brand bg-brand",
+                  )}
+                />
+                <span className="min-w-0 truncate leading-tight">{g.short}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      <div className="mt-auto flex items-center gap-2 border-t p-3 px-4">
+      <div className="mt-auto flex items-center gap-2 border-t p-3 px-4 md:py-2">
         <span
           aria-hidden
           className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-sm font-medium text-secondary-foreground uppercase"
@@ -138,7 +175,7 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
           aria-label="Salir"
           title="Salir"
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground",
+            "flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground md:size-9",
             focus,
           )}
         >
@@ -149,13 +186,35 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
   );
 }
 
-function Brand() {
+/** Compact lockup for the phone top bar: logo beside the name. */
+function BrandInline() {
   return (
-    <div className="flex items-center gap-2.5">
-      <BrandMark />
+    <div className="flex min-w-0 items-center gap-2.5">
+      <BrandMark decorative className="h-10" />
       <span className="min-w-0 leading-tight">
-        <span className="block text-sm font-semibold tracking-tight">Control de Flota</span>
-        <span className="micro-label mt-1 block">El Imperio · Páez</span>
+        <span className="block truncate text-sm font-bold tracking-tight">
+          Transportes El Imperio
+        </span>
+        <span className="micro-label mt-1 block">Control de Flota</span>
+      </span>
+    </div>
+  );
+}
+
+/** Stacked lockup for the desktop sidebar: the logo leads, the name sits under it. */
+function BrandStacked() {
+  return (
+    <div className="flex flex-col items-center gap-2 border-b px-4 pt-4 pb-3.5 text-center">
+      <BrandMark decorative className="h-16 drop-shadow-sm" />
+      <span className="leading-tight">
+        <span className="block text-base font-bold tracking-tight text-balance">
+          Transportes El Imperio
+        </span>
+        <span className="mt-2 flex items-center justify-center gap-2">
+          <span aria-hidden className="h-px w-4 bg-brand" />
+          <span className="micro-label">Control de Flota</span>
+          <span aria-hidden className="h-px w-4 bg-brand" />
+        </span>
       </span>
     </div>
   );
@@ -186,7 +245,7 @@ export function Sidebar({ userName }: { userName: string }) {
         >
           <Menu className="size-5" aria-hidden />
         </button>
-        <Brand />
+        <BrandInline />
       </div>
 
       <SlideOver
@@ -200,9 +259,7 @@ export function Sidebar({ userName }: { userName: string }) {
       </SlideOver>
 
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r bg-sidebar md:flex">
-        <div className="flex h-16 items-center border-b px-4">
-          <Brand />
-        </div>
+        <BrandStacked />
         <SidebarBody {...shared} />
       </aside>
     </>
