@@ -41,7 +41,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-300 [--card-spacing:--spacing(6)]">
       <CardHeader>
-        <BrandMark className="mb-3 size-10" />
+        <BrandMark className="mx-auto mb-3 h-24" />
         <CardTitle className="text-xl">Control de Flota</CardTitle>
         <CardDescription>
           Ingresa con tu usuario y contraseña para continuar.
