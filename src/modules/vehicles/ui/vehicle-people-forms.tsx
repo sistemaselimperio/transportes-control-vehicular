@@ -121,7 +121,7 @@ export function TransferOwnerForm({ plate, ctx, onDone, onCancel }: FormProps) {
 }
 
 /** Live thousands separators for a peso amount ("45000000" -> "45.000.000"). */
-const formatPesos = (raw: string) => {
+export const formatPesos = (raw: string) => {
   const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 10);
   return digits === "" ? "" : Number(digits).toLocaleString("es-CO");
 };
