@@ -76,7 +76,7 @@ export function TabBar<K extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onSelect(item.key)}
             className={cn(
-              "-mb-0.5 flex h-11 shrink-0 items-center gap-2 border-b-2 border-transparent px-4 text-sm whitespace-nowrap text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset active:scale-[0.98]",
+              "-mb-0.5 flex h-11 shrink-0 cursor-pointer items-center gap-2 border-b-2 border-transparent px-4 text-sm whitespace-nowrap text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset active:scale-[0.98]",
               chips &&
                 "relative overflow-hidden max-xl:mb-0 max-xl:h-auto max-xl:min-h-14 max-xl:min-w-0 max-xl:flex-col-reverse max-xl:items-start max-xl:justify-center max-xl:gap-1 max-xl:rounded-xl max-xl:border max-xl:border-border max-xl:bg-card max-xl:px-3 max-xl:py-2 max-xl:text-left max-xl:text-xs max-xl:whitespace-normal",
               selected &&

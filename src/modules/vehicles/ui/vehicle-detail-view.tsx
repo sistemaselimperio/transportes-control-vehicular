@@ -194,13 +194,7 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
                 </Figure>
               </dl>
             </Section>
-            <VehicleLogbookSection
-              plate={r.plate}
-              sold={sold}
-              logbook={detail.logbook}
-              providers={detail.providers}
-              today={detail.actions.today}
-            />
+            <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} />
           </div>
 
           <aside className="min-w-0 space-y-8 max-lg:border-t max-lg:pt-8 lg:self-stretch lg:border-l lg:pl-10">

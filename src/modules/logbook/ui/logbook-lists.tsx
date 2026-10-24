@@ -203,6 +203,13 @@ interface ListProps<T> {
 
 type Row = { id: number; plate: string; date: string; driverName: string | null };
 
+type Column<T extends Row> = Spec<T>["columns"][number];
+
+const cellClass = <T extends Row>(c: Column<T>) =>
+  `px-4 py-3 ${c.right ? "num text-right whitespace-nowrap" : ""} ${c.muted ? "text-muted-foreground" : ""} ${c.header === "Fecha" ? "num whitespace-nowrap" : ""}`;
+
+const headerClass = <T extends Row>(c: Column<T>) => `micro-label px-4 py-3 font-medium ${c.right ? "text-right" : ""}`;
+
 /** A fleet-wide list: a table from `md`, cards on phones. */
 function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListProps<T> & { spec: Spec<T> }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
@@ -245,7 +252,7 @@ function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListPro
             <thead className="text-left">
               <tr className="border-b">
                 {spec.columns.map((c) => (
-                  <th key={c.header} scope="col" className={`micro-label px-4 py-3 font-medium ${c.right ? "text-right" : ""}`}>
+                  <th key={c.header} scope="col" className={headerClass(c)}>
                     {c.header}
                   </th>
                 ))}
@@ -258,10 +265,7 @@ function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListPro
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-muted/50">
                   {spec.columns.map((c) => (
-                    <td
-                      key={c.header}
-                      className={`px-4 py-3 ${c.right ? "num text-right whitespace-nowrap" : ""} ${c.muted ? "text-muted-foreground" : ""} ${c.header === "Fecha" ? "num whitespace-nowrap" : ""}`}
-                    >
+                    <td key={c.header} className={cellClass(c)}>
                       {c.cell(r)}
                     </td>
                   ))}
@@ -281,21 +285,54 @@ export const OilList = (p: ListProps<OilRow>) => <LogList spec={OIL_SPEC} {...p}
 export const TireList = (p: ListProps<TireRow>) => <LogList spec={TIRE_SPEC} {...p} />;
 export const FuelList = (p: ListProps<FuelRow>) => <LogList spec={FUEL_SPEC} {...p} />;
 
+interface CompactProps<T> {
+  rows: readonly T[];
+  empty?: string;
+}
+
 /**
- * One vehicle's records of a kind as ruled lines, like the other lists of the vehicle file:
- * date and what was done on the left, the amount on the right, the detail under them.
+ * One vehicle's records of a kind, read-only: from `md` a table with the Bitácora columns (minus
+ * the plate) that scrolls under a sticky header, so long histories stay readable; ruled lines on
+ * phones. Records are created, edited and deleted in the Bitácora page.
  */
-function CompactLog<T extends Row>({
-  spec,
-  rows,
-  editable,
-  empty = "Sin registros.",
-  onEdit,
-  onResult,
-}: Omit<ListProps<T>, "empty"> & { spec: Spec<T>; editable: boolean; empty?: string }) {
+function CompactLog<T extends Row>({ spec, rows, empty = "Sin registros." }: CompactProps<T> & { spec: Spec<T> }) {
   if (rows.length === 0) return <p className="border-b py-2.5 text-sm text-muted-foreground">{empty}</p>;
+  const columns = spec.columns.filter((c) => c.header !== "Placa");
   return (
-    <ul>
+    <>
+      <div className="hidden max-h-[32rem] overflow-auto border-b md:block">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-background text-left">
+            <tr className="border-b">
+              {columns.map((c) => (
+                <th key={c.header} scope="col" className={headerClass(c)}>
+                  {c.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map((r) => (
+              <tr key={r.id} className="hover:bg-muted/50">
+                {columns.map((c) => (
+                  <td key={c.header} className={cellClass(c)}>
+                    {c.cell(r)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <CompactLines spec={spec} rows={rows} />
+    </>
+  );
+}
+
+/** Phone layout of `CompactLog`: date and what was done on the left, the amount on the right. */
+function CompactLines<T extends Row>({ spec, rows }: { spec: Spec<T>; rows: readonly T[] }) {
+  return (
+    <ul className="md:hidden">
       {rows.map((r) => {
         const s = spec.summary(r);
         return (
@@ -308,18 +345,7 @@ function CompactLog<T extends Row>({
               {s.detail && <p className="text-muted-foreground">{s.detail}</p>}
               {r.driverName && <p className="text-muted-foreground">Conductor: {r.driverName}</p>}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {s.amount && <span className="num font-medium">{s.amount}</span>}
-              {editable && (
-                <RowActions
-                  noun={spec.noun}
-                  plate={r.plate}
-                  onEdit={() => onEdit(r)}
-                  remove={() => spec.remove(r.id)}
-                  onResult={onResult}
-                />
-              )}
-            </div>
+            {s.amount && <span className="num shrink-0 font-medium">{s.amount}</span>}
           </li>
         );
       })}
@@ -327,15 +353,7 @@ function CompactLog<T extends Row>({
   );
 }
 
-export const CompactServices = (p: Omit<ListProps<ServiceRow>, "empty"> & { editable: boolean }) => (
-  <CompactLog spec={SERVICE_SPEC} {...p} />
-);
-export const CompactOilChanges = (p: Omit<ListProps<OilRow>, "empty"> & { editable: boolean }) => (
-  <CompactLog spec={OIL_SPEC} {...p} />
-);
-export const CompactTires = (p: Omit<ListProps<TireRow>, "empty"> & { editable: boolean }) => (
-  <CompactLog spec={TIRE_SPEC} {...p} />
-);
-export const CompactFuel = (p: Omit<ListProps<FuelRow>, "empty"> & { editable: boolean }) => (
-  <CompactLog spec={FUEL_SPEC} {...p} />
-);
+export const CompactServices = (p: CompactProps<ServiceRow>) => <CompactLog spec={SERVICE_SPEC} {...p} />;
+export const CompactOilChanges = (p: CompactProps<OilRow>) => <CompactLog spec={OIL_SPEC} {...p} />;
+export const CompactTires = (p: CompactProps<TireRow>) => <CompactLog spec={TIRE_SPEC} {...p} />;
+export const CompactFuel = (p: CompactProps<FuelRow>) => <CompactLog spec={FUEL_SPEC} {...p} />;

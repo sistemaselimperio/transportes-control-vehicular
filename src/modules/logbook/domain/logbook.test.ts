@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   driverAtDate,
+  logbookHref,
   monthBounds,
   normalizePlateQuery,
   parseLogbookQuery,
@@ -20,6 +21,18 @@ describe("parseTabParam", () => {
     expect(parseTabParam(undefined)).toBe("servicios");
     expect(parseTabParam("nope")).toBe("servicios");
     expect(parseTabParam(["aceite", "llantas"])).toBe("aceite");
+  });
+});
+
+describe("logbookHref", () => {
+  it("opens the Bitácora on one vehicle and tab, over its whole history", () => {
+    expect(logbookHref("ABC-123", "combustible")).toBe("/bitacora?tab=combustible&placa=ABC-123");
+  });
+
+  it("round-trips through the page's own parsers", () => {
+    const params = Object.fromEntries(new URLSearchParams(logbookHref("XYZ 98", "aceite").split("?")[1]));
+    expect(parseTabParam(params.tab)).toBe("aceite");
+    expect(parseLogbookQuery(params)).toEqual({ plate: "XYZ98", from: null, to: null, group: null });
   });
 });
 

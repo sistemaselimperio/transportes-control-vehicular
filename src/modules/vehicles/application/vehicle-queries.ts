@@ -1,4 +1,4 @@
-import { loadVehicleLogbook, loadProviders } from "@/modules/logbook/infrastructure/logbook-repository";
+import { loadVehicleLogbook } from "@/modules/logbook/infrastructure/logbook-repository";
 import type { VehicleLogbook } from "@/modules/logbook/domain/logbook";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
@@ -75,8 +75,6 @@ export interface VehicleDetail {
   ownerships: HistoryItem[];
   drivers: HistoryItem[];
   logbook: VehicleLogbook;
-  /** Providers already used in any record, for the logbook forms' suggestions. */
-  providers: string[];
   sale: HistoryItem | null;
   /** Metadata of the attached files (never their bytes). */
   files: VehicleFileItem[];
@@ -115,14 +113,13 @@ export async function getVehicleActionContext(plate: string): Promise<VehicleAct
 export async function getVehicleDetail(plate: string): Promise<VehicleDetail | null> {
   const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
   if (!input) return null;
-  const [history, people, editValues, lists, files, logbook, providers, lastOilItems] = await Promise.all([
+  const [history, people, editValues, lists, files, logbook, lastOilItems] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),
     loadPeople(),
     loadVehicleEditValues(plate),
     loadVehicleFormLists(),
     vehicleFileRepository.listByVehicle(input.vehicle.id),
     loadVehicleLogbook(input.vehicle.id),
-    loadProviders(),
     loadLastOilItems(input.vehicle.id),
   ]);
 
@@ -159,7 +156,6 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
     ownerships,
     drivers,
     logbook,
-    providers,
     sale,
     files: files.map(({ id, category, fileName, sizeBytes, uploadedAt }) => ({
       id,

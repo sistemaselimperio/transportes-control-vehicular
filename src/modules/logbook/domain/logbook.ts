@@ -80,6 +80,11 @@ export function parseTabParam(value: string | string[] | undefined): LogbookTab 
   return LOGBOOK_TABS.find((t) => t.key === v)?.key ?? "servicios";
 }
 
+/** The Bitácora page on one vehicle and tab; without `desde`/`hasta` it shows the whole history. */
+export function logbookHref(plate: string, tab: LogbookTab): string {
+  return `/bitacora?${new URLSearchParams({ tab, placa: plate })}`;
+}
+
 /** Reads a date search param ("YYYY-MM-DD", as an `<input type="date">` sends it); invalid days are dropped. */
 export function parseDateParam(value: string | string[] | undefined): IsoDate | null {
   const v = first(value);
