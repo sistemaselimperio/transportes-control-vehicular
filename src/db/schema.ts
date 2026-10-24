@@ -5,6 +5,7 @@
  */
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -13,6 +14,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -51,6 +53,20 @@ export const taxKindEnum = pgEnum("tax_kind", [
   "EXEMPT_LOW_DISPLACEMENT",
   "UNKNOWN",
 ]);
+
+export const fileCategoryEnum = pgEnum("file_category", [
+  "POLICY",
+  "SOAT",
+  "TECNO",
+  "TAX",
+  "LOGBOOK",
+  "OWNERSHIP_CARD",
+]);
+
+/** Postgres bytea as a Node Buffer (drizzle has no built-in column for it). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 /* ---------------------------- Fleet domain ---------------------------- */
 
@@ -210,6 +226,26 @@ export const sales = pgTable("sales", {
   price: integer(),
   notes: text(),
 });
+
+/** Scanned papers (PDF / images) of a vehicle. List queries must never select `data`. */
+export const vehicleFiles = pgTable(
+  "vehicle_files",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    category: fileCategoryEnum().notNull(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    data: bytea().notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("vehicle_files_vehicle_category_idx").on(t.vehicleId, t.category)],
+);
 
 /* ------------------- Better Auth (username plugin) ------------------- */
 
