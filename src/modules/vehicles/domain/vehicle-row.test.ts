@@ -172,12 +172,17 @@ describe("buildVehicleRow", () => {
 });
 
 describe("ownerShortName", () => {
+  it("shortens a Páez family member to first name and first surname", () => {
+    expect(ownerShortName("Sandra Marcela Páez Porras", "PAEZ")).toBe("Sandra Páez");
+  });
+
   it("keeps only the first word of the company name", () => {
     expect(ownerShortName("Transportes El Imperio", "IMPERIO")).toBe("Transportes");
   });
 
   it("leaves any other owner whole", () => {
     expect(ownerShortName("Fabián Páez", "PAEZ")).toBe("Fabián Páez");
+    expect(ownerShortName("Sandra Marcela Páez Porras", "THIRD_PARTY")).toBe("Sandra Marcela Páez Porras");
     expect(ownerShortName("Bancolombia S.A.", "THIRD_PARTY")).toBe("Bancolombia S.A.");
   });
 });
