@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/app/sidebar";
 import { auth } from "@/lib/auth";
+import { getExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 
 export default async function AppLayout({
   children,
@@ -11,6 +12,7 @@ export default async function AppLayout({
 }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
+  const expiredCounts = await getExpiredVehicleCounts();
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col md:flex-row">
@@ -22,7 +24,7 @@ export default async function AppLayout({
       </a>
       {/* useSearchParams in the sidebar needs a boundary. */}
       <Suspense fallback={<div className="hidden w-60 shrink-0 border-r bg-sidebar md:block" />}>
-        <Sidebar userName={session.user.name} />
+        <Sidebar userName={session.user.name} expiredCounts={expiredCounts} />
       </Suspense>
       <main id="contenido" className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8">
         <div className="mx-auto w-full max-w-[96rem]">{children}</div>

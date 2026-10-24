@@ -1,5 +1,5 @@
 /**
- * Pure filters for the "Alertas" screen: narrow the attention items by kind,
+ * Pure filters for the "Hoy" list: narrow the attention items by kind,
  * status and plate, and count them per kind for the tabs.
  */
 import type { AttentionItem, ItemKind } from "@/modules/dashboard/domain/dashboard-metrics";
@@ -38,12 +38,22 @@ export function countByKind(items: readonly AttentionItem[]): Record<KindFilter,
   return out;
 }
 
+/** Counter buttons act as toggles: picking the active status again clears it. */
+export function toggleStatus(current: StatusFilter, target: StatusFilter): StatusFilter {
+  return current === target ? "ALL" : target;
+}
+
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Reads the `tipo` search param; anything unknown means "all". */
 export function parseKindParam(value: string | string[] | undefined): KindFilter {
   const v = first(value);
   return KIND_FILTERS.find((k) => k === v) ?? "ALL";
+}
+
+/** Reads the `placa` search param as free text. */
+export function parseQueryParam(value: string | string[] | undefined): string {
+  return first(value) ?? "";
 }
 
 /** Reads the `estado` search param; anything unknown means "all". */

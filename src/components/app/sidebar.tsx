@@ -3,7 +3,6 @@
 import {
   Bell,
   Building2,
-  CalendarCheck,
   LogOut,
   Menu,
   Receipt,
@@ -19,16 +18,22 @@ import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import type { ExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Shows the expired-vehicle count after the label. */
+  badge?: "expired";
+};
 
 const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
     label: "Operación",
     items: [
-      { href: "/", label: "Hoy", icon: CalendarCheck },
-      { href: "/alertas", label: "Alertas", icon: Bell },
+      { href: "/", label: "Hoy", icon: Bell, badge: "expired" },
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
       { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
@@ -62,6 +67,8 @@ interface BodyProps {
   /** Query string of the current page, kept when only the group changes. */
   currentQuery: string;
   userName: string;
+  /** Expired vehicles for the active owner group. */
+  expiredVehicles: number;
   onNavigate?: () => void;
 }
 
@@ -79,7 +86,7 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
   return qs ? `${path}?${qs}` : path;
 }
 
-function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: BodyProps) {
+function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const router = useRouter();
 
   async function signOut() {
@@ -114,7 +121,18 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, onNavigate }: Bo
                   )}
                 >
                   <Icon className="size-[1.125rem] shrink-0" aria-hidden />
-                  {item.label}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge === "expired" && (
+                    <span
+                      className={cn(
+                        "num text-xs font-medium tabular-nums",
+                        active ? "text-primary-foreground" : expiredVehicles > 0 ? "text-danger-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {expiredVehicles}
+                      <span className="sr-only"> {expiredVehicles === 1 ? "vehículo vencido" : "vehículos vencidos"}</span>
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -220,14 +238,20 @@ function BrandStacked() {
  * Navigation shell: a fixed sidebar from `md`, an off-canvas drawer on
  * phones. The owner-group filter lives here and travels in `?grupo=`.
  */
-export function Sidebar({ userName }: { userName: string }) {
+export function Sidebar({
+  userName,
+  expiredCounts,
+}: {
+  userName: string;
+  expiredCounts: ExpiredVehicleCounts;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const grupo = parseGroupParam(searchParams.get("grupo") ?? undefined);
   const currentQuery = searchParams.toString();
-  const shared = { pathname, grupo, currentQuery, userName };
+  const shared = { pathname, grupo, currentQuery, userName, expiredVehicles: expiredCounts[grupo ?? "ALL"] };
 
   return (
     <>

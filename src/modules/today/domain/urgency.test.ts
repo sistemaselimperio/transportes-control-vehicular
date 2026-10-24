@@ -72,3 +72,4 @@ describe("describeDaysLeft", () => {
     expect(describeDaysLeft(null)).toBe("");
   });
 });
+

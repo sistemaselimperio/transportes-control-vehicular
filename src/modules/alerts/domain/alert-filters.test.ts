@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AttentionItem } from "@/modules/dashboard/domain/dashboard-metrics";
-import { countByKind, filterAlerts, parseKindParam, parseStatusParam } from "./alert-filters";
+import { countByKind, filterAlerts, parseKindParam, parseStatusParam, toggleStatus } from "./alert-filters";
 
 function item(p: Partial<AttentionItem> & { plate: string }): AttentionItem {
   return {
@@ -63,5 +63,17 @@ describe("search params", () => {
     expect(parseStatusParam("expired")).toBe("expired");
     expect(parseStatusParam("warning")).toBe("warning");
     expect(parseStatusParam("ok")).toBe("ALL");
+  });
+});
+
+describe("toggleStatus", () => {
+  it("selects a status that is not active", () => {
+    expect(toggleStatus("ALL", "expired")).toBe("expired");
+    expect(toggleStatus("warning", "expired")).toBe("expired");
+  });
+
+  it("clears the filter when the active status is toggled again", () => {
+    expect(toggleStatus("expired", "expired")).toBe("ALL");
+    expect(toggleStatus("warning", "warning")).toBe("ALL");
   });
 });

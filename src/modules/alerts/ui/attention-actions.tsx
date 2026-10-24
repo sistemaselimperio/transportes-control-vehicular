@@ -1,8 +1,7 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
-import { useState } from "react";
-import { SlideOver } from "@/components/app/slide-over";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AttentionItem, ItemKind } from "@/modules/dashboard/domain/dashboard-metrics";
 import { describeDaysLeft } from "@/modules/today/domain/urgency";
@@ -31,7 +30,7 @@ export const ACTION_LABELS: Record<ItemKind, string> = {
   OIL: "Registrar cambio",
 };
 
-const PANEL_TITLES: Record<ItemKind, string> = {
+export const ACTION_TITLES: Record<ItemKind, string> = {
   SOAT: "Renovar SOAT",
   TECNO: "Renovar tecnomecánica",
   POLICY: "Renovar póliza",
@@ -48,42 +47,20 @@ export function pillText(item: AttentionItem): string {
   return item.status === "expired" ? "Vencido" : "Por vencer";
 }
 
-interface Active {
-  item: AttentionItem;
-  ctx: VehicleActionContext | null;
-  failed: boolean;
-}
-
-/**
- * Quick action per attention item: opens a side panel with the matching form
- * and shows a confirmation once it is saved. Render `banner` and `panel` once.
- */
-export function useAttentionAction() {
-  const [active, setActive] = useState<Active | null>(null);
-  const [open, setOpen] = useState(false);
+/** Transient success message shown above the list once a form is saved. */
+export function useDoneMessage() {
   const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function fetchContext(item: AttentionItem) {
-    loadActionContextAction(item.plate).then((ctx) =>
-      setActive((a) => (a && a.item === item ? { item, ctx, failed: ctx === null } : a)),
-    );
-  }
-
-  function openFor(item: AttentionItem) {
-    setMessage(null);
-    setActive({ item, ctx: null, failed: false });
-    setOpen(true);
-    if (!isDocument(item.kind)) fetchContext(item);
-  }
-
-  function done(msg: string) {
-    setOpen(false);
+  function flash(msg: string) {
+    if (timer.current) clearTimeout(timer.current);
     setMessage(msg);
-    setTimeout(() => setMessage(null), 6000);
+    timer.current = setTimeout(() => setMessage(null), 6000);
   }
 
-  const close = () => setOpen(false);
-  const item = active?.item;
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
 
   const banner = message && (
     <p
@@ -94,71 +71,84 @@ export function useAttentionAction() {
       {message}
     </p>
   );
+  return { banner, flash };
+}
 
-  const panel = (
-    <SlideOver
-      open={open}
-      onOpenChange={setOpen}
-      title={item ? PANEL_TITLES[item.kind] : ""}
-      description={item ? `Vehículo ${item.plate}` : undefined}
-    >
-      {item && isDocument(item.kind) && (
-        <RenewDocumentForm plate={item.plate} initialType={item.kind} onDone={done} onCancel={close} />
-      )}
-      {item && !isDocument(item.kind) && active && (
-        <ContextForm
-          active={active}
-          onDone={done}
-          onCancel={close}
-          onRetry={() => {
-            setActive({ item: active.item, ctx: null, failed: false });
-            fetchContext(active.item);
-          }}
-        />
-      )}
-    </SlideOver>
-  );
-
-  return {
-    openFor,
-    isActive: (row: AttentionItem) => open && active?.item === row,
-    banner,
-    panel,
-  };
+/**
+ * The form that resolves one attention item. Renders inline (desktop panel) or
+ * inside a SlideOver (phone). Documents need no extra data; tax and oil load
+ * the vehicle context on mount. Key it by plate + kind so it starts fresh.
+ */
+export function ActionFormBody({
+  item,
+  onDone,
+  onCancel,
+}: {
+  item: AttentionItem;
+  onDone: (message: string) => void;
+  onCancel: () => void;
+}) {
+  if (isDocument(item.kind)) {
+    return <RenewDocumentForm plate={item.plate} initialType={item.kind} onDone={onDone} onCancel={onCancel} />;
+  }
+  return <ContextForm item={item} onDone={onDone} onCancel={onCancel} />;
 }
 
 function ContextForm({
-  active,
+  item,
   onDone,
   onCancel,
-  onRetry,
 }: {
-  active: Active;
+  item: AttentionItem;
   onDone: (message: string) => void;
   onCancel: () => void;
-  onRetry: () => void;
 }) {
-  if (active.failed) {
+  const [ctx, setCtx] = useState<VehicleActionContext | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadActionContextAction(item.plate).then((next) => {
+      if (cancelled) return;
+      setCtx(next);
+      setFailed(next === null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.plate, attempt]);
+
+  if (failed) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 p-4">
         <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
           No se pudieron cargar los datos del vehículo.
         </p>
-        <Button type="button" variant="outline" className="h-11" onClick={onRetry}>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11"
+          onClick={() => {
+            setFailed(false);
+            setCtx(null);
+            setAttempt((n) => n + 1);
+          }}
+        >
           Reintentar
         </Button>
       </div>
     );
   }
-  if (!active.ctx) {
+  if (!ctx) {
     return (
-      <div className="space-y-4" aria-busy="true" aria-label="Cargando datos del vehículo">
+      <div className="space-y-4 p-4" aria-busy="true" aria-label="Cargando datos del vehículo">
         <div className="skeleton h-9 w-full" />
         <div className="skeleton h-9 w-2/3" />
         <div className="skeleton h-9 w-full" />
       </div>
     );
   }
-  const common = { plate: active.item.plate, ctx: active.ctx, onDone, onCancel };
-  return active.item.kind === "TAX" ? <UpdateTaxForm {...common} /> : <OilChangeForm {...common} />;
+  const common = { plate: item.plate, ctx, onDone, onCancel };
+  return item.kind === "TAX" ? <UpdateTaxForm {...common} /> : <OilChangeForm {...common} />;
 }

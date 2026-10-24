@@ -102,7 +102,7 @@ function itemsOf(row: DashboardRow, today: IsoDate): AttentionItem[] {
   return out;
 }
 
-const byUrgency = (a: AttentionItem, b: AttentionItem) => {
+export const byUrgency = (a: AttentionItem, b: AttentionItem) => {
   if (a.status !== b.status) return a.status === "expired" ? -1 : 1;
   if (a.daysLeft !== b.daysLeft) {
     if (a.daysLeft === null) return 1;
@@ -123,8 +123,6 @@ export function buildAttentionItems(
 /* ---------------------------------- KPIs ---------------------------------- */
 
 export interface Kpis {
-  idle: number;
-  inWorkshop: number;
   expiredItems: number;
   expiredVehicles: number;
   warningItems: number;
@@ -138,8 +136,6 @@ export function computeKpis(rows: readonly DashboardRow[], today: IsoDate): Kpis
     new Set(items.filter((i) => i.status === status).map((i) => i.plate)).size;
 
   return {
-    idle: live.filter((r) => r.vehicleStatus === "IDLE").length,
-    inWorkshop: live.filter((r) => r.vehicleStatus === "IN_WORKSHOP").length,
     expiredItems: items.filter((i) => i.status === "expired").length,
     expiredVehicles: vehiclesWith("expired"),
     warningItems: items.filter((i) => i.status === "warning").length,

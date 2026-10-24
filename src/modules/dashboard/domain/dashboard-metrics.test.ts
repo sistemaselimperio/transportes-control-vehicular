@@ -67,10 +67,6 @@ describe("computeKpis", () => {
   ];
   const k = computeKpis(rows, TODAY);
 
-  it("counts idle and in-workshop vehicles", () => {
-    expect(k.idle).toBe(1);
-    expect(k.inWorkshop).toBe(1);
-  });
   it("counts expired and warning items and vehicles", () => {
     expect(k.expiredItems).toBe(2);
     expect(k.expiredVehicles).toBe(1);
