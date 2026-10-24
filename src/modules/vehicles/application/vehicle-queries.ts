@@ -1,4 +1,7 @@
+import { loadVehicleLogbook, loadProviders } from "@/modules/logbook/infrastructure/logbook-repository";
+import type { VehicleLogbook } from "@/modules/logbook/domain/logbook";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
+import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
 import type { VehicleFileItem } from "@/modules/documents/application/vehicle-file-ports";
 import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
@@ -7,6 +10,7 @@ import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
   loadVehicleEditValues,
   loadVehicleFormLists,
+  loadLastOilItems,
   loadVehicleHistory,
   loadVehicleRowInputs,
 } from "../infrastructure/vehicle-repository";
@@ -29,6 +33,8 @@ export interface VehicleActionContext {
   oilMode: OilMode;
   /** Interval of the latest oil change, else the class default. */
   oilInterval: { months: number | null; km: number | null };
+  /** Supplies of the latest oil change: the new one starts from them. */
+  lastOilItems: OilItem[];
   owners: Array<{ id: number; name: string }>;
   drivers: Array<{ id: number; name: string; nationalId: string | null }>;
   imperioOwnerId: number | null;
@@ -68,7 +74,9 @@ export interface VehicleDetail {
   edit: { values: VehicleEditValues; options: VehicleFormOptions };
   ownerships: HistoryItem[];
   drivers: HistoryItem[];
-  oilChanges: HistoryItem[];
+  logbook: VehicleLogbook;
+  /** Providers already used in any record, for the logbook forms' suggestions. */
+  providers: string[];
   sale: HistoryItem | null;
   /** Metadata of the attached files (never their bytes). */
   files: VehicleFileItem[];
@@ -80,6 +88,7 @@ const period = (from: string, to: string | null) =>
 function buildActionContext(
   input: VehicleRowInput,
   people: Pick<VehicleActionContext, "owners" | "drivers" | "imperioOwnerId">,
+  lastOilItems: OilItem[],
 ): VehicleActionContext {
   return {
     today: input.today,
@@ -90,6 +99,7 @@ function buildActionContext(
       months: input.lastOil?.intervalMonths ?? input.classInfo.oilIntervalMonths,
       km: input.lastOil?.intervalKm ?? input.classInfo.oilIntervalKm,
     },
+    lastOilItems,
     ...people,
   };
 }
@@ -98,18 +108,22 @@ function buildActionContext(
 export async function getVehicleActionContext(plate: string): Promise<VehicleActionContext | null> {
   const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
   if (!input) return null;
-  return buildActionContext(input, await loadPeople());
+  const [people, lastOilItems] = await Promise.all([loadPeople(), loadLastOilItems(input.vehicle.id)]);
+  return buildActionContext(input, people, lastOilItems);
 }
 
 export async function getVehicleDetail(plate: string): Promise<VehicleDetail | null> {
   const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
   if (!input) return null;
-  const [history, people, editValues, lists, files] = await Promise.all([
+  const [history, people, editValues, lists, files, logbook, providers, lastOilItems] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),
     loadPeople(),
     loadVehicleEditValues(plate),
     loadVehicleFormLists(),
     vehicleFileRepository.listByVehicle(input.vehicle.id),
+    loadVehicleLogbook(input.vehicle.id),
+    loadProviders(),
+    loadLastOilItems(input.vehicle.id),
   ]);
 
   const ownerships = history.ownerships.map((o) => ({
@@ -119,18 +133,6 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
   const drivers = history.assignments.map((a) => ({
     title: a.driverName,
     detail: `${period(a.fromDate, a.toDate)}${a.phone ? ` · ${a.phone}` : ""}`,
-  }));
-  const oilChanges = history.oilChanges.map((c) => ({
-    title: formatDisplayDate(c.date),
-    detail:
-      [
-        c.km != null ? `${formatKm(c.km)} km` : null,
-        c.nextKm != null ? `próximo a ${formatKm(c.nextKm)} km` : null,
-        c.nextDate ? `próximo el ${formatDisplayDate(c.nextDate)}` : null,
-        c.notes,
-      ]
-        .filter(Boolean)
-        .join(" · ") || "Sin kilometraje",
   }));
   const sale = history.sale
     ? {
@@ -149,14 +151,15 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
 
   return {
     row: buildVehicleRow(input),
-    actions: buildActionContext(input, people),
+    actions: buildActionContext(input, people, lastOilItems),
     edit: {
       values: editValues!,
       options: { today: input.today, ...lists, ...people },
     },
     ownerships,
     drivers,
-    oilChanges,
+    logbook,
+    providers,
     sale,
     files: files.map(({ id, category, fileName, sizeBytes, uploadedAt }) => ({
       id,

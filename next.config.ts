@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "4.5mb",
     },
   },
+  async redirects() {
+    // The maintenance placeholder became the logbook; keep old links (and their query) working.
+    return [{ source: "/mantenimiento", destination: "/bitacora", permanent: true }];
+  },
   turbopack: {
     rules: {
       "*.css": {

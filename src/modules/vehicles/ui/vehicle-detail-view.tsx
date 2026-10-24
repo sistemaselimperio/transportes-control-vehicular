@@ -2,11 +2,13 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusMark } from "@/components/app/status-mark";
+import { VehicleLogbookSection } from "@/modules/logbook/ui/vehicle-logbook";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { HistoryItem, VehicleDetail } from "../application/vehicle-queries";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
+import { Section, SubHeading } from "./file-section";
 import { TabParamScroll } from "./tab-param-scroll";
 import {
   ActionButtons,
@@ -16,40 +18,6 @@ import {
   SoldNotice,
   StatusSwitch,
 } from "./vehicle-file-actions";
-
-/** A register section: the heading row carries one bottom rule and the section's own actions. */
-function Section({
-  id,
-  title,
-  note,
-  actions,
-  children,
-}: {
-  id?: string;
-  title: string;
-  note?: ReactNode;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} className="min-w-0 scroll-mt-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b pb-2">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {note && <span className="num text-sm text-muted-foreground">{note}</span>}
-        {actions && <div className="max-md:order-last max-md:basis-full md:ml-auto">{actions}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Small heading for a list inside a section. */
-const SubHeading = ({ children, count }: { children: ReactNode; count: number }) => (
-  <h3 className="mt-5 flex items-baseline gap-2 border-b pb-1.5 text-sm font-semibold">
-    {children}
-    <span className="num font-normal text-muted-foreground">{count}</span>
-  </h3>
-);
 
 /** Label muted on the left, value on the right, one thin rule per row. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -223,9 +191,14 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
                   </span>
                 </Figure>
               </dl>
-              <SubHeading count={detail.oilChanges.length}>Cambios de aceite</SubHeading>
-              <Records items={detail.oilChanges} />
             </Section>
+            <VehicleLogbookSection
+              plate={r.plate}
+              sold={sold}
+              logbook={detail.logbook}
+              providers={detail.providers}
+              today={detail.actions.today}
+            />
           </div>
 
           <aside className="min-w-0 space-y-8 max-lg:border-t max-lg:pt-8 lg:self-stretch lg:border-l lg:pl-10">

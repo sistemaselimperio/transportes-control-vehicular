@@ -1,5 +1,6 @@
 import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
+import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 
 /** What the command use cases need to know about a vehicle. */
@@ -51,6 +52,7 @@ export interface OilChangeRecord {
   intervalKm: number | null;
   nextDate: IsoDate | null;
   nextKm: number | null;
+  price: number | null;
   notes: string | null;
 }
 
@@ -123,12 +125,25 @@ export interface VehicleCommandRepository {
 
   addDocument(vehicleId: number, doc: DocumentRecord): Promise<void>;
   addTax(vehicleId: number, tax: TaxRecord): Promise<void>;
-  /** Inserts the oil change and, when `newCurrentKm` is set, updates the vehicle km. */
+  /** Inserts the oil change with its supplies and, when `newCurrentKm` is set, updates the vehicle km. */
   addOilChange(
     vehicleId: number,
     oil: OilChangeRecord,
     newCurrentKm: number | null,
+    items: OilItem[],
   ): Promise<void>;
+  /** The vehicle an oil change belongs to; null when the oil change does not exist. */
+  findOilChangeVehicle(oilChangeId: number): Promise<VehicleSnapshot | null>;
+  /** Rewrites the oil change and replaces its supplies; raises the vehicle km like `addOilChange`. */
+  updateOilChange(
+    oilChangeId: number,
+    vehicleId: number,
+    oil: OilChangeRecord,
+    newCurrentKm: number | null,
+    items: OilItem[],
+  ): Promise<void>;
+  /** Removes the oil change and its supplies. */
+  deleteOilChange(oilChangeId: number): Promise<void>;
   /** `reading` null leaves the stored km untouched. */
   updateOdometer(
     vehicleId: number,

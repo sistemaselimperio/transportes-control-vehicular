@@ -1,0 +1,359 @@
+"use client";
+
+import { Loader2, Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useState, useTransition, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import { formatPrice } from "@/modules/sales/domain/sale-row";
+import { formatKm } from "@/modules/vehicles/domain/vehicle-row";
+import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
+import { deleteOilChangeAction } from "@/modules/vehicles/application/vehicle-actions";
+import { deleteLogbookEntryAction } from "../application/logbook-actions";
+import { SERVICE_KIND_LABELS, type FuelRow, type OilRow, type ServiceRow, type TireRow } from "../domain/logbook";
+
+const PLATE_LINK = "plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70";
+
+const gallonsText = (n: number) => `${n.toLocaleString("es-CO", { maximumFractionDigits: 2 })} gal`;
+const priceText = (n: number | null) => (n === null ? "—" : formatPrice(n));
+
+/** What a record says in one line plus an optional detail line (cards and the vehicle file). */
+interface Summary {
+  title: string;
+  detail: string | null;
+  amount: string | null;
+}
+
+const joinDetail = (parts: Array<string | null | undefined>) => parts.filter(Boolean).join(" · ") || null;
+
+/** How one kind of record is shown and deleted. */
+interface Spec<T extends { id: number; plate: string; date: string; driverName: string | null }> {
+  /** Singular noun for accessible labels ("servicio de ABC-123"). */
+  noun: string;
+  columns: ReadonlyArray<{ header: string; cell: (row: T) => ReactNode; right?: boolean; muted?: boolean }>;
+  summary: (row: T) => Summary;
+  remove: (id: number) => Promise<ActionResult>;
+}
+
+const itemsText = (row: OilRow) => row.items.map((i) => `${i.quantity.toLocaleString("es-CO")} ${i.detail}`);
+
+export const SERVICE_SPEC: Spec<ServiceRow> = {
+  noun: "servicio",
+  columns: [
+    { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
+    { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
+    { header: "Tipo", cell: (r) => SERVICE_KIND_LABELS[r.kind] },
+    { header: "Descripción", cell: (r) => <span className="font-medium">{r.description}</span> },
+    { header: "Proveedor", cell: (r) => r.provider ?? "—" },
+    { header: "Conductor", cell: (r) => r.driverName ?? "—" },
+    { header: "Precio", cell: (r) => priceText(r.price), right: true },
+    { header: "Novedad", cell: (r) => <Clamp text={r.notes} />, muted: true },
+  ],
+  summary: (r) => ({
+    title: r.description,
+    detail: joinDetail([SERVICE_KIND_LABELS[r.kind], r.provider, r.km != null ? `${formatKm(r.km)} km` : null, r.notes]),
+    amount: r.price === null ? null : formatPrice(r.price),
+  }),
+  remove: (id) => deleteLogbookEntryAction("service", id),
+};
+
+export const OIL_SPEC: Spec<OilRow> = {
+  noun: "cambio de aceite",
+  columns: [
+    { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
+    { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
+    { header: "Km", cell: (r) => (r.km != null ? formatKm(r.km) : "—") },
+    {
+      header: "Próximo cambio",
+      cell: (r) => joinDetail([r.nextDate && formatDisplayDate(r.nextDate), r.nextKm != null ? `${formatKm(r.nextKm)} km` : null]) ?? "—",
+    },
+    {
+      header: "Insumos",
+      cell: (r) =>
+        r.items.length === 0 ? (
+          "—"
+        ) : (
+          <ul className="max-w-64 space-y-0.5 text-xs">
+            {itemsText(r).map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        ),
+    },
+    { header: "Conductor", cell: (r) => r.driverName ?? "—" },
+    { header: "Precio", cell: (r) => priceText(r.price), right: true },
+    { header: "Notas", cell: (r) => <Clamp text={r.notes} />, muted: true },
+  ],
+  summary: (r) => ({
+    title: r.km != null ? `${formatKm(r.km)} km` : "Sin kilometraje",
+    detail: joinDetail([
+      itemsText(r).join(", "),
+      r.nextKm != null ? `próximo a ${formatKm(r.nextKm)} km` : null,
+      r.nextDate ? `próximo el ${formatDisplayDate(r.nextDate)}` : null,
+      r.notes,
+    ]),
+    amount: r.price === null ? null : formatPrice(r.price),
+  }),
+  remove: deleteOilChangeAction,
+};
+
+export const TIRE_SPEC: Spec<TireRow> = {
+  noun: "cambio de llantas",
+  columns: [
+    { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
+    { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
+    { header: "Cant.", cell: (r) => r.quantity },
+    { header: "Referencia", cell: (r) => <span className="font-medium">{r.reference}</span> },
+    { header: "Proveedor", cell: (r) => r.provider ?? "—" },
+    { header: "Conductor", cell: (r) => r.driverName ?? "—" },
+    { header: "Precio", cell: (r) => priceText(r.price), right: true },
+    { header: "Observación", cell: (r) => <Clamp text={r.notes} />, muted: true },
+  ],
+  summary: (r) => ({
+    title: `${r.quantity} × ${r.reference}`,
+    detail: joinDetail([r.provider, r.notes]),
+    amount: r.price === null ? null : formatPrice(r.price),
+  }),
+  remove: (id) => deleteLogbookEntryAction("tire", id),
+};
+
+export const FUEL_SPEC: Spec<FuelRow> = {
+  noun: "tanqueo",
+  columns: [
+    { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
+    { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
+    { header: "Galones", cell: (r) => gallonsText(r.gallons), right: true },
+    { header: "Valor", cell: (r) => formatPrice(r.amount), right: true },
+    { header: "Estación", cell: (r) => r.provider ?? "—" },
+    { header: "Conductor", cell: (r) => r.driverName ?? "—" },
+  ],
+  summary: (r) => ({ title: gallonsText(r.gallons), detail: r.provider, amount: formatPrice(r.amount) }),
+  remove: (id) => deleteLogbookEntryAction("fuel", id),
+};
+
+function PlateLink({ plate }: { plate: string }) {
+  return (
+    <Link href={`/flota/${encodeURIComponent(plate)}`} className={PLATE_LINK}>
+      {plate}
+    </Link>
+  );
+}
+
+function Clamp({ text }: { text: string | null }) {
+  return (
+    <span className="block max-w-56 truncate" title={text ?? undefined}>
+      {text ?? "—"}
+    </span>
+  );
+}
+
+/**
+ * Edit and delete buttons of one record. Deleting asks first, inline in the same spot
+ * ("¿Eliminar? Sí / No"), and reports the outcome through `onResult`.
+ */
+export function RowActions({
+  noun,
+  plate,
+  onEdit,
+  remove,
+  onResult,
+}: {
+  noun: string;
+  plate: string;
+  onEdit: () => void;
+  remove: () => Promise<ActionResult>;
+  onResult: (result: ActionResult) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  if (confirming) {
+    return (
+      <div role="group" aria-label={`Confirmar eliminar ${noun} de ${plate}`} className="flex items-center gap-1 whitespace-nowrap">
+        <span className="px-1 text-sm text-destructive">¿Eliminar?</span>
+        <Button
+          type="button"
+          variant="destructive"
+          className="h-11 px-2.5 md:h-8"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await remove();
+              setConfirming(false);
+              onResult(result);
+            })
+          }
+        >
+          {pending ? <Loader2 className="animate-spin" aria-hidden /> : "Sí"}
+        </Button>
+        <Button type="button" variant="ghost" className="h-11 px-2.5 md:h-8" disabled={pending} onClick={() => setConfirming(false)}>
+          No
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center whitespace-nowrap">
+      <Button variant="ghost" size="icon" className="size-11 md:size-9" aria-label={`Editar ${noun} de ${plate}`} title="Editar" onClick={onEdit}>
+        <Pencil aria-hidden />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-11 hover:text-destructive md:size-9"
+        aria-label={`Eliminar ${noun} de ${plate}`}
+        title="Eliminar"
+        onClick={() => setConfirming(true)}
+      >
+        <Trash2 aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+interface ListProps<T> {
+  rows: readonly T[];
+  /** Text shown when nothing matches the current filters. */
+  empty: string;
+  onEdit: (row: T) => void;
+  onResult: (result: ActionResult) => void;
+}
+
+type Row = { id: number; plate: string; date: string; driverName: string | null };
+
+/** A fleet-wide list: a table from `md`, cards on phones. */
+function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListProps<T> & { spec: Spec<T> }) {
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
+  const actions = (r: T) => (
+    <RowActions noun={spec.noun} plate={r.plate} onEdit={() => onEdit(r)} remove={() => spec.remove(r.id)} onResult={onResult} />
+  );
+  return (
+    <>
+      <ul className="grid gap-3 md:hidden">
+        {rows.map((r) => {
+          const s = spec.summary(r);
+          return (
+            <li key={r.id} className="space-y-2 rounded-2xl border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <PlateLink plate={r.plate} />
+                  <span className="num text-sm text-muted-foreground">{formatDisplayDate(r.date)}</span>
+                </div>
+                <div className="-mt-2 -mr-2 shrink-0">{actions(r)}</div>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 font-medium">{s.title}</span>
+                {s.amount && <span className="num shrink-0 font-semibold">{s.amount}</span>}
+              </div>
+              {s.detail && <p className="text-sm text-muted-foreground">{s.detail}</p>}
+              {r.driverName && <p className="text-sm text-muted-foreground">Conductor: {r.driverName}</p>}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="panel hidden md:block">
+        <div className="plate-head">
+          <span className="micro-label">
+            {rows.length} {rows.length === 1 ? "registro" : "registros"}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left">
+              <tr className="border-b">
+                {spec.columns.map((c) => (
+                  <th key={c.header} scope="col" className={`micro-label px-4 py-3 font-medium ${c.right ? "text-right" : ""}`}>
+                    {c.header}
+                  </th>
+                ))}
+                <th scope="col" className="w-px">
+                  <span className="sr-only">Acciones</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((r) => (
+                <tr key={r.id} className="hover:bg-muted/50">
+                  {spec.columns.map((c) => (
+                    <td
+                      key={c.header}
+                      className={`px-4 py-3 ${c.right ? "num text-right whitespace-nowrap" : ""} ${c.muted ? "text-muted-foreground" : ""} ${c.header === "Fecha" ? "num whitespace-nowrap" : ""}`}
+                    >
+                      {c.cell(r)}
+                    </td>
+                  ))}
+                  <td className="px-2 py-1.5 text-right">{actions(r)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export const ServiceList = (p: ListProps<ServiceRow>) => <LogList spec={SERVICE_SPEC} {...p} />;
+export const OilList = (p: ListProps<OilRow>) => <LogList spec={OIL_SPEC} {...p} />;
+export const TireList = (p: ListProps<TireRow>) => <LogList spec={TIRE_SPEC} {...p} />;
+export const FuelList = (p: ListProps<FuelRow>) => <LogList spec={FUEL_SPEC} {...p} />;
+
+/**
+ * One vehicle's records of a kind as ruled lines, like the other lists of the vehicle file:
+ * date and what was done on the left, the amount on the right, the detail under them.
+ */
+function CompactLog<T extends Row>({
+  spec,
+  rows,
+  editable,
+  empty = "Sin registros.",
+  onEdit,
+  onResult,
+}: Omit<ListProps<T>, "empty"> & { spec: Spec<T>; editable: boolean; empty?: string }) {
+  if (rows.length === 0) return <p className="border-b py-2.5 text-sm text-muted-foreground">{empty}</p>;
+  return (
+    <ul>
+      {rows.map((r) => {
+        const s = spec.summary(r);
+        return (
+          <li key={r.id} className="flex items-start justify-between gap-2 border-b py-2 text-sm">
+            <div className="min-w-0">
+              <p className="flex flex-wrap gap-x-3">
+                <span className="num font-medium">{formatDisplayDate(r.date)}</span>
+                <span className="font-medium">{s.title}</span>
+              </p>
+              {s.detail && <p className="text-muted-foreground">{s.detail}</p>}
+              {r.driverName && <p className="text-muted-foreground">Conductor: {r.driverName}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              {s.amount && <span className="num font-medium">{s.amount}</span>}
+              {editable && (
+                <RowActions
+                  noun={spec.noun}
+                  plate={r.plate}
+                  onEdit={() => onEdit(r)}
+                  remove={() => spec.remove(r.id)}
+                  onResult={onResult}
+                />
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export const CompactServices = (p: Omit<ListProps<ServiceRow>, "empty"> & { editable: boolean }) => (
+  <CompactLog spec={SERVICE_SPEC} {...p} />
+);
+export const CompactOilChanges = (p: Omit<ListProps<OilRow>, "empty"> & { editable: boolean }) => (
+  <CompactLog spec={OIL_SPEC} {...p} />
+);
+export const CompactTires = (p: Omit<ListProps<TireRow>, "empty"> & { editable: boolean }) => (
+  <CompactLog spec={TIRE_SPEC} {...p} />
+);
+export const CompactFuel = (p: Omit<ListProps<FuelRow>, "empty"> & { editable: boolean }) => (
+  <CompactLog spec={FUEL_SPEC} {...p} />
+);

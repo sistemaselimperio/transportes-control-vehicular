@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { alias, type PgColumn } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
+import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import type { DocumentData, VehicleRowInput } from "../domain/vehicle-row";
 
@@ -124,7 +125,7 @@ export async function loadVehicleRowInputs(
 
 /** Full history of one vehicle for the read-only detail page. */
 export async function loadVehicleHistory(vehicleId: number) {
-  const [ownerships, assignments, documents, oilChanges, sales] = await Promise.all([
+  const [ownerships, assignments, documents, sales] = await Promise.all([
     db
       .select({
         fromDate: schema.ownerships.fromDate,
@@ -151,14 +152,26 @@ export async function loadVehicleHistory(vehicleId: number) {
       .from(schema.vehicleDocuments)
       .where(eq(schema.vehicleDocuments.vehicleId, vehicleId))
       .orderBy(desc(schema.vehicleDocuments.id)),
-    db
-      .select()
-      .from(schema.oilChanges)
-      .where(eq(schema.oilChanges.vehicleId, vehicleId))
-      .orderBy(desc(schema.oilChanges.date), desc(schema.oilChanges.id)),
     db.select().from(schema.sales).where(eq(schema.sales.vehicleId, vehicleId)),
   ]);
-  return { ownerships, assignments, documents, oilChanges, sale: sales[0] ?? null };
+  return { ownerships, assignments, documents, sale: sales[0] ?? null };
+}
+
+/** Supplies of the vehicle's latest oil change: the starting point of the next one. */
+export async function loadLastOilItems(vehicleId: number): Promise<OilItem[]> {
+  const [last] = await db
+    .select({ id: schema.oilChanges.id })
+    .from(schema.oilChanges)
+    .where(eq(schema.oilChanges.vehicleId, vehicleId))
+    .orderBy(desc(schema.oilChanges.date), desc(schema.oilChanges.id))
+    .limit(1);
+  if (!last) return [];
+  const items = await db
+    .select({ quantity: schema.oilChangeItems.quantity, detail: schema.oilChangeItems.detail })
+    .from(schema.oilChangeItems)
+    .where(eq(schema.oilChangeItems.oilChangeId, last.id))
+    .orderBy(asc(schema.oilChangeItems.id));
+  return items;
 }
 
 /** Vehicle classes and the plates that can tow, for the create / edit forms. */

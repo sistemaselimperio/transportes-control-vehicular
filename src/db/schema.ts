@@ -9,6 +9,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -53,6 +54,8 @@ export const taxKindEnum = pgEnum("tax_kind", [
   "EXEMPT_LOW_DISPLACEMENT",
   "UNKNOWN",
 ]);
+
+export const serviceKindEnum = pgEnum("service_kind", ["PREVENTIVE", "CORRECTIVE"]);
 
 export const fileCategoryEnum = pgEnum("file_category", [
   "POLICY",
@@ -210,9 +213,81 @@ export const oilChanges = pgTable(
     intervalKm: integer("interval_km"),
     nextDate: date("next_date", { mode: "string" }),
     nextKm: integer("next_km"),
+    /** Total cost in whole pesos (COP); null when unknown. */
+    price: integer(),
     notes: text(),
   },
   (t) => [index("oil_changes_vehicle_idx").on(t.vehicleId)],
+);
+
+/** Supplies used in an oil change ("48" x "CUARTOS DELO 15W40"); read in insertion order. */
+export const oilChangeItems = pgTable(
+  "oil_change_items",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    oilChangeId: integer("oil_change_id")
+      .notNull()
+      .references(() => oilChanges.id, { onDelete: "cascade" }),
+    quantity: numeric({ precision: 8, scale: 2, mode: "number" }).notNull(),
+    detail: text().notNull(),
+  },
+  (t) => [index("oil_change_items_oil_change_idx").on(t.oilChangeId)],
+);
+
+/** Logbook: workshop services and repairs. */
+export const vehicleServices = pgTable(
+  "vehicle_services",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    kind: serviceKindEnum().notNull(),
+    description: text().notNull(),
+    /** Free text; the forms suggest the providers already used. */
+    provider: text(),
+    km: integer(),
+    /** Whole pesos (COP); null when unknown. */
+    price: integer(),
+    notes: text(),
+  },
+  (t) => [index("vehicle_services_vehicle_date_idx").on(t.vehicleId, t.date)],
+);
+
+/** Logbook: tire changes. */
+export const tireChanges = pgTable(
+  "tire_changes",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    quantity: integer().notNull(),
+    reference: text().notNull(),
+    provider: text(),
+    price: integer(),
+    notes: text(),
+  },
+  (t) => [index("tire_changes_vehicle_date_idx").on(t.vehicleId, t.date)],
+);
+
+/** Logbook: fuel fills. `provider` is the station. */
+export const fuelFills = pgTable(
+  "fuel_fills",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    gallons: numeric({ precision: 8, scale: 2, mode: "number" }).notNull(),
+    /** Amount paid, whole pesos (COP). */
+    amount: integer().notNull(),
+    provider: text(),
+  },
+  (t) => [index("fuel_fills_vehicle_date_idx").on(t.vehicleId, t.date)],
 );
 
 export const sales = pgTable("sales", {

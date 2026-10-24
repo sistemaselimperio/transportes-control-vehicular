@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { driverKey, stripAccents } from "@/modules/import-export/domain/cell-parsers";
+import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
 import type {
   DriverTarget,
@@ -91,6 +92,19 @@ async function closeAssignment(tx: Tx, close: PeriodClose | null) {
     .update(schema.driverAssignments)
     .set({ fromDate: close.fromDate, toDate: close.toDate })
     .where(eq(schema.driverAssignments.id, close.id));
+}
+
+async function insertOilItems(tx: Tx, oilChangeId: number, items: OilItem[]) {
+  if (items.length === 0) return;
+  await tx.insert(schema.oilChangeItems).values(items.map((item) => ({ oilChangeId, ...item })));
+}
+
+async function raiseKm(tx: Tx, vehicleId: number, newCurrentKm: number | null, at: string) {
+  if (newCurrentKm == null) return;
+  await tx
+    .update(schema.vehicles)
+    .set({ currentKm: newCurrentKm, currentKmAt: at })
+    .where(eq(schema.vehicles.id, vehicleId));
 }
 
 export const vehicleCommandRepository: VehicleCommandRepository = {
@@ -209,18 +223,38 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
     await db.insert(schema.vehicleTaxes).values({ vehicleId, ...tax });
   },
 
-  async addOilChange(vehicleId, oil, newCurrentKm) {
+  async addOilChange(vehicleId, oil, newCurrentKm, items) {
     await db.transaction(async (tx) => {
-      await tx.insert(schema.oilChanges).values({ vehicleId, ...oil });
-      if (newCurrentKm != null) {
-        await tx
-          .update(schema.vehicles)
-          .set({ currentKm: newCurrentKm, currentKmAt: oil.date })
-          .where(eq(schema.vehicles.id, vehicleId));
-      }
+      const [row] = await tx
+        .insert(schema.oilChanges)
+        .values({ vehicleId, ...oil })
+        .returning({ id: schema.oilChanges.id });
+      await insertOilItems(tx, row.id, items);
+      await raiseKm(tx, vehicleId, newCurrentKm, oil.date);
     });
   },
-
+  async findOilChangeVehicle(oilChangeId) {
+    const [row] = await db
+      .select({ plate: schema.vehicles.plate })
+      .from(schema.oilChanges)
+      .innerJoin(schema.vehicles, eq(schema.oilChanges.vehicleId, schema.vehicles.id))
+      .where(eq(schema.oilChanges.id, oilChangeId));
+    if (!row) return null;
+    const [vehicle] = await vehicleCommandRepository.findByPlates([row.plate]);
+    return vehicle ?? null;
+  },
+  async updateOilChange(oilChangeId, vehicleId, oil, newCurrentKm, items) {
+    await db.transaction(async (tx) => {
+      await tx.update(schema.oilChanges).set(oil).where(eq(schema.oilChanges.id, oilChangeId));
+      await tx.delete(schema.oilChangeItems).where(eq(schema.oilChangeItems.oilChangeId, oilChangeId));
+      await insertOilItems(tx, oilChangeId, items);
+      await raiseKm(tx, vehicleId, newCurrentKm, oil.date);
+    });
+  },
+  async deleteOilChange(oilChangeId) {
+    // The supplies go with it (ON DELETE CASCADE).
+    await db.delete(schema.oilChanges).where(eq(schema.oilChanges.id, oilChangeId));
+  },
   async updateOdometer(vehicleId, { odometerWorking, reading }) {
     await db
       .update(schema.vehicles)

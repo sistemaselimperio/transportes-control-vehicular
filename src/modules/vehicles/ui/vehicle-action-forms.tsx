@@ -2,15 +2,19 @@
 
 import { useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
+import { PesosInput } from "@/components/app/pesos-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import type { OilChangeValues } from "@/modules/maintenance/domain/oil-items";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
+import { OilItemsEditor } from "@/modules/maintenance/ui/oil-items-editor";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import {
   registerOilChangeAction,
   renewDocumentAction,
   updateKmAction,
+  updateOilChangeAction,
   updateTaxAction,
 } from "../application/vehicle-actions";
 import type { VehicleActionContext } from "../application/vehicle-queries";
@@ -124,12 +128,27 @@ export function UpdateTaxForm({ plate, ctx, onDone, onCancel }: FormProps) {
   );
 }
 
-export function OilChangeForm({ plate, ctx, onDone, onCancel }: FormProps) {
-  const [date, setDate] = useState(ctx.today);
-  const [km, setKm] = useState("");
-  const [months, setMonths] = useState(ctx.oilInterval.months?.toString() ?? "");
-  const [intervalKm, setIntervalKm] = useState(ctx.oilInterval.km?.toString() ?? "");
+/** What the oil change form needs to know about the vehicle. */
+export type OilFormContext = Pick<
+  VehicleActionContext,
+  "today" | "odometerWorking" | "currentKm" | "oilMode" | "oilInterval" | "lastOilItems"
+>;
 
+/**
+ * Registers an oil change, or edits one when `editing` is given. A new change starts with the
+ * supplies of the vehicle's previous one.
+ */
+export function OilChangeForm({
+  plate,
+  ctx,
+  editing,
+  onDone,
+  onCancel,
+}: Omit<FormProps, "ctx"> & { ctx: OilFormContext; editing?: OilChangeValues }) {
+  const [date, setDate] = useState(editing?.date ?? ctx.today);
+  const [km, setKm] = useState(editing?.km?.toString() ?? "");
+  const [months, setMonths] = useState((editing ? editing.intervalMonths : ctx.oilInterval.months)?.toString() ?? "");
+  const [intervalKm, setIntervalKm] = useState((editing ? editing.intervalKm : ctx.oilInterval.km)?.toString() ?? "");
   let preview: string;
   try {
     const plan = planOilChange({
@@ -152,8 +171,8 @@ export function OilChangeForm({ plate, ctx, onDone, onCancel }: FormProps) {
 
   return (
     <ActionForm
-      action={(fd) => registerOilChangeAction(plate, fd)}
-      submitLabel="Registrar cambio"
+      action={(fd) => (editing ? updateOilChangeAction(editing.id, fd) : registerOilChangeAction(plate, fd))}
+      submitLabel={editing ? "Guardar cambios" : "Registrar cambio"}
       onDone={onDone}
       onCancel={onCancel}
     >
@@ -210,8 +229,12 @@ export function OilChangeForm({ plate, ctx, onDone, onCancel }: FormProps) {
         <span className="text-muted-foreground">Próximo cambio: </span>
         <span className="font-medium">{preview}</span>
       </p>
+      <Field label="Precio (opcional)" htmlFor="oil-price">
+        <PesosInput id="oil-price" name="price" defaultValue={editing?.price} />
+      </Field>
+      <OilItemsEditor initial={editing ? editing.items : ctx.lastOilItems} prefilled={!editing} />
       <Field label="Notas (opcional)" htmlFor="oil-notes">
-        <Textarea id="oil-notes" name="notes" rows={2} />
+        <Textarea id="oil-notes" name="notes" rows={2} defaultValue={editing?.notes ?? ""} />
       </Field>
     </ActionForm>
   );

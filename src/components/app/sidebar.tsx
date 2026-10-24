@@ -5,10 +5,10 @@ import {
   Building2,
   LogOut,
   Menu,
+  NotebookText,
   Receipt,
   Truck,
   Users,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -36,7 +36,7 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
       { href: "/", label: "Hoy", icon: Bell, badge: "expired" },
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
-      { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
+      { href: "/bitacora", label: "Bitácora", icon: NotebookText },
     ],
   },
   {

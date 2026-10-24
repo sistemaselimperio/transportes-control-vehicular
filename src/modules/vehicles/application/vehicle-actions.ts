@@ -16,6 +16,7 @@ import { getVehicleActionContext, type VehicleActionContext } from "./vehicle-qu
 import {
   assignDriverSchema,
   oilChangeSchema,
+  oilChangeIdSchema,
   plateSchema,
   renewDocumentSchema,
   sellSchema,
@@ -43,6 +44,7 @@ async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
     const result = await fn();
     revalidatePath("/flota");
     revalidatePath("/flota/[placa]", "page");
+    revalidatePath("/bitacora");
     revalidatePath("/");
     return { ok: true, message: result.message };
   } catch (e) {
@@ -98,9 +100,29 @@ export async function registerOilChangeAction(plate: string, fd: FormData): Prom
       date: v.date,
       km: v.km,
       notes: v.notes,
+      price: v.price,
+      items: v.items,
       interval: { months: v.intervalMonths, km: v.intervalKm },
     });
   });
+}
+
+export async function updateOilChangeAction(id: number, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const v = parse(oilChangeSchema, formValues(fd));
+    return commands.updateOilChange(parse(oilChangeIdSchema, id), {
+      date: v.date,
+      km: v.km,
+      notes: v.notes,
+      price: v.price,
+      items: v.items,
+      interval: { months: v.intervalMonths, km: v.intervalKm },
+    });
+  });
+}
+
+export async function deleteOilChangeAction(id: number): Promise<ActionResult> {
+  return run(async () => commands.deleteOilChange(parse(oilChangeIdSchema, id)));
 }
 
 export async function updateKmAction(plate: string, fd: FormData): Promise<ActionResult> {

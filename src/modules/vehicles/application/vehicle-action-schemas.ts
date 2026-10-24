@@ -1,10 +1,11 @@
 /** Zod schemas that parse the raw form values (strings) of each vehicle action. */
 import { z } from "zod";
+import { oilItemsField } from "@/modules/maintenance/application/oil-items-schema";
 
 const VALID_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Required ISO calendar date from an `<input type="date">`. */
-const dateField = (label: string) =>
+export const dateField = (label: string) =>
   z
     .string()
     .default("")
@@ -14,14 +15,14 @@ const dateField = (label: string) =>
     );
 
 /** Trimmed text where blank means "not provided". */
-const textField = z
+export const textField = z
   .string()
   .default("")
   .transform((v) => v.trim())
   .transform((v) => (v === "" ? null : v));
 
 /** Optional non-negative integer; tolerates "359.174"-style thousands separators. */
-const intField = (label: string, max = 2_000_000_000) =>
+export const intField = (label: string, max = 2_000_000_000) =>
   z
     .string()
     .default("")
@@ -56,7 +57,9 @@ export const oilChangeSchema = z.object({
   km: intField("El kilometraje", 999_999_999),
   intervalMonths: intField("Los meses de intervalo", 120),
   intervalKm: intField("Los km de intervalo", 999_999),
+  price: intField("El precio"),
   notes: textField,
+  items: oilItemsField,
 });
 
 export const updateKmSchema = z.object({
@@ -112,3 +115,5 @@ export const sellSchema = z.object({
 });
 
 export const plateSchema = z.string().min(1).max(20);
+
+export const oilChangeIdSchema = z.number().int().positive();

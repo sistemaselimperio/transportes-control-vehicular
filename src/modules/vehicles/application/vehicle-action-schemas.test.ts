@@ -15,6 +15,21 @@ describe("form schemas", () => {
     ).toMatchObject({ km: 359174, intervalMonths: null, intervalKm: null, notes: null });
   });
 
+  it("reads the price and the supplies of an oil change", () => {
+    const parsed = oilChangeSchema.parse({
+      date: "2026-10-01",
+      km: "1000",
+      price: "350.000",
+      items: JSON.stringify([{ quantity: "48", detail: "CUARTOS DELO 15W40" }]),
+    });
+    expect(parsed.price).toBe(350000);
+    expect(parsed.items).toEqual([{ quantity: 48, detail: "CUARTOS DELO 15W40" }]);
+  });
+
+  it("leaves price and supplies empty when they are not sent", () => {
+    expect(oilChangeSchema.parse({ date: "2026-10-01", km: "1" })).toMatchObject({ price: null, items: [] });
+  });
+
   it("rejects non numeric km and invalid dates", () => {
     expect(() => updateKmSchema.parse({ km: "12abc" })).toThrow(/entero/);
     expect(() => oilChangeSchema.parse({ date: "2026-13-45", km: "1" })).toThrow(/fecha/);

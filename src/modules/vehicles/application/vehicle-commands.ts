@@ -5,6 +5,7 @@
  */
 import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import type { OilInterval, OilMode } from "@/modules/maintenance/domain/oil-change";
+import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "../domain/plate";
@@ -125,6 +126,14 @@ export function createVehicleCommands(
     return vehicle;
   }
 
+  /** The vehicle of an existing oil change, which must still accept changes. */
+  async function loadOilChangeVehicle(oilChangeId: number): Promise<VehicleSnapshot> {
+    const vehicle = await repo.findOilChangeVehicle(oilChangeId);
+    if (!vehicle) throw new RuleError("El cambio de aceite ya no existe.");
+    assertEditable(vehicle.status);
+    return vehicle;
+  }
+
   return {
     async createVehicle(input: NewVehicleInput): Promise<CommandResult & { id: number; plate: string }> {
       const plate = parsePlate(input.plate);
@@ -169,6 +178,7 @@ export function createVehicleCommands(
           intervalKm: plan.intervalKm,
           nextDate: plan.nextDate,
           nextKm: plan.nextKm,
+          price: null,
           notes: oil.notes,
         };
         if (plan.newCurrentKm != null) {
@@ -255,7 +265,14 @@ export function createVehicleCommands(
 
     async registerOilChange(
       plate: string,
-      input: { date: IsoDate; km: number | null; notes: string | null; interval: OilInterval },
+      input: {
+        date: IsoDate;
+        km: number | null;
+        notes: string | null;
+        price: number | null;
+        items: OilItem[];
+        interval: OilInterval;
+      },
     ): Promise<CommandResult> {
       const vehicle = await loadOne(plate);
       assertEditable(vehicle.status);
@@ -275,13 +292,56 @@ export function createVehicleCommands(
           intervalKm: plan.intervalKm,
           nextDate: plan.nextDate,
           nextKm: plan.nextKm,
+          price: input.price,
           notes: input.notes,
         },
         plan.newCurrentKm,
+        input.items,
       );
       return { message: "Cambio de aceite registrado." };
     },
-
+    async updateOilChange(
+      oilChangeId: number,
+      input: {
+        date: IsoDate;
+        km: number | null;
+        notes: string | null;
+        price: number | null;
+        items: OilItem[];
+        interval: OilInterval;
+      },
+    ): Promise<CommandResult> {
+      const vehicle = await loadOilChangeVehicle(oilChangeId);
+      const plan = planOilChange({
+        date: input.date,
+        km: input.km,
+        today: today(),
+        vehicle,
+        interval: input.interval,
+      });
+      await repo.updateOilChange(
+        oilChangeId,
+        vehicle.id,
+        {
+          date: input.date,
+          km: input.km,
+          intervalMonths: plan.intervalMonths,
+          intervalKm: plan.intervalKm,
+          nextDate: plan.nextDate,
+          nextKm: plan.nextKm,
+          price: input.price,
+          notes: input.notes,
+        },
+        plan.newCurrentKm,
+        input.items,
+      );
+      return { message: "Cambio de aceite actualizado." };
+    },
+    async deleteOilChange(oilChangeId: number): Promise<CommandResult> {
+      await loadOilChangeVehicle(oilChangeId);
+      await repo.deleteOilChange(oilChangeId);
+      return { message: "Cambio de aceite eliminado." };
+    },
     async updateKm(
       plate: string,
       input: { odometerWorking: boolean; km: number | null },

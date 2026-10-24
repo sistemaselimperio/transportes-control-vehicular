@@ -21,7 +21,7 @@ function snapshot(overrides: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
 }
 
 /** In-memory fake that records every write call. */
-function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99) {
+function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99, oilChangeOwners: Record<number, number> = {}) {
   const calls: Array<{ op: string; args: unknown }> = [];
   const record = (op: string) => async (args: unknown) => {
     calls.push({ op, args });
@@ -36,8 +36,12 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99) {
     updateVehicle: async () => {},
     addDocument: async (id, doc) => void calls.push({ op: "addDocument", args: { id, doc } }),
     addTax: async (id, tax) => void calls.push({ op: "addTax", args: { id, tax } }),
-    addOilChange: async (id, oil, km) =>
-      void calls.push({ op: "addOilChange", args: { id, oil, km } }),
+    addOilChange: async (id, oil, km, items) =>
+      void calls.push({ op: "addOilChange", args: { id, oil, km, items } }),
+    findOilChangeVehicle: async (oilId) => vehicles.find((v) => v.id === oilChangeOwners[oilId]) ?? null,
+    updateOilChange: async (id, vehicleId, oil, km, items) =>
+      void calls.push({ op: "updateOilChange", args: { id, vehicleId, oil, km, items } }),
+    deleteOilChange: async (id) => void calls.push({ op: "deleteOilChange", args: { id } }),
     updateOdometer: async (id, o) => void calls.push({ op: "updateOdometer", args: { id, o } }),
     setStatus: async (id, s) => void calls.push({ op: "setStatus", args: { id, s } }),
     assignDriver: record("assignDriver"),
@@ -47,8 +51,8 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99) {
   return { repo, calls };
 }
 
-const commands = (vehicles: VehicleSnapshot[], imperioId?: number | null) => {
-  const { repo, calls } = fakeRepo(vehicles, imperioId);
+const commands = (vehicles: VehicleSnapshot[], imperioId?: number | null, oilChangeOwners?: Record<number, number>) => {
+  const { repo, calls } = fakeRepo(vehicles, imperioId, oilChangeOwners);
   return { ...createVehicleCommands(repo, () => TODAY), calls };
 };
 
@@ -129,6 +133,8 @@ describe("registerOilChange", () => {
       date: "2026-10-01",
       km: 105000,
       notes: "Filtro",
+      price: 350000,
+      items: [{ quantity: 48, detail: "CUARTOS DELO 15W40" }],
       interval: { months: 2, km: 20000 },
     });
     expect(c.calls).toEqual([
@@ -143,9 +149,11 @@ describe("registerOilChange", () => {
             intervalKm: 20000,
             nextDate: "2026-12-01",
             nextKm: 125000,
+            price: 350000,
             notes: "Filtro",
           },
           km: 105000,
+          items: [{ quantity: 48, detail: "CUARTOS DELO 15W40" }],
         },
       },
     ]);
@@ -154,8 +162,86 @@ describe("registerOilChange", () => {
   it("rejects sold vehicles", async () => {
     const c = commands([snapshot({ status: "SOLD" })]);
     await expect(
-      c.registerOilChange("AAA-111", { date: TODAY, km: 1, notes: null, interval: { months: 2, km: 1 } }),
+      c.registerOilChange("AAA-111", {
+        date: TODAY,
+        km: 1,
+        notes: null,
+        price: null,
+        items: [],
+        interval: { months: 2, km: 1 },
+      }),
     ).rejects.toThrow(RuleError);
+  });
+});
+
+describe("updateOilChange", () => {
+  const edit = {
+    date: "2026-10-01",
+    km: 105000,
+    notes: null,
+    price: null,
+    items: [{ quantity: 1, detail: "FILTRO" }],
+    interval: { months: 3, km: 10000 },
+  };
+
+  it("recomputes the next change and replaces the supplies", async () => {
+    const c = commands([snapshot()], 99, { 7: 1 });
+    const result = await c.updateOilChange(7, edit);
+    expect(result.message).toBe("Cambio de aceite actualizado.");
+    expect(c.calls).toEqual([
+      {
+        op: "updateOilChange",
+        args: {
+          id: 7,
+          vehicleId: 1,
+          oil: {
+            date: "2026-10-01",
+            km: 105000,
+            intervalMonths: 3,
+            intervalKm: 10000,
+            nextDate: "2027-01-01",
+            nextKm: 115000,
+            price: null,
+            notes: null,
+          },
+          km: 105000,
+          items: [{ quantity: 1, detail: "FILTRO" }],
+        },
+      },
+    ]);
+  });
+
+  it("rejects an oil change that no longer exists", async () => {
+    const c = commands([snapshot()]);
+    await expect(c.updateOilChange(7, edit)).rejects.toThrow(/ya no existe/);
+  });
+
+  it("rejects sold vehicles", async () => {
+    const c = commands([snapshot({ status: "SOLD" })], 99, { 7: 1 });
+    await expect(c.updateOilChange(7, edit)).rejects.toThrow(RuleError);
+  });
+
+  it("rejects a future date", async () => {
+    const c = commands([snapshot()], 99, { 7: 1 });
+    await expect(c.updateOilChange(7, { ...edit, date: "2026-12-01" })).rejects.toThrow(RuleError);
+  });
+});
+
+describe("deleteOilChange", () => {
+  it("removes the oil change", async () => {
+    const c = commands([snapshot()], 99, { 7: 1 });
+    expect((await c.deleteOilChange(7)).message).toBe("Cambio de aceite eliminado.");
+    expect(c.calls).toEqual([{ op: "deleteOilChange", args: { id: 7 } }]);
+  });
+
+  it("rejects an oil change that no longer exists", async () => {
+    const c = commands([snapshot()]);
+    await expect(c.deleteOilChange(7)).rejects.toThrow(/ya no existe/);
+  });
+
+  it("rejects sold vehicles", async () => {
+    const c = commands([snapshot({ status: "SOLD" })], 99, { 7: 1 });
+    await expect(c.deleteOilChange(7)).rejects.toThrow(RuleError);
   });
 });
 
