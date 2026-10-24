@@ -9,10 +9,10 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "./index";
 
 const OWNERS = [
-  { name: "TRANSPORTES EL IMPERIO", documentNumber: "901838598", group: "IMPERIO" },
-  { name: "FABIÁN PÁEZ", documentNumber: "74439231", group: "PAEZ" },
+  { name: "Transportes El Imperio", documentNumber: "901838598", group: "IMPERIO" },
+  { name: "Fabián Páez", documentNumber: "74439231", group: "PAEZ" },
   {
-    name: "SANDRA MARCELA PÁEZ PORRAS",
+    name: "Sandra Marcela Páez Porras",
     documentNumber: "1053323036",
     group: "PAEZ",
   },

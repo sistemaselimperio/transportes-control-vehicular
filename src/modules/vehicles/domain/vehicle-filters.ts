@@ -1,4 +1,5 @@
 import type { AlertStatus, VehicleStatus } from "@/modules/alerts/domain/alert-status";
+import { titleCase } from "@/modules/shared/domain/title-case";
 import type { OwnerGroup } from "./vehicle-row";
 
 export interface FilterableRow {
@@ -76,15 +77,8 @@ export function filterVehicleRows<T extends FilterableRow>(
 export const THIRD_PARTY_OWNER = "__THIRD_PARTY__";
 export const NO_OWNER = "__NONE__";
 
-/** Own owners that are not offered in the owner filter. */
+/** Own owners that are not offered in the owner filter, in uppercase to match any stored case. */
 const HIDDEN_OWNERS: ReadonlySet<string> = new Set(["SANDRA MARCELA PÁEZ PORRAS"]);
-
-/** "FABIÁN PÁEZ" -> "Fabián Páez": first letter of each word up, the rest down. */
-export function titleCase(text: string): string {
-  return text
-    .toLocaleLowerCase("es")
-    .replace(/(^|\s)(\p{L})/gu, (_, space: string, letter: string) => space + letter.toLocaleUpperCase("es"));
-}
 
 export interface OwnerOption {
   /** Stored owner name, used as the filter value. */
@@ -97,7 +91,7 @@ export function ownerOptions(rows: readonly Pick<FilterableRow, "ownerName" | "o
   const names = rows
     .filter((r) => r.ownerGroup === "IMPERIO" || r.ownerGroup === "PAEZ")
     .map((r) => r.ownerName)
-    .filter((n): n is string => !!n && !HIDDEN_OWNERS.has(n));
+    .filter((n): n is string => !!n && !HIDDEN_OWNERS.has(n.toLocaleUpperCase("es")));
   return [...new Set(names)]
     .sort((a, b) => a.localeCompare(b, "es"))
     .map((value) => ({ value, label: titleCase(value) }));

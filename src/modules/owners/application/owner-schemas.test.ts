@@ -4,7 +4,7 @@ import { ownerIdSchema, ownerSchema } from "./owner-schemas";
 describe("ownerSchema", () => {
   it("normalizes the raw form values", () => {
     expect(ownerSchema.parse({ name: "  pérez   gómez juan ", documentNumber: "1.053.350.927", group: "PAEZ" })).toEqual({
-      name: "PÉREZ GÓMEZ JUAN",
+      name: "Pérez Gómez Juan",
       documentNumber: "1053350927",
       group: "PAEZ",
     });

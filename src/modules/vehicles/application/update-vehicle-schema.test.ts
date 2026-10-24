@@ -15,7 +15,7 @@ describe("updateVehicleSchema", () => {
       updateVehicleSchema.parse({
         plate: "XYZ987",
         classId: 2,
-        municipality: "TUNJA (BOYACÁ)",
+        municipality: "Tunja (Boyacá)",
         serviceType: "PUBLICO",
         oilMode: "date",
         towingPlate: "TRC500",
@@ -23,7 +23,7 @@ describe("updateVehicleSchema", () => {
     ).toEqual({
       plate: "XYZ987",
       classId: 2,
-      municipality: "TUNJA (BOYACÁ)",
+      municipality: "Tunja (Boyacá)",
       serviceType: "PUBLICO",
       oilMode: "date",
       towingPlate: "TRC500",

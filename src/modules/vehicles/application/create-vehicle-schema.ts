@@ -1,6 +1,7 @@
 /** Zod schema for the JSON body of `POST /api/vehiculos` (create a vehicle). */
 import { z } from "zod";
 import { isMunicipalityLabel } from "@/modules/shared/domain/municipalities";
+import { titleCase } from "@/modules/shared/domain/title-case";
 import type { NewVehicleInput } from "./vehicle-commands";
 
 const isoDate = z
@@ -14,13 +15,16 @@ const text = z
   .nullish()
   .transform((v) => (v?.trim() ? v.trim() : null));
 
+/** A person or company name, e.g. "PÉREZ gómez" becomes "Pérez Gómez". */
+const personName = z.string().trim().min(1).transform(titleCase);
+
 const count = (max: number) => z.number().int().min(0).max(max).nullish().transform((v) => v ?? null);
 
 const ownerSchema = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("existing"), id: z.number().int().positive(), date: isoDate }),
     z.object({ kind: z.literal("imperio"), date: isoDate }),
-    z.object({ kind: z.literal("new"), name: z.string().trim().min(1), documentNumber: text, date: isoDate }),
+    z.object({ kind: z.literal("new"), name: personName, documentNumber: text, date: isoDate }),
   ])
   .transform(({ date, ...target }) => ({ target, date }));
 
@@ -29,7 +33,7 @@ const driverSchema = z
     z.object({ kind: z.literal("existing"), id: z.number().int().positive(), date: isoDate }),
     z.object({
       kind: z.literal("new"),
-      name: z.string().trim().min(1),
+      name: personName,
       nationalId: text,
       phone: text,
       date: isoDate,

@@ -12,7 +12,7 @@ describe("driverSchema", () => {
         status: "IN_WORKSHOP",
       }),
     ).toEqual({
-      name: "PÉREZ GÓMEZ JUAN",
+      name: "Pérez Gómez Juan",
       nationalId: "1053350927",
       phone: "3204298346",
       company: "IMPERIO",
@@ -22,7 +22,7 @@ describe("driverSchema", () => {
 
   it("treats blank optional fields as not provided", () => {
     expect(driverSchema.parse({ name: "Juan", nationalId: "", phone: " ", company: "", status: "ACTIVE" })).toEqual({
-      name: "JUAN",
+      name: "Juan",
       nationalId: null,
       phone: null,
       company: null,

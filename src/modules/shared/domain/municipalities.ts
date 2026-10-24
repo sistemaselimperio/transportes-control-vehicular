@@ -1,9 +1,10 @@
 /**
  * Colombian departments and municipalities from DANE's DIVIPOLA
  * (datos.gov.co dataset gdxc-w37w), sorted by name. A vehicle stores the
- * municipality as its label, e.g. "TUNJA (BOYACÁ)", which is unique.
+ * municipality as its label, e.g. "Tunja (Boyacá)", which is unique.
  */
 import data from "./colombia-divipola.json";
+import { titleCase } from "./title-case";
 
 export interface Municipality {
   /** Five-digit DANE code. */
@@ -22,8 +23,8 @@ export const DEPARTMENTS: readonly Department[] = (
   data as Array<{ code: string; name: string; cities: Array<[string, string]> }>
 ).map((d) => ({
   code: d.code,
-  name: d.name,
-  cities: d.cities.map(([code, name]) => ({ code, name })),
+  name: titleCase(d.name),
+  cities: d.cities.map(([code, name]) => ({ code, name: titleCase(name) })),
 }));
 
 export interface MunicipalityMatch {

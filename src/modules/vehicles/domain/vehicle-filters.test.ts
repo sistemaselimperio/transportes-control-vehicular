@@ -6,7 +6,6 @@ import {
   NO_OWNER,
   THIRD_PARTY_OWNER,
   parseFilterParams,
-  titleCase,
   type FilterableRow,
 } from "./vehicle-filters";
 
@@ -104,16 +103,17 @@ describe("ownerOptions", () => {
     expect(ownerOptions(rows).map((o) => o.value)).toEqual(["FABIÁN PÁEZ"]);
   });
 
+  it("leaves Sandra Páez out whatever the case of her stored name", () => {
+    const rows = [
+      { ownerName: "Sandra Marcela Páez Porras", ownerGroup: "PAEZ" as const },
+      { ownerName: "Fabián Páez", ownerGroup: "PAEZ" as const },
+    ];
+    expect(ownerOptions(rows).map((o) => o.value)).toEqual(["Fabián Páez"]);
+  });
+
   it("labels each owner in title case and keeps the stored name as the value", () => {
     const rows = [{ ownerName: "TRANSPORTES EL IMPERIO", ownerGroup: "IMPERIO" as const }];
     expect(ownerOptions(rows)).toEqual([{ value: "TRANSPORTES EL IMPERIO", label: "Transportes El Imperio" }]);
-  });
-});
-
-describe("titleCase", () => {
-  it("capitalizes the first letter of each word and lowers the rest", () => {
-    expect(titleCase("FABIÁN PÁEZ")).toBe("Fabián Páez");
-    expect(titleCase("sin  propietario")).toBe("Sin  Propietario");
   });
 });
 

@@ -3,8 +3,8 @@ import { createVehicleSchema } from "./create-vehicle-schema";
 
 describe("createVehicleSchema", () => {
   it("accepts only municipalities from the DIVIPOLA catalog", () => {
-    expect(createVehicleSchema.parse({ plate: "ABC123", classId: 1, municipality: "BOGOTÁ, D.C." }).municipality).toBe(
-      "BOGOTÁ, D.C.",
+    expect(createVehicleSchema.parse({ plate: "ABC123", classId: 1, municipality: "Bogotá, D.C." }).municipality).toBe(
+      "Bogotá, D.C.",
     );
     expect(createVehicleSchema.safeParse({ plate: "ABC123", classId: 1, municipality: "Bogota" }).success).toBe(false);
   });
@@ -27,6 +27,17 @@ describe("createVehicleSchema", () => {
       tax: null,
       oilChange: null,
     });
+  });
+
+  it("capitalizes the first letter of each word of a new owner and driver", () => {
+    const parsed = createVehicleSchema.parse({
+      plate: "ABC123",
+      classId: 1,
+      owner: { kind: "new", name: "  PÉREZ   gómez juan ", date: "2026-10-01" },
+      driver: { kind: "new", name: "maría de la rosa", date: "2026-10-01" },
+    });
+    expect(parsed.owner?.target).toMatchObject({ name: "Pérez Gómez Juan" });
+    expect(parsed.driver?.target).toMatchObject({ name: "María de la Rosa" });
   });
 
   it("parses the full body with owner, driver, documents, tax and oil change", () => {

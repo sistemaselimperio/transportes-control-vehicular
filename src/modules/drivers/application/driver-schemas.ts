@@ -1,5 +1,6 @@
 /** Zod schemas that parse the raw form values (strings) of the driver forms. */
 import { z } from "zod";
+import { titleCase } from "@/modules/shared/domain/title-case";
 
 /** Trimmed text where blank means "not provided". */
 const textField = z
@@ -12,7 +13,7 @@ export const driverSchema = z.object({
   name: z
     .string()
     .default("")
-    .transform((v) => v.trim().replace(/\s+/g, " ").toUpperCase())
+    .transform(titleCase)
     .refine((v) => v !== "", "Ingresa el nombre del conductor."),
   nationalId: textField
     .transform((v) => v?.replace(/[.\s]/g, "") ?? null)
