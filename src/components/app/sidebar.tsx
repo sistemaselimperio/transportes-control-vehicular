@@ -5,7 +5,6 @@ import {
   Bell,
   Building2,
   CalendarCheck,
-  FileText,
   LogOut,
   Menu,
   Receipt,
@@ -34,7 +33,6 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
       { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench },
-      { href: "/documentos", label: "Documentos", icon: FileText },
     ],
   },
   {
