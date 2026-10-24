@@ -7,9 +7,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
-import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import {
-  changeStatusAction,
   registerOilChangeAction,
   renewDocumentAction,
   updateKmAction,
@@ -253,39 +251,6 @@ export function UpdateKmForm({ plate, ctx, onDone, onCancel }: FormProps) {
         />
         El odómetro no funciona
       </label>
-    </ActionForm>
-  );
-}
-
-const STATUS_OPTIONS: Array<{ value: Exclude<VehicleStatus, "SOLD">; label: string }> = [
-  { value: "ACTIVE", label: "Activo" },
-  { value: "IDLE", label: "Quieta" },
-  { value: "IN_WORKSHOP", label: "En taller" },
-];
-
-export function ChangeStatusForm({
-  plate,
-  status,
-  onDone,
-  onCancel,
-}: Omit<FormProps, "ctx"> & { status: VehicleStatus }) {
-  const first = STATUS_OPTIONS.find((o) => o.value !== status)?.value;
-  return (
-    <ActionForm
-      action={(fd) => changeStatusAction(plate, fd)}
-      submitLabel="Cambiar estado"
-      onDone={onDone}
-      onCancel={onCancel}
-    >
-      <Field label="Nuevo estado" htmlFor="status-value">
-        <NativeSelect id="status-value" name="status" defaultValue={first}>
-          {STATUS_OPTIONS.filter((o) => o.value !== status).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
     </ActionForm>
   );
 }

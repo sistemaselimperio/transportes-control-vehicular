@@ -44,6 +44,7 @@ export function ActionForm({
   action,
   submitLabel,
   pendingLabel = "Guardando…",
+  destructive = false,
   onDone,
   onCancel,
   children,
@@ -51,6 +52,8 @@ export function ActionForm({
   action: (fd: FormData) => Promise<ActionResult>;
   submitLabel: string;
   pendingLabel?: string;
+  /** Draws the submit button as destructive, for irreversible actions. */
+  destructive?: boolean;
   onDone: (message: string) => void;
   onCancel: () => void;
   children: ReactNode;
@@ -89,7 +92,12 @@ export function ActionForm({
           <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={onCancel} disabled={pending}>
             Cancelar
           </Button>
-          <Button type="submit" className="h-11 px-4 md:h-10" disabled={pending}>
+          <Button
+            type="submit"
+            variant={destructive ? "destructive" : "default"}
+            className="h-11 px-4 md:h-10"
+            disabled={pending}
+          >
             {pending ? pendingLabel : submitLabel}
           </Button>
         </div>

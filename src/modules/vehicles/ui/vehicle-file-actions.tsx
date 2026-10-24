@@ -1,32 +1,33 @@
 "use client";
 
-import { Menu } from "@base-ui/react/menu";
 import {
   ArrowRightLeft,
   CalendarClock,
+  AlertCircle,
   CheckCircle2,
   Droplets,
   Gauge,
   HandCoins,
-  MoreHorizontal,
   Pencil,
-  Power,
   Receipt,
   UserRound,
 } from "lucide-react";
 import {
   createContext,
   useContext,
+  useOptimistic,
   useState,
+  useTransition,
   type ComponentType,
   type ReactNode,
 } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
+import { changeStatusAction } from "../application/vehicle-actions";
 import type { VehicleActionContext, VehicleDetail } from "../application/vehicle-queries";
 import {
-  ChangeStatusForm,
   OilChangeForm,
   RenewDocumentForm,
   UpdateKmForm,
@@ -41,7 +42,6 @@ export type ActionKey =
   | "tax"
   | "oil"
   | "km"
-  | "status"
   | "driver"
   | "owner"
   | "sell";
@@ -55,20 +55,24 @@ const ACTIONS: Record<
   tax: { label: "Impuesto", title: "Actualizar impuesto", icon: Receipt },
   oil: { label: "Cambio de aceite", title: "Registrar cambio de aceite", icon: Droplets },
   km: { label: "Kilometraje", title: "Actualizar kilometraje", icon: Gauge },
-  status: { label: "Cambiar estado", title: "Cambiar estado", icon: Power },
   driver: { label: "Asignar conductor", title: "Asignar conductor", icon: UserRound },
   owner: { label: "Traspasar", title: "Traspasar propietario", icon: ArrowRightLeft },
   sell: { label: "Vender", title: "Vender vehículo", icon: HandCoins },
 };
 
+type Notice = { tone: "ok" | "error"; text: string };
+
 interface FileActionsContext {
+  plate: string;
+  status: VehicleStatus;
   sold: boolean;
   open: (key: ActionKey) => void;
+  notify: (notice: Notice) => void;
 }
 
 const Ctx = createContext<FileActionsContext | null>(null);
 
-function useFileActions() {
+export function useFileActions() {
   const value = useContext(Ctx);
   if (!value) throw new Error("File action controls must sit inside <FileActions>");
   return value;
@@ -76,7 +80,7 @@ function useFileActions() {
 
 /**
  * Owns the one side panel of the vehicle file. Buttons anywhere below
- * (`ActionButtons`, `OverflowMenu`) open it through context, so the page itself
+ * (`ActionButtons`, `SellButton`) open it through context, so the page itself
  * stays a server component.
  */
 export function FileActions({
@@ -84,26 +88,32 @@ export function FileActions({
   status,
   ctx,
   edit,
+  current,
   children,
 }: {
   plate: string;
   status: VehicleStatus;
   ctx: VehicleActionContext;
   edit: VehicleDetail["edit"];
+  /** Who the sale would close, shown in the sell form. */
+  current: { owner: string | null; driver: string | null };
   children: ReactNode;
 }) {
   const [active, setActive] = useState<ActionKey | null>(null);
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<Notice | null>(null);
 
   const close = () => setOpen(false);
+  const notify = (notice: Notice) => {
+    setMessage(notice);
+    setTimeout(() => setMessage((m) => (m === notice ? null : m)), 6000);
+  };
   const common = {
     plate,
     ctx,
     onCancel: close,
-    onDone: (msg: string) => {
-      setMessage(msg);
-      setTimeout(() => setMessage(null), 6000);
+    onDone: (text: string) => {
+      notify({ tone: "ok", text });
       close();
     },
   };
@@ -111,23 +121,35 @@ export function FileActions({
   return (
     <Ctx.Provider
       value={{
+        plate,
+        status,
         sold: status === "SOLD",
         open: (key) => {
           setMessage(null);
           setActive(key);
           setOpen(true);
         },
+        notify,
       }}
     >
       {children}
 
       {message && (
         <p
-          role="status"
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-ok-foreground/20 bg-ok px-4 py-3 text-sm text-ok-foreground shadow-soft"
+          role={message.tone === "error" ? "alert" : "status"}
+          className={cn(
+            "fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border px-4 py-3 text-sm shadow-soft",
+            message.tone === "error"
+              ? "border-destructive/20 bg-popover text-destructive"
+              : "border-ok-foreground/20 bg-ok text-ok-foreground",
+          )}
         >
-          <CheckCircle2 className="size-4 shrink-0" aria-hidden />
-          {message}
+          {message.tone === "error" ? (
+            <AlertCircle className="size-4 shrink-0" aria-hidden />
+          ) : (
+            <CheckCircle2 className="size-4 shrink-0" aria-hidden />
+          )}
+          {message.text}
         </p>
       )}
 
@@ -151,23 +173,15 @@ export function FileActions({
         {active === "tax" && <UpdateTaxForm {...common} />}
         {active === "oil" && <OilChangeForm {...common} />}
         {active === "km" && <UpdateKmForm {...common} />}
-        {active === "status" && (
-          <ChangeStatusForm
-            plate={plate}
-            status={status}
-            onCancel={close}
-            onDone={common.onDone}
-          />
-        )}
         {active === "driver" && <AssignDriverForm {...common} />}
         {active === "owner" && <TransferOwnerForm {...common} />}
-        {active === "sell" && <SellForm {...common} />}
+        {active === "sell" && <SellForm {...common} current={current} />}
       </SlideOver>
     </Ctx.Provider>
   );
 }
 
-const EDIT_SHORTCUTS: readonly ActionKey[] = ["owner", "driver", "document", "tax", "km", "oil", "status"];
+const EDIT_SHORTCUTS: readonly ActionKey[] = ["owner", "driver", "document", "tax", "km", "oil"];
 
 /** Inside "Editar datos": jumps the open panel straight to another action. */
 function EditShortcuts({ onOpen }: { onOpen: (key: ActionKey) => void }) {
@@ -192,20 +206,27 @@ function EditShortcuts({ onOpen }: { onOpen: (key: ActionKey) => void }) {
   );
 }
 
-/** The actions that belong to one tab. Sold vehicles get the read-only notice instead. */
-export function ActionButtons({ keys }: { keys: readonly ActionKey[] }) {
+/**
+ * Compact action buttons for one section (32px on desktop, 44px on phones). `primary` names the
+ * one key drawn filled; the rest are outlined. Hidden once the vehicle is sold.
+ */
+export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; primary?: ActionKey }) {
   const { sold, open } = useFileActions();
-  if (sold) return <SoldNotice />;
+  if (sold) return null;
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {keys.map((key) => {
         const { label, icon: Icon } = ACTIONS[key];
         return (
           <Button
             key={key}
             type="button"
-            variant="outline"
-            className="h-11 px-3.5 md:h-9"
+            variant={key === primary ? "default" : "outline"}
+            className={
+              key === primary
+                ? "h-11 bg-foreground px-3 text-background hover:bg-foreground/85 md:h-8"
+                : "h-11 bg-transparent px-3 hover:bg-muted md:h-8"
+            }
             onClick={() => open(key)}
           >
             <Icon aria-hidden />
@@ -217,9 +238,74 @@ export function ActionButtons({ keys }: { keys: readonly ActionKey[] }) {
   );
 }
 
+const STATUS_CHOICES: Array<{ value: Exclude<VehicleStatus, "SOLD">; label: string; dot: string }> = [
+  { value: "ACTIVE", label: "Activo", dot: "bg-ok-foreground" },
+  { value: "IDLE", label: "Quieta", dot: "bg-muted-foreground" },
+  { value: "IN_WORKSHOP", label: "Taller", dot: "bg-warn-foreground" },
+];
+
+/**
+ * Operational status as a segmented control: one tap saves it, no panel. The pick shows at
+ * once (optimistic) and falls back if the server refuses. Hidden once the vehicle is sold.
+ */
+export function StatusSwitch() {
+  const { plate, status, sold, notify } = useFileActions();
+  const [shown, setShown] = useOptimistic(status);
+  const [pending, startTransition] = useTransition();
+  if (sold) return null;
+
+  function choose(next: (typeof STATUS_CHOICES)[number]) {
+    if (next.value === shown || pending) return;
+    startTransition(async () => {
+      setShown(next.value);
+      const fd = new FormData();
+      fd.set("status", next.value);
+      const result = await changeStatusAction(plate, fd);
+      notify(result.ok ? { tone: "ok", text: `Estado: ${next.label}.` } : { tone: "error", text: result.error });
+    });
+  }
+
+  return (
+    <div
+      role="group"
+      aria-label="Estado del vehículo"
+      aria-busy={pending}
+      className="inline-flex shrink-0 rounded-lg border bg-muted/50 p-0.5"
+    >
+      {STATUS_CHOICES.map((choice) => {
+        const on = choice.value === shown;
+        return (
+          <button
+            key={choice.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => choose(choice)}
+            className={cn(
+              "inline-flex h-10 items-center gap-1.5 rounded-md px-3 text-sm outline-none transition-[color,background-color,box-shadow] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50 md:h-7 md:px-2.5",
+              on
+                ? "bg-background font-medium text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "size-2 rounded-full transition-opacity duration-150",
+                choice.dot,
+                on ? "opacity-100" : "opacity-40",
+              )}
+            />
+            {choice.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SoldNotice() {
   return (
-    <p className="rounded-xl border border-dashed bg-card/60 px-4 py-3 text-sm text-muted-foreground">
+    <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
       Vehículo vendido: ya no admite cambios.
     </p>
   );
@@ -231,38 +317,26 @@ export function EditDataButton() {
   if (sold) return null;
   const { label, icon: Icon } = ACTIONS.edit;
   return (
-    <Button type="button" variant="outline" className="h-11 px-3.5 md:h-9" onClick={() => open("edit")}>
+    <Button type="button" variant="outline" className="h-11 bg-transparent px-3 hover:bg-muted md:h-8" onClick={() => open("edit")}>
       <Icon aria-hidden />
       {label}
     </Button>
   );
 }
 
-/** Header overflow: the destructive action lives here, away from daily ones. */
-export function OverflowMenu() {
+/** Header button that opens the sale form; icon only, kept apart from daily actions. Hidden once sold. */
+export function SellButton() {
   const { sold, open } = useFileActions();
   if (sold) return null;
   return (
-    <Menu.Root>
-      <Menu.Trigger
-        aria-label="Más acciones"
-        className="flex size-11 items-center justify-center rounded-lg border bg-card text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 data-popup-open:bg-muted data-popup-open:text-foreground md:size-9"
-      >
-        <MoreHorizontal className="size-4" aria-hidden />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner align="end" sideOffset={6} className="z-50">
-          <Menu.Popup className="min-w-52 rounded-xl border bg-popover p-1 shadow-soft outline-none transition-[opacity,transform] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            <Menu.Item
-              onClick={() => requestAnimationFrame(() => open("sell"))}
-              className="flex min-h-11 cursor-default items-center gap-2 rounded-lg px-3 text-sm text-destructive outline-none data-highlighted:bg-destructive/10"
-            >
-              <HandCoins className="size-4" aria-hidden />
-              Vender vehículo
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+    <button
+      type="button"
+      aria-label="Vender vehículo"
+      title="Vender vehículo"
+      onClick={() => open("sell")}
+      className="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-transparent text-muted-foreground outline-none transition-colors duration-150 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/50 md:size-8"
+    >
+      <HandCoins className="size-4" aria-hidden />
+    </button>
   );
 }

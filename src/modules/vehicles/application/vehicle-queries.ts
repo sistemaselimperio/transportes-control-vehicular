@@ -1,7 +1,8 @@
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
 import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
+import type { VehicleFileItem } from "@/modules/documents/application/vehicle-file-ports";
+import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { buildVehicleRow, formatKm, type VehicleGridRow, type VehicleRowInput } from "../domain/vehicle-row";
-import { mergeTimeline, type TimelineEntry } from "../domain/vehicle-timeline";
 import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
   loadVehicleEditValues,
@@ -67,14 +68,11 @@ export interface VehicleDetail {
   edit: { values: VehicleEditValues; options: VehicleFormOptions };
   ownerships: HistoryItem[];
   drivers: HistoryItem[];
-  documents: HistoryItem[];
   oilChanges: HistoryItem[];
   sale: HistoryItem | null;
-  /** Owners, drivers, documents, oil changes and sale on one timeline, newest first. */
-  timeline: TimelineEntry[];
+  /** Metadata of the attached files (never their bytes). */
+  files: VehicleFileItem[];
 }
-
-const DOC_LABELS = { SOAT: "SOAT", TECNO: "Tecnomecánica", POLICY: "Póliza" } as const;
 
 const period = (from: string, to: string | null) =>
   `Desde ${formatDisplayDate(from)}${to ? ` hasta ${formatDisplayDate(to)}` : ""}`;
@@ -106,11 +104,12 @@ export async function getVehicleActionContext(plate: string): Promise<VehicleAct
 export async function getVehicleDetail(plate: string): Promise<VehicleDetail | null> {
   const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
   if (!input) return null;
-  const [history, people, editValues, lists] = await Promise.all([
+  const [history, people, editValues, lists, files] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),
     loadPeople(),
     loadVehicleEditValues(plate),
     loadVehicleFormLists(),
+    vehicleFileRepository.listByVehicle(input.vehicle.id),
   ]);
 
   const ownerships = history.ownerships.map((o) => ({
@@ -120,14 +119,6 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
   const drivers = history.assignments.map((a) => ({
     title: a.driverName,
     detail: `${period(a.fromDate, a.toDate)}${a.phone ? ` · ${a.phone}` : ""}`,
-  }));
-  const documents = history.documents.map((d) => ({
-    title: `${DOC_LABELS[d.type]}${d.policyKind ? ` (${d.policyKind})` : ""}`,
-    detail: d.notApplicable
-      ? "No aplica"
-      : d.expiresOn
-        ? `Vence ${formatDisplayDate(d.expiresOn)}`
-        : "Sin fecha",
   }));
   const oilChanges = history.oilChanges.map((c) => ({
     title: formatDisplayDate(c.date),
@@ -156,37 +147,6 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
       }
     : null;
 
-  // Same records, now with the day they happened (documents: the day they were registered).
-  const timeline = mergeTimeline([
-    ...history.ownerships.map((o, i) => ({
-      kind: "owner" as const,
-      date: o.fromDate,
-      title: ownerships[i].title,
-      detail: ownerships[i].detail,
-    })),
-    ...history.assignments.map((a, i) => ({
-      kind: "driver" as const,
-      date: a.fromDate,
-      title: drivers[i].title,
-      detail: drivers[i].detail,
-    })),
-    ...history.documents.map((d, i) => ({
-      kind: "document" as const,
-      date: todayInBogota(d.createdAt),
-      title: documents[i].title,
-      detail: `Registrado · ${documents[i].detail}`,
-    })),
-    ...history.oilChanges.map((c, i) => ({
-      kind: "oil" as const,
-      date: c.date,
-      title: "Cambio de aceite",
-      detail: oilChanges[i].detail,
-    })),
-    ...(history.sale && sale
-      ? [{ kind: "sale" as const, date: history.sale.date ?? null, title: sale.title, detail: sale.detail }]
-      : []),
-  ]);
-
   return {
     row: buildVehicleRow(input),
     actions: buildActionContext(input, people),
@@ -196,9 +156,14 @@ export async function getVehicleDetail(plate: string): Promise<VehicleDetail | n
     },
     ownerships,
     drivers,
-    documents,
     oilChanges,
     sale,
-    timeline,
+    files: files.map(({ id, category, fileName, sizeBytes, uploadedAt }) => ({
+      id,
+      category,
+      fileName,
+      sizeBytes,
+      uploadedAt,
+    })),
   };
 }
