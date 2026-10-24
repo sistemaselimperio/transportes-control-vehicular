@@ -103,6 +103,11 @@ export const STATUS_LABELS: Record<VehicleStatus, string> = {
   SOLD: "Vendido",
 };
 
+/** Name shown in the fleet table: "Transportes El Imperio" reads as "Transportes"; other owners stay whole. */
+export function ownerShortName(name: string, group: OwnerGroup | null): string {
+  return group === "IMPERIO" ? name.split(" ")[0] : name;
+}
+
 export function formatKm(km: number): string {
   return String(Math.round(km)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }

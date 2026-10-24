@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { COLUMN_GROUPS, type ColumnGroupKey } from "../domain/column-groups";
-import { formatKm, type DocCell, type VehicleGridRow } from "../domain/vehicle-row";
+import { formatKm, ownerShortName, type DocCell, type VehicleGridRow } from "../domain/vehicle-row";
 
 declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -75,7 +75,11 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
     header: "Propietario",
     accessorFn: (r) => r.ownerName ?? "",
     cell: ({ row }) =>
-      row.original.ownerName ?? <span className="text-muted-foreground">Sin propietario</span>,
+      row.original.ownerName ? (
+        <span title={row.original.ownerName}>{ownerShortName(row.original.ownerName, row.original.ownerGroup)}</span>
+      ) : (
+        <span className="text-muted-foreground">Sin propietario</span>
+      ),
   },
   driver: {
     id: "driver",

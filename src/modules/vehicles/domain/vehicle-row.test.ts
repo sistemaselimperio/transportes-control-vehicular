@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_TECHNICAL_DATA } from "./technical-data";
-import { buildVehicleRow, type VehicleRowInput } from "./vehicle-row";
+import { buildVehicleRow, ownerShortName, type VehicleRowInput } from "./vehicle-row";
 
 const TODAY = "2026-10-17";
 
@@ -168,5 +168,16 @@ describe("buildVehicleRow", () => {
     expect(row.nextChange.text).toBe("01/12/2026");
     expect(row.nextChange.status).toBe("ok");
     expect(row.odometerWorking).toBe(false);
+  });
+});
+
+describe("ownerShortName", () => {
+  it("keeps only the first word of the company name", () => {
+    expect(ownerShortName("Transportes El Imperio", "IMPERIO")).toBe("Transportes");
+  });
+
+  it("leaves any other owner whole", () => {
+    expect(ownerShortName("Fabián Páez", "PAEZ")).toBe("Fabián Páez");
+    expect(ownerShortName("Bancolombia S.A.", "THIRD_PARTY")).toBe("Bancolombia S.A.");
   });
 });
