@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils";
 const STYLES: Record<AlertStatus, { className: string; label: string }> = {
   expired: {
     className:
-      "bg-danger text-danger-foreground ring-danger-foreground/25",
+      "bg-danger-foreground/15 text-danger-foreground ring-danger-foreground/40",
     label: "Vencido",
   },
   warning: {
     className:
-      "bg-warn text-warn-foreground ring-warn-foreground/25",
+      "bg-warn/60 text-warn-foreground ring-warn-foreground/30",
     label: "Por vencer o sin dato",
   },
   ok: {

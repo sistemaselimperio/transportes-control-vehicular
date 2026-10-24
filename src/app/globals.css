@@ -91,11 +91,11 @@
   --border: #dcdccc;
   --input: #c6c6b0;
   --ring: #879200;
-  /* Status: green ok, orange warn (kept apart from the brand yellow), red danger. */
+  /* Status: green ok, amber warn (kept apart from the red danger), red danger. */
   --ok: #dcf5e3;
   --ok-foreground: #166534;
-  --warn: #ffead2;
-  --warn-foreground: #9a3412;
+  --warn: #fde68a;
+  --warn-foreground: #713f12;
   --danger: #ffe2dc;
   --danger-foreground: #b42318;
   /* Owner series: olive Imperio, blue Páez, orange third parties, gray none. */

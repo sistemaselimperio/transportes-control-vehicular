@@ -13,7 +13,7 @@ const BLOCKS: Record<Urgency, { id: string; title: string; range: string; tone?:
   month: { id: "proximos-30", title: "Próximos 30 días", range: "8 a 30 días" },
 };
 
-const focus = "outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset";
+const focus ="outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset";
 
 function VehicleRow({
   vehicle,
@@ -27,7 +27,7 @@ function VehicleRow({
   return (
     <li
       data-active={selected ? "true" : undefined}
-      className="flex flex-col gap-x-4 gap-y-1 px-5 py-2 transition-colors duration-150 hover:bg-muted data-[active=true]:bg-secondary md:flex-row md:items-center"
+      className="relative flex cursor-pointer items-center gap-x-3 px-4 py-1.5 transition-colors duration-150 hover:bg-muted data-[active=true]:bg-brand/12 data-[active=true]:shadow-[inset_3px_0_0_var(--color-brand)] md:gap-x-4 md:px-5"
     >
       <button
         type="button"
@@ -35,22 +35,25 @@ function VehicleRow({
         aria-label={`Ver pendientes de ${vehicle.plate}`}
         onClick={() => onSelect(vehicle.plate, null)}
         className={cn(
-          "flex min-h-11 flex-none items-center self-start rounded-md transition-transform duration-150 active:scale-[0.97] md:w-28",
+          // The ::after overlay stretches this button over the whole row, so any click on it selects the vehicle.
+          "flex min-h-11 flex-none cursor-pointer items-center rounded-md transition-transform duration-150 after:absolute after:inset-0 after:content-[''] active:scale-[0.97] md:w-28",
           focus,
         )}
       >
         <span className="plate">{vehicle.plate}</span>
       </button>
-      <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 md:gap-y-1" aria-label={`Pendientes de ${vehicle.plate}`}>
+      <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5" aria-label={`Pendientes de ${vehicle.plate}`}>
         {vehicle.items.map((item) => (
-          <li key={item.kind} className="flex-none">
+          <li key={item.kind} className="relative z-10 flex-none">
             <button
               type="button"
+              aria-label={`${KIND_LABELS[item.kind]} de ${vehicle.plate}: ${pillText(item)}`}
+              title={`${KIND_LABELS[item.kind]} · ${pillText(item)}`}
               onClick={() => onSelect(vehicle.plate, item.kind)}
-              className={cn("flex min-h-11 items-center rounded-md transition-transform duration-150 active:scale-[0.97] md:min-h-9", focus)}
+              className={cn("flex min-h-11 cursor-pointer items-center rounded-md transition-transform duration-150 active:scale-[0.97] md:min-h-9", focus)}
             >
-              <StatusPill status={item.status} className="flex-none whitespace-nowrap">
-                {KIND_LABELS[item.kind]} · {pillText(item)}
+              <StatusPill status={item.status} className="flex-none whitespace-nowrap py-1.5 text-sm">
+                {KIND_LABELS[item.kind]}
               </StatusPill>
             </button>
           </li>
