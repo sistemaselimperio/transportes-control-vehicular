@@ -12,7 +12,7 @@ export interface CommandResult {
 }
 
 const CREATED: Record<EntryKind, string> = {
-  service: "Servicio registrado.",
+  service: "Mantenimiento registrado.",
   tire: "Cambio de llantas registrado.",
   fuel: "Tanqueo registrado.",
 };

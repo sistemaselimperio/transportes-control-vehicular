@@ -22,7 +22,7 @@ type Form =
   | { kind: "oil"; row: OilRow };
 
 const TITLES: Record<Form["kind"], { create: string; edit: string }> = {
-  service: { create: "Registrar servicio", edit: "Editar servicio" },
+  service: { create: "Registrar mantenimiento", edit: "Editar mantenimiento" },
   tire: { create: "Registrar cambio de llantas", edit: "Editar cambio de llantas" },
   fuel: { create: "Registrar tanqueo", edit: "Editar tanqueo" },
   oil: { create: "Registrar cambio de aceite", edit: "Editar cambio de aceite" },
@@ -78,7 +78,7 @@ export function VehicleLogbookSection({
       actions={
         sold ? undefined : (
           <div className="flex flex-wrap gap-1.5">
-            <AddButton icon={Wrench} label="Servicio" onClick={() => setForm({ kind: "service" })} />
+            <AddButton icon={Wrench} label="Mantenimiento" onClick={() => setForm({ kind: "service" })} />
             <AddButton icon={Droplets} label="Aceite" onClick={() => fileActions.open("oil")} />
             <AddButton icon={Disc3} label="Llantas" onClick={() => setForm({ kind: "tire" })} />
             <AddButton icon={Fuel} label="Combustible" onClick={() => setForm({ kind: "fuel" })} />
@@ -86,7 +86,7 @@ export function VehicleLogbookSection({
         )
       }
     >
-      <SubHeading count={logbook.services.length}>Servicios</SubHeading>
+      <SubHeading count={logbook.services.length}>Mantenimiento</SubHeading>
       <CompactServices rows={logbook.services} {...list} onEdit={(row) => setForm({ kind: "service", row })} />
       <SubHeading count={logbook.oilChanges.length}>Cambios de aceite</SubHeading>
       <CompactOilChanges rows={logbook.oilChanges} {...list} onEdit={(row) => setForm({ kind: "oil", row })} />

@@ -43,7 +43,7 @@ describe("create", () => {
   it("stores the record on the vehicle with the plate", async () => {
     const { commands, calls } = setup();
     const result = await commands.create("service", "AAA-111", service);
-    expect(result.message).toBe("Servicio registrado.");
+    expect(result.message).toBe("Mantenimiento registrado.");
     expect(calls).toEqual([{ op: "create", args: { kind: "service", vehicleId: 1, values: service } }]);
   });
 

@@ -43,7 +43,7 @@ describe("serviceSchema", () => {
   it("requires the description and the kind", () => {
     expect(() =>
       serviceSchema.parse({ plate: "ABC-123", date: "2026-05-10", kind: "CORRECTIVE", description: " " }),
-    ).toThrow("Describe el servicio");
+    ).toThrow("Describe el mantenimiento");
     expect(() =>
       serviceSchema.parse({ plate: "ABC-123", date: "2026-05-10", kind: "OTHER", description: "x" }),
     ).toThrow("tipo de servicio");

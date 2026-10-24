@@ -38,7 +38,7 @@ interface Spec<T extends { id: number; plate: string; date: string; driverName: 
 const itemsText = (row: OilRow) => row.items.map((i) => `${i.quantity.toLocaleString("es-CO")} ${i.detail}`);
 
 export const SERVICE_SPEC: Spec<ServiceRow> = {
-  noun: "servicio",
+  noun: "mantenimiento",
   columns: [
     { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
     { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
@@ -51,7 +51,7 @@ export const SERVICE_SPEC: Spec<ServiceRow> = {
   ],
   summary: (r) => ({
     title: r.description,
-    detail: joinDetail([SERVICE_KIND_LABELS[r.kind], r.provider, r.km != null ? `${formatKm(r.km)} km` : null, r.notes]),
+    detail: joinDetail([SERVICE_KIND_LABELS[r.kind], r.provider, r.notes]),
     amount: r.price === null ? null : formatPrice(r.price),
   }),
   remove: (id) => deleteLogbookEntryAction("service", id),

@@ -18,8 +18,8 @@ const positiveInt = (label: string, message: string, max: number) =>
 
 const serviceBody = z.object({
   date: dateField("Fecha"),
-  kind: z.enum(["PREVENTIVE", "CORRECTIVE"], "Elige el tipo de servicio."),
-  description: requiredText("Describe el servicio."),
+  kind: z.enum(["PREVENTIVE", "CORRECTIVE"], "Elige el tipo de mantenimiento."),
+  description: requiredText("Describe el mantenimiento."),
   provider: textField,
   km: intField("El kilometraje", 999_999_999),
   price,

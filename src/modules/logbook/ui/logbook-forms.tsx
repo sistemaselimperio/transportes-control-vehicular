@@ -99,7 +99,7 @@ export function ServiceForm({ row, today, providers, vehicle, onDone, onCancel }
   return (
     <ActionForm
       action={(fd) => (row ? updateServiceAction(row.id, fd) : createServiceAction(fd))}
-      submitLabel={row ? "Guardar cambios" : "Registrar servicio"}
+      submitLabel={row ? "Guardar cambios" : "Registrar mantenimiento"}
       onDone={onDone}
       onCancel={onCancel}
     >
@@ -131,9 +131,6 @@ export function ServiceForm({ row, today, providers, vehicle, onDone, onCancel }
       <Fields>
         <Field label="Precio (opcional)" htmlFor={`${id}-price`}>
           <PesosInput id={`${id}-price`} name="price" defaultValue={row?.price} />
-        </Field>
-        <Field label="Kilometraje (opcional)" htmlFor={`${id}-km`}>
-          <Input id={`${id}-km`} name="km" inputMode="numeric" className={FIELD} defaultValue={row?.km ?? ""} />
         </Field>
       </Fields>
       <Field label="Novedad (opcional)" htmlFor={`${id}-notes`}>

@@ -30,7 +30,7 @@ import { OilCreateFlow, OilEditForm } from "./oil-forms";
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const NEW_LABELS: Record<LogbookTab, { button: string; create: string; edit: string }> = {
-  servicios: { button: "Servicio", create: "Registrar servicio", edit: "Editar servicio" },
+  servicios: { button: "Mantenimiento", create: "Registrar mantenimiento", edit: "Editar mantenimiento" },
   aceite: { button: "Cambio de aceite", create: "Registrar cambio de aceite", edit: "Editar cambio de aceite" },
   llantas: { button: "Llantas", create: "Registrar cambio de llantas", edit: "Editar cambio de llantas" },
   combustible: { button: "Tanqueo", create: "Registrar tanqueo", edit: "Editar tanqueo" },
@@ -123,7 +123,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
     <section className="space-y-5">
       <PageHeader
         title="Bitácora"
-        description={`Servicios, cambios de aceite, llantas y combustible de la flota${query.group ? ` · ${GROUP_LABELS[query.group]}` : ""}.`}
+        description={`Mantenimientos, cambios de aceite, llantas y combustible de la flota${query.group ? ` · ${GROUP_LABELS[query.group]}` : ""}.`}
         actions={
           <Button type="button" className="h-11 px-4 md:h-9" onClick={() => setCreating(true)}>
             <Plus aria-hidden />

@@ -66,7 +66,7 @@ export interface VehicleLogbook {
 export type LogbookTab = "servicios" | "aceite" | "llantas" | "combustible";
 
 export const LOGBOOK_TABS: ReadonlyArray<{ key: LogbookTab; label: string }> = [
-  { key: "servicios", label: "Servicios" },
+  { key: "servicios", label: "Mantenimiento" },
   { key: "aceite", label: "Aceite" },
   { key: "llantas", label: "Llantas" },
   { key: "combustible", label: "Combustible" },
