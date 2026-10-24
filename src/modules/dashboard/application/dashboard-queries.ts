@@ -4,19 +4,13 @@ import {
   buildAttentionItems,
   computeKpis,
   filterByGroup,
-  fleetByClass,
-  fleetByGroup,
-  migrationProgress,
-  pendingOilChanges,
-  soldByYear,
   type DashboardRow,
   type OwnerGroup,
 } from "../domain/dashboard-metrics";
-import { loadSaleDates } from "../infrastructure/dashboard-repository";
 
 export async function getDashboard(group: OwnerGroup | null) {
   const today = todayInBogota();
-  const [gridRows, saleDates] = await Promise.all([listVehicleRows(), loadSaleDates()]);
+  const gridRows = await listVehicleRows();
 
   const all: DashboardRow[] = gridRows.map((r) => ({
     plate: r.plate,
@@ -29,7 +23,6 @@ export async function getDashboard(group: OwnerGroup | null) {
     policy: { status: r.policy.status, date: r.policy.date },
     tax: { status: r.tax.status, text: r.tax.text },
     nextChange: { status: r.nextChange.status, text: r.nextChange.text },
-    soldOn: r.vehicleStatus === "SOLD" ? (saleDates.get(r.id) ?? null) : null,
   }));
   const rows = filterByGroup(all, group);
 
@@ -38,12 +31,6 @@ export async function getDashboard(group: OwnerGroup | null) {
     group,
     kpis: computeKpis(rows, today),
     attention: buildAttentionItems(rows, today),
-    byClass: fleetByClass(rows),
-    byGroup: fleetByGroup(rows),
-    // Migration is a fleet-wide measure: it ignores the owner-group filter.
-    migration: migrationProgress(all),
-    oil: pendingOilChanges(rows),
-    soldByYear: soldByYear(rows),
   };
 }
 

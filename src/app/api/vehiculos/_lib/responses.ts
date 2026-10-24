@@ -28,7 +28,6 @@ export function invalidBody(error: ZodError) {
 export function revalidateVehiclePages() {
   revalidatePath("/flota");
   revalidatePath("/flota/[placa]", "page");
-  revalidatePath("/reportes");
   revalidatePath("/");
 }
 

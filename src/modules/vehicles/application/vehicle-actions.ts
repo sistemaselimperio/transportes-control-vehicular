@@ -43,7 +43,6 @@ async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
     const result = await fn();
     revalidatePath("/flota");
     revalidatePath("/flota/[placa]", "page");
-    revalidatePath("/reportes");
     revalidatePath("/");
     return { ok: true, message: result.message };
   } catch (e) {

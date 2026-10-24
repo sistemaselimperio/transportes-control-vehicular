@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BarChart3,
   Bell,
   Building2,
   CalendarCheck,
@@ -40,7 +39,6 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
     items: [
       { href: "/propietarios", label: "Propietarios", icon: Building2 },
       { href: "/ventas", label: "Ventas", icon: Receipt },
-      { href: "/reportes", label: "Reportes", icon: BarChart3 },
     ],
   },
 ];
