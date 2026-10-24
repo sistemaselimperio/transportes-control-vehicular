@@ -9,6 +9,7 @@ import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "../domain/plate";
+import { assertModelYear, type VehicleTechnicalData } from "../domain/technical-data";
 import {
   assertCanAssignDriver,
   assertCanChangeStatus,
@@ -247,6 +248,14 @@ export function createVehicleCommands(
       await repo.updateVehicle(vehicle.id, fields);
       const plate = fields.plate ?? vehicle.plate;
       return { plate, message: `Vehículo ${plate} actualizado.` };
+    },
+
+    async updateTechnicalData(plate: string, data: VehicleTechnicalData): Promise<CommandResult> {
+      const vehicle = await loadOne(plate);
+      assertEditable(vehicle.status);
+      assertModelYear(data.modelYear, today());
+      await repo.updateVehicle(vehicle.id, data);
+      return { message: "Datos técnicos actualizados." };
     },
 
     async renewDocument(plate: string, doc: DocumentRecord): Promise<CommandResult> {

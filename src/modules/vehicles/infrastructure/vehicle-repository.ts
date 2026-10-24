@@ -118,6 +118,19 @@ export async function loadVehicleRowInputs(
             intervalMonths: oil.intervalMonths,
           }
         : null,
+      technical: {
+        registrationDate: vehicle.registrationDate,
+        modelYear: vehicle.modelYear,
+        engineNumber: vehicle.engineNumber,
+        chassisNumber: vehicle.chassisNumber,
+        serialNumber: vehicle.serialNumber,
+        bodyType: vehicle.bodyType,
+        fuelType: vehicle.fuelType,
+        capacity: vehicle.capacity,
+        engineDisplacement: vehicle.engineDisplacement,
+        grossWeightKg: vehicle.grossWeightKg,
+        color: vehicle.color,
+      },
       today,
     };
   });

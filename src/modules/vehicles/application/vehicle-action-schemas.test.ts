@@ -4,6 +4,7 @@ import {
   oilChangeSchema,
   renewDocumentSchema,
   sellSchema,
+  technicalDataSchema,
   transferOwnerSchema,
   updateKmSchema,
 } from "./vehicle-action-schemas";
@@ -68,5 +69,46 @@ describe("form schemas", () => {
 
   it("parses the sale price", () => {
     expect(sellSchema.parse({ date: "2026-10-17", price: "25.000.000" }).price).toBe(25_000_000);
+  });
+});
+
+describe("technicalDataSchema", () => {
+  it("parses the datos generales sheet", () => {
+    expect(
+      technicalDataSchema.parse({
+        registrationDate: "2020-09-28",
+        modelYear: "2021",
+        engineNumber: " 80236366 ",
+        chassisNumber: "0727121",
+        serialNumber: "727121",
+        bodyType: "SRS",
+        fuelType: "DIESEL",
+        capacity: "",
+        engineDisplacement: "14.900",
+        grossWeightKg: "52.000",
+        color: "BLANCO",
+      }),
+    ).toEqual({
+      registrationDate: "2020-09-28",
+      modelYear: 2021,
+      engineNumber: "80236366",
+      chassisNumber: "0727121",
+      serialNumber: "727121",
+      bodyType: "SRS",
+      fuelType: "DIESEL",
+      capacity: null,
+      engineDisplacement: 14900,
+      grossWeightKg: 52000,
+      color: "BLANCO",
+    });
+  });
+
+  it("turns an empty form into all nulls", () => {
+    expect(Object.values(technicalDataSchema.parse({})).every((v) => v === null)).toBe(true);
+  });
+
+  it("rejects an invalid date or non numeric values", () => {
+    expect(() => technicalDataSchema.parse({ registrationDate: "2020-13-45" })).toThrow(/fecha/);
+    expect(() => technicalDataSchema.parse({ engineDisplacement: "14x" })).toThrow(/entero/);
   });
 });

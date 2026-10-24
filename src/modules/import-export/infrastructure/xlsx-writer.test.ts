@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
+import { EMPTY_TECHNICAL_DATA } from "@/modules/vehicles/domain/technical-data";
 import { buildVehicleRow } from "@/modules/vehicles/domain/vehicle-row";
 import { EXPORT_HEADERS, buildVehiclesWorkbook } from "./xlsx-writer";
 
@@ -36,6 +37,15 @@ const row = buildVehicleRow({
     intervalKm: 20000,
     intervalMonths: null,
   },
+  technical: {
+    ...EMPTY_TECHNICAL_DATA,
+    registrationDate: "2020-09-28",
+    modelYear: 2021,
+    chassisNumber: "727121",
+    engineDisplacement: 14900,
+    grossWeightKg: 52000,
+    color: "BLANCO",
+  },
   today: "2026-10-17",
 });
 
@@ -59,6 +69,12 @@ describe("buildVehiclesWorkbook", () => {
     expect(values[8]).toBe("3137546359");
     expect(values[10]).toBe(359174);
     expect(values[14]).toBe("Activo");
+    expect((values[15] as Date).toISOString().slice(0, 10)).toBe("2020-09-28");
+    expect(values[16]).toBe(2021);
+    expect(values[18]).toBe("727121");
+    expect(values[23]).toBe(14900);
+    expect(values[24]).toBe(52000);
+    expect(values[25]).toBe("BLANCO");
     expect(ws.rowCount).toBe(2);
   });
 });

@@ -18,6 +18,17 @@ export const EXPORT_HEADERS = [
   "SOAT",
   "Tecno",
   "Estado",
+  "F. matrícula",
+  "Modelo",
+  "N.º motor",
+  "N.º chasis",
+  "N.º serie",
+  "Carrocería",
+  "Combustible",
+  "Capacidad",
+  "Cilindraje",
+  "Peso bruto (kg)",
+  "Color",
 ] as const;
 
 const isoToDate = (iso: string | null) =>
@@ -50,12 +61,23 @@ export async function buildVehiclesWorkbook(
       r.soat.date ? isoToDate(r.soat.date) : r.soat.text,
       r.tecno.date ? isoToDate(r.tecno.date) : r.tecno.text,
       r.statusLabel,
+      isoToDate(r.technical.registrationDate),
+      r.technical.modelYear,
+      r.technical.engineNumber ?? "",
+      r.technical.chassisNumber ?? "",
+      r.technical.serialNumber ?? "",
+      r.technical.bodyType ?? "",
+      r.technical.fuelType ?? "",
+      r.technical.capacity ?? "",
+      r.technical.engineDisplacement,
+      r.technical.grossWeightKg,
+      r.technical.color ?? "",
     ]);
   }
 
   // Dates and widths.
-  for (const col of [10, 13, 14]) ws.getColumn(col).numFmt = "dd/mm/yyyy";
-  const widths = [34, 11, 28, 15, 18, 11, 16, 26, 13, 12, 12, 22, 12, 12, 11];
+  for (const col of [10, 13, 14, 16]) ws.getColumn(col).numFmt = "dd/mm/yyyy";
+  const widths = [34, 11, 28, 15, 18, 11, 16, 26, 13, 12, 12, 22, 12, 12, 11, 13, 9, 14, 14, 12, 14, 13, 12, 11, 15, 12];
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: EXPORT_HEADERS.length } };
 

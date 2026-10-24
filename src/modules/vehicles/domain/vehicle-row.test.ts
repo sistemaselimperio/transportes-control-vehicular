@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EMPTY_TECHNICAL_DATA } from "./technical-data";
 import { buildVehicleRow, type VehicleRowInput } from "./vehicle-row";
 
 const TODAY = "2026-10-17";
@@ -37,6 +38,7 @@ function input(overrides: Partial<VehicleRowInput> = {}): VehicleRowInput {
       intervalKm: 20000,
       intervalMonths: null,
     },
+    technical: EMPTY_TECHNICAL_DATA,
     today: TODAY,
     ...overrides,
   };

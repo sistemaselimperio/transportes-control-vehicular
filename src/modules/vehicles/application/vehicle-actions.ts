@@ -21,6 +21,7 @@ import {
   renewDocumentSchema,
   sellSchema,
   statusSchema,
+  technicalDataSchema,
   transferOwnerSchema,
   updateKmSchema,
   updateTaxSchema,
@@ -123,6 +124,12 @@ export async function updateOilChangeAction(id: number, fd: FormData): Promise<A
 
 export async function deleteOilChangeAction(id: number): Promise<ActionResult> {
   return run(async () => commands.deleteOilChange(parse(oilChangeIdSchema, id)));
+}
+
+export async function updateTechnicalDataAction(plate: string, fd: FormData): Promise<ActionResult> {
+  return run(async () =>
+    commands.updateTechnicalData(parse(plateSchema, plate), parse(technicalDataSchema, formValues(fd))),
+  );
 }
 
 export async function updateKmAction(plate: string, fd: FormData): Promise<ActionResult> {

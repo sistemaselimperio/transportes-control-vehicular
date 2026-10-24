@@ -31,6 +31,17 @@ export const intField = (label: string, max = 2_000_000_000) =>
     .transform((v) => (v === "" ? null : Number(v)))
     .refine((v) => v === null || v <= max, `${label} es demasiado grande.`);
 
+/** Optional ISO calendar date: blank means "not provided". */
+const optionalDateField = (label: string) =>
+  z
+    .string()
+    .default("")
+    .refine(
+      (v) => v === "" || (VALID_DATE.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`))),
+      `${label}: ingresa una fecha válida.`,
+    )
+    .transform((v) => (v === "" ? null : v));
+
 const checkbox = z
   .string()
   .optional()
@@ -65,6 +76,20 @@ export const oilChangeSchema = z.object({
 export const updateKmSchema = z.object({
   km: intField("El kilometraje", 999_999_999),
   odometerBroken: checkbox,
+});
+
+export const technicalDataSchema = z.object({
+  registrationDate: optionalDateField("Fecha de matrícula"),
+  modelYear: intField("El modelo", 9999),
+  engineNumber: textField,
+  chassisNumber: textField,
+  serialNumber: textField,
+  bodyType: textField,
+  fuelType: textField,
+  capacity: textField,
+  engineDisplacement: intField("El cilindraje", 99_999),
+  grossWeightKg: intField("El peso bruto", 9_999_999),
+  color: textField,
 });
 
 export const statusSchema = z.object({

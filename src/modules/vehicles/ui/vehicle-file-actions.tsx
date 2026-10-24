@@ -11,6 +11,7 @@ import {
   Pencil,
   Receipt,
   UserRound,
+  Wrench,
 } from "lucide-react";
 import {
   createContext,
@@ -25,11 +26,13 @@ import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
+import type { VehicleTechnicalData } from "../domain/technical-data";
 import { changeStatusAction } from "../application/vehicle-actions";
 import type { VehicleActionContext, VehicleDetail } from "../application/vehicle-queries";
 import {
   OilChangeForm,
   RenewDocumentForm,
+  TechnicalDataForm,
   UpdateKmForm,
   UpdateTaxForm,
 } from "./vehicle-action-forms";
@@ -38,6 +41,7 @@ import { AssignDriverForm, SellForm, TransferOwnerForm } from "./vehicle-people-
 
 export type ActionKey =
   | "edit"
+  | "technical"
   | "document"
   | "tax"
   | "oil"
@@ -51,6 +55,7 @@ const ACTIONS: Record<
   { label: string; title: string; icon: ComponentType<{ className?: string }> }
 > = {
   edit: { label: "Editar datos", title: "Editar datos del vehículo", icon: Pencil },
+  technical: { label: "Editar datos técnicos", title: "Editar datos técnicos", icon: Wrench },
   document: { label: "Renovar documento", title: "Renovar documento", icon: CalendarClock },
   tax: { label: "Impuesto", title: "Actualizar impuesto", icon: Receipt },
   oil: { label: "Cambio de aceite", title: "Registrar cambio de aceite", icon: Droplets },
@@ -88,6 +93,7 @@ export function FileActions({
   status,
   ctx,
   edit,
+  technical,
   current,
   children,
 }: {
@@ -95,6 +101,8 @@ export function FileActions({
   status: VehicleStatus;
   ctx: VehicleActionContext;
   edit: VehicleDetail["edit"];
+  /** Current "Datos generales" prefilling the technical data form. */
+  technical: VehicleTechnicalData;
   /** Who the sale would close, shown in the sell form. */
   current: { owner: string | null; driver: string | null };
   children: ReactNode;
@@ -169,6 +177,7 @@ export function FileActions({
             otherActions={<EditShortcuts onOpen={setActive} />}
           />
         )}
+        {active === "technical" && <TechnicalDataForm {...common} values={technical} />}
         {active === "document" && <RenewDocumentForm {...common} />}
         {active === "tax" && <UpdateTaxForm {...common} />}
         {active === "oil" && <OilChangeForm {...common} />}

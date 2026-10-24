@@ -14,8 +14,10 @@ import {
   updateKmAction,
   updateOilChangeAction,
   updateTaxAction,
+  updateTechnicalDataAction,
 } from "../application/vehicle-actions";
 import type { VehicleActionContext } from "../application/vehicle-queries";
+import { FUEL_TYPE_SUGGESTIONS, type VehicleTechnicalData } from "../domain/technical-data";
 import { formatKm } from "../domain/vehicle-row";
 
 export interface FormProps {
@@ -53,12 +55,12 @@ export function RenewDocumentForm({
       <Field label="Documento" htmlFor="doc-type">
         <NativeSelect id="doc-type" name="type" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="SOAT">SOAT</option>
-          <option value="TECNO">Tecnomec·nica</option>
-          <option value="POLICY">PÛliza</option>
+          <option value="TECNO">Tecnomec√°nica</option>
+          <option value="POLICY">P√≥liza</option>
         </NativeSelect>
       </Field>
       {type === "POLICY" && (
-        <Field label="Tipo de pÛliza" htmlFor="doc-kind">
+        <Field label="Tipo de p√≥liza" htmlFor="doc-kind">
           <NativeSelect id="doc-kind" name="policyKind" defaultValue="TR">
             <option value="TR">Todo riesgo (TR)</option>
             <option value="RC">Responsabilidad civil (RC)</option>
@@ -87,7 +89,7 @@ export function RenewDocumentForm({
           checked={notApplicable}
           onChange={(e) => setNotApplicable(e.target.checked)}
         />
-        No aplica para este vehÌculo
+        No aplica para este veh√≠culo
       </label>
     </ActionForm>
   );
@@ -105,13 +107,13 @@ export function UpdateTaxForm({ plate, ctx, onDone, onCancel }: FormProps) {
     >
       <Field label="Estado del impuesto" htmlFor="tax-kind">
         <NativeSelect id="tax-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="PAID_YEAR">Pagado (aÒo)</option>
+          <option value="PAID_YEAR">Pagado (a√±o)</option>
           <option value="EXEMPT">No paga</option>
           <option value="EXEMPT_LOW_DISPLACEMENT">No paga por cilindraje inferior</option>
         </NativeSelect>
       </Field>
       {kind === "PAID_YEAR" && (
-        <Field label="AÒo pagado" htmlFor="tax-year">
+        <Field label="A√±o pagado" htmlFor="tax-year">
           <Input
             id="tax-year"
             name="year"
@@ -159,7 +161,7 @@ export function OilChangeForm({
         plan.nextKm != null ? `${formatKm(plan.nextKm)} km` : null,
       ]
         .filter(Boolean)
-        .join(" ∑ ") || "Sin fecha calculada";
+        .join(" ¬∑ ") || "Sin fecha calculada";
   } catch {
     preview = "Completa la fecha y el kilometraje";
   }
@@ -221,7 +223,7 @@ export function OilChangeForm({
         </Field>
       </div>
       <p className="rounded-lg bg-muted p-2 text-sm" aria-live="polite">
-        <span className="text-muted-foreground">PrÛximo cambio: </span>
+        <span className="text-muted-foreground">Pr√≥ximo cambio: </span>
         <span className="font-medium">{preview}</span>
       </p>
       <Field label="Notas (opcional)" htmlFor="oil-notes">
@@ -263,8 +265,104 @@ export function UpdateKmForm({ plate, ctx, onDone, onCancel }: FormProps) {
           checked={broken}
           onChange={(e) => setBroken(e.target.checked)}
         />
-        El odÛmetro no funciona
+        El od√≥metro no funciona
       </label>
+    </ActionForm>
+  );
+}
+
+/** Edits the "Datos generales" of the vehicle's registration sheet. */
+export function TechnicalDataForm({
+  plate,
+  values,
+  onDone,
+  onCancel,
+}: Omit<FormProps, "ctx"> & { values: VehicleTechnicalData }) {
+  const text = (name: keyof VehicleTechnicalData) => values[name]?.toString() ?? "";
+  return (
+    <ActionForm
+      action={(fd) => updateTechnicalDataAction(plate, fd)}
+      submitLabel="Guardar datos t√©cnicos"
+      onDone={onDone}
+      onCancel={onCancel}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Fecha de matr√≠cula" htmlFor="tech-registration">
+          <Input
+            id="tech-registration"
+            name="registrationDate"
+            type="date"
+            className={FIELD}
+            defaultValue={text("registrationDate")}
+          />
+        </Field>
+        <Field label="Modelo" htmlFor="tech-model">
+          <Input
+            id="tech-model"
+            name="modelYear"
+            inputMode="numeric"
+            className={FIELD}
+            defaultValue={text("modelYear")}
+            placeholder="2021"
+          />
+        </Field>
+        <Field label="N√∫mero de motor" htmlFor="tech-engine">
+          <Input id="tech-engine" name="engineNumber" className={FIELD} defaultValue={text("engineNumber")} />
+        </Field>
+        <Field label="N√∫mero de chasis" htmlFor="tech-chassis">
+          <Input id="tech-chassis" name="chassisNumber" className={FIELD} defaultValue={text("chassisNumber")} />
+        </Field>
+        <Field label="N√∫mero de serie" htmlFor="tech-serial">
+          <Input id="tech-serial" name="serialNumber" className={FIELD} defaultValue={text("serialNumber")} />
+        </Field>
+        <Field label="Tipo de carrocer√≠a" htmlFor="tech-body">
+          <Input id="tech-body" name="bodyType" className={FIELD} defaultValue={text("bodyType")} />
+        </Field>
+        <Field label="Combustible" htmlFor="tech-fuel">
+          <Input
+            id="tech-fuel"
+            name="fuelType"
+            className={FIELD}
+            list="tech-fuel-options"
+            defaultValue={text("fuelType")}
+          />
+          <datalist id="tech-fuel-options">
+            {FUEL_TYPE_SUGGESTIONS.map((fuel) => (
+              <option key={fuel} value={fuel} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="Capacidad" htmlFor="tech-capacity">
+          <Input
+            id="tech-capacity"
+            name="capacity"
+            className={FIELD}
+            defaultValue={text("capacity")}
+            placeholder="34 t, 40 pasajeros‚Ä¶"
+          />
+        </Field>
+        <Field label="Cilindraje (cc)" htmlFor="tech-displacement">
+          <Input
+            id="tech-displacement"
+            name="engineDisplacement"
+            inputMode="numeric"
+            className={FIELD}
+            defaultValue={text("engineDisplacement")}
+          />
+        </Field>
+        <Field label="Peso bruto vehicular (kg)" htmlFor="tech-weight">
+          <Input
+            id="tech-weight"
+            name="grossWeightKg"
+            inputMode="numeric"
+            className={FIELD}
+            defaultValue={text("grossWeightKg")}
+          />
+        </Field>
+      </div>
+      <Field label="Color" htmlFor="tech-color">
+        <Input id="tech-color" name="color" className={FIELD} defaultValue={text("color")} />
+      </Field>
     </ActionForm>
   );
 }

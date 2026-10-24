@@ -325,3 +325,40 @@ describe("renewDocument and updateTax", () => {
     );
   });
 });
+
+describe("updateTechnicalData", () => {
+  const data = {
+    registrationDate: "2020-09-28",
+    modelYear: 2021,
+    engineNumber: "80236366",
+    chassisNumber: "727121",
+    serialNumber: "727121",
+    bodyType: "SRS",
+    fuelType: "DIESEL",
+    capacity: null,
+    engineDisplacement: 14900,
+    grossWeightKg: 52000,
+    color: "BLANCO",
+  };
+
+  it("saves the technical data of the vehicle", async () => {
+    const updates: unknown[] = [];
+    const { repo } = fakeRepo([snapshot()]);
+    repo.updateVehicle = async (id, fields) => void updates.push({ id, fields });
+    const result = await createVehicleCommands(repo, () => TODAY).updateTechnicalData("AAA-111", data);
+    expect(updates).toEqual([{ id: 1, fields: data }]);
+    expect(result.message).toMatch(/datos técnicos/i);
+  });
+
+  it("rejects a sold vehicle", async () => {
+    const c = commands([snapshot({ status: "SOLD" })]);
+    await expect(c.updateTechnicalData("AAA-111", data)).rejects.toThrow(RuleError);
+  });
+
+  it("rejects an unknown plate and an out of range model year", async () => {
+    await expect(commands([]).updateTechnicalData("ZZZ-999", data)).rejects.toThrow(/no existe/i);
+    await expect(
+      commands([snapshot()]).updateTechnicalData("AAA-111", { ...data, modelYear: 1800 }),
+    ).rejects.toThrow(/modelo/i);
+  });
+});

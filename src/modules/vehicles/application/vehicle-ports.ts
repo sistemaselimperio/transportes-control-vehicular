@@ -2,6 +2,7 @@ import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import type { VehicleTechnicalData } from "../domain/technical-data";
 
 /** What the command use cases need to know about a vehicle. */
 export interface VehicleSnapshot {
@@ -106,7 +107,8 @@ export type VehicleUpdate = Partial<
     | "oilMode"
     | "towingVehicleId"
   >
->;
+> &
+  Partial<VehicleTechnicalData>;
 
 /**
  * Port for the vehicle commands. Every method that writes more than one row

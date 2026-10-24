@@ -7,6 +7,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { HistoryItem, VehicleDetail } from "../application/vehicle-queries";
+import { technicalRows } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
 import { TabParamScroll } from "./tab-param-scroll";
@@ -158,6 +159,7 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
       status={r.vehicleStatus}
       ctx={detail.actions}
       edit={detail.edit}
+      technical={r.technical}
       current={{ owner: r.ownerName, driver: r.driverName }}
     >
       <TabParamScroll />
@@ -213,6 +215,16 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
               <Records items={detail.ownerships} />
               <SubHeading count={detail.drivers.length}>Conductores anteriores</SubHeading>
               <Records items={detail.drivers} />
+            </Section>
+
+            <Section id="datos-tecnicos" title="Datos técnicos" actions={<ActionButtons keys={["technical"]} />}>
+              <dl>
+                {technicalRows(r.technical).map(({ label, value }) => (
+                  <Row key={label} label={label}>
+                    {value}
+                  </Row>
+                ))}
+              </dl>
             </Section>
 
             <Section title="Ficha">

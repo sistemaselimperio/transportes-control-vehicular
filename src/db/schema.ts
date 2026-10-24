@@ -114,6 +114,18 @@ export const vehicles = pgTable(
     towingVehicleId: integer("towing_vehicle_id").references(
       (): AnyPgColumn => vehicles.id,
     ),
+    /** "Datos generales" of the registration sheet; all optional. */
+    registrationDate: date("registration_date", { mode: "string" }),
+    modelYear: integer("model_year"),
+    engineNumber: text("engine_number"),
+    chassisNumber: text("chassis_number"),
+    serialNumber: text("serial_number"),
+    bodyType: text("body_type"),
+    fuelType: text("fuel_type"),
+    capacity: text(),
+    engineDisplacement: integer("engine_displacement"),
+    grossWeightKg: integer("gross_weight_kg"),
+    color: text(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

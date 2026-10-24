@@ -15,6 +15,7 @@ import {
   type OilMode,
 } from "@/modules/maintenance/domain/oil-change";
 import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
+import type { VehicleTechnicalData } from "./technical-data";
 
 export type OwnerGroup = "IMPERIO" | "PAEZ" | "THIRD_PARTY";
 
@@ -57,6 +58,7 @@ export interface VehicleRowInput {
     intervalKm: number | null;
     intervalMonths: number | null;
   } | null;
+  technical: VehicleTechnicalData;
   today: IsoDate;
 }
 
@@ -91,6 +93,7 @@ export interface VehicleGridRow {
   statusLabel: string;
   overall: AlertStatus;
   notes: string | null;
+  technical: VehicleTechnicalData;
 }
 
 export const STATUS_LABELS: Record<VehicleStatus, string> = {
@@ -222,5 +225,6 @@ export function buildVehicleRow(input: VehicleRowInput): VehicleGridRow {
       alerts: [policy.status, soat.status, tecno.status, tax.status, nextChange.status],
     }),
     notes: vehicle.notes,
+    technical: input.technical,
   };
 }
