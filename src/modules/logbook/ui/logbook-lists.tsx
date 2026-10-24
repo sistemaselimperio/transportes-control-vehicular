@@ -14,7 +14,7 @@ import { SERVICE_KIND_LABELS, type FuelRow, type OilRow, type ServiceRow, type T
 
 const PLATE_LINK = "plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70";
 
-const gallonsText = (n: number) => `${n.toLocaleString("es-CO", { maximumFractionDigits: 2 })} gal`;
+const gallonsText = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
 const priceText = (n: number | null) => (n === null ? "—" : formatPrice(n));
 
 /** What a record says in one line plus an optional detail line (cards and the vehicle file). */
@@ -35,15 +35,13 @@ interface Spec<T extends { id: number; plate: string; date: string; driverName: 
   remove: (id: number) => Promise<ActionResult>;
 }
 
-const itemsText = (row: OilRow) => row.items.map((i) => `${i.quantity.toLocaleString("es-CO")} ${i.detail}`);
-
 export const SERVICE_SPEC: Spec<ServiceRow> = {
   noun: "mantenimiento",
   columns: [
     { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
     { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
     { header: "Tipo", cell: (r) => SERVICE_KIND_LABELS[r.kind] },
-    { header: "Descripción", cell: (r) => <span className="font-medium">{r.description}</span> },
+    { header: "Descripción", cell: (r) => <span className="block min-w-64 font-medium break-words whitespace-pre-line">{r.description}</span> },
     { header: "Proveedor", cell: (r) => r.provider ?? "—" },
     { header: "Conductor", cell: (r) => r.driverName ?? "—" },
     { header: "Precio", cell: (r) => priceText(r.price), right: true },
@@ -67,32 +65,17 @@ export const OIL_SPEC: Spec<OilRow> = {
       header: "Próximo cambio",
       cell: (r) => joinDetail([r.nextDate && formatDisplayDate(r.nextDate), r.nextKm != null ? `${formatKm(r.nextKm)} km` : null]) ?? "—",
     },
-    {
-      header: "Insumos",
-      cell: (r) =>
-        r.items.length === 0 ? (
-          "—"
-        ) : (
-          <ul className="max-w-64 space-y-0.5 text-xs">
-            {itemsText(r).map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
-        ),
-    },
     { header: "Conductor", cell: (r) => r.driverName ?? "—" },
-    { header: "Precio", cell: (r) => priceText(r.price), right: true },
     { header: "Notas", cell: (r) => <Clamp text={r.notes} />, muted: true },
   ],
   summary: (r) => ({
     title: r.km != null ? `${formatKm(r.km)} km` : "Sin kilometraje",
     detail: joinDetail([
-      itemsText(r).join(", "),
       r.nextKm != null ? `próximo a ${formatKm(r.nextKm)} km` : null,
       r.nextDate ? `próximo el ${formatDisplayDate(r.nextDate)}` : null,
       r.notes,
     ]),
-    amount: r.price === null ? null : formatPrice(r.price),
+    amount: null,
   }),
   remove: deleteOilChangeAction,
 };
@@ -103,15 +86,14 @@ export const TIRE_SPEC: Spec<TireRow> = {
     { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
     { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
     { header: "Cant.", cell: (r) => r.quantity },
-    { header: "Referencia", cell: (r) => <span className="font-medium">{r.reference}</span> },
-    { header: "Proveedor", cell: (r) => r.provider ?? "—" },
+    { header: "Detalle", cell: (r) => <span className="font-medium">{r.reference}</span> },
     { header: "Conductor", cell: (r) => r.driverName ?? "—" },
     { header: "Precio", cell: (r) => priceText(r.price), right: true },
     { header: "Observación", cell: (r) => <Clamp text={r.notes} />, muted: true },
   ],
   summary: (r) => ({
     title: `${r.quantity} × ${r.reference}`,
-    detail: joinDetail([r.provider, r.notes]),
+    detail: r.notes,
     amount: r.price === null ? null : formatPrice(r.price),
   }),
   remove: (id) => deleteLogbookEntryAction("tire", id),
@@ -122,12 +104,12 @@ export const FUEL_SPEC: Spec<FuelRow> = {
   columns: [
     { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
     { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
-    { header: "Galones", cell: (r) => gallonsText(r.gallons), right: true },
+    { header: "Cantidad", cell: (r) => gallonsText(r.gallons), right: true },
     { header: "Valor", cell: (r) => formatPrice(r.amount), right: true },
     { header: "Estación", cell: (r) => r.provider ?? "—" },
     { header: "Conductor", cell: (r) => r.driverName ?? "—" },
   ],
-  summary: (r) => ({ title: gallonsText(r.gallons), detail: r.provider, amount: formatPrice(r.amount) }),
+  summary: (r) => ({ title: `Cantidad ${gallonsText(r.gallons)}`, detail: r.provider, amount: formatPrice(r.amount) }),
   remove: (id) => deleteLogbookEntryAction("fuel", id),
 };
 
@@ -242,7 +224,7 @@ function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListPro
                 <div className="-mt-2 -mr-2 shrink-0">{actions(r)}</div>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0 font-medium">{s.title}</span>
+                <span className="min-w-0 font-medium break-words whitespace-pre-line">{s.title}</span>
                 {s.amount && <span className="num shrink-0 font-semibold">{s.amount}</span>}
               </div>
               {s.detail && <p className="text-sm text-muted-foreground">{s.detail}</p>}

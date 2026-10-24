@@ -4,7 +4,6 @@ import {
   monthBounds,
   normalizePlateQuery,
   parseLogbookQuery,
-  parseMonthParam,
   parseTabParam,
   summarizeCost,
   summarizeFuel,
@@ -21,19 +20,6 @@ describe("parseTabParam", () => {
     expect(parseTabParam(undefined)).toBe("servicios");
     expect(parseTabParam("nope")).toBe("servicios");
     expect(parseTabParam(["aceite", "llantas"])).toBe("aceite");
-  });
-});
-
-describe("parseMonthParam", () => {
-  it("accepts YYYY-MM", () => {
-    expect(parseMonthParam("2026-02")).toBe("2026-02");
-  });
-
-  it("rejects anything else", () => {
-    expect(parseMonthParam("2026-13")).toBeNull();
-    expect(parseMonthParam("2026-2")).toBeNull();
-    expect(parseMonthParam("")).toBeNull();
-    expect(parseMonthParam(undefined)).toBeNull();
   });
 });
 
@@ -59,16 +45,32 @@ describe("normalizePlateQuery", () => {
 });
 
 describe("parseLogbookQuery", () => {
-  it("reads placa, mes and grupo from the search params", () => {
-    expect(parseLogbookQuery({ placa: "abc-1", mes: "2026-05", grupo: "PAEZ" })).toEqual({
+  it("reads placa, desde, hasta and grupo from the search params", () => {
+    expect(parseLogbookQuery({ placa: "abc-1", desde: "2026-05-01", hasta: "2026-05-31", grupo: "PAEZ" })).toEqual({
       plate: "ABC1",
-      month: "2026-05",
+      from: "2026-05-01",
+      to: "2026-05-31",
       group: "PAEZ",
     });
   });
 
   it("defaults to no filters", () => {
-    expect(parseLogbookQuery({})).toEqual({ plate: "", month: null, group: null });
+    expect(parseLogbookQuery({})).toEqual({ plate: "", from: null, to: null, group: null });
+  });
+
+  it("ignores dates that are malformed or do not exist", () => {
+    expect(parseLogbookQuery({ desde: "2026-5-1", hasta: "2026-02-30" })).toMatchObject({ from: null, to: null });
+  });
+
+  it("swaps an inverted range", () => {
+    expect(parseLogbookQuery({ desde: "2026-08-10", hasta: "2026-07-15" })).toMatchObject({
+      from: "2026-07-15",
+      to: "2026-08-10",
+    });
+  });
+
+  it("keeps an open-ended range", () => {
+    expect(parseLogbookQuery({ desde: "2026-07-15" })).toMatchObject({ from: "2026-07-15", to: null });
   });
 });
 

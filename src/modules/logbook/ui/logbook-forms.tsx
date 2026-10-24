@@ -117,13 +117,14 @@ export function ServiceForm({ row, today, providers, vehicle, onDone, onCancel }
         </Field>
       </Fields>
       <Field label="Descripción" htmlFor={`${id}-description`} required>
-        <Input
+        {/* Grows with the text so long descriptions (parts lists, labor) stay fully visible. */}
+        <Textarea
           id={`${id}-description`}
           name="description"
-          className={FIELD}
-          autoComplete="off"
+          rows={3}
+          className="field-sizing-content max-h-80 min-h-20"
           defaultValue={row?.description ?? ""}
-          placeholder="Cambio de bomba de agua"
+          placeholder="1 bocín, retenedor 370003, libra de grasa, mano de obra"
           required
         />
       </Field>
@@ -141,7 +142,7 @@ export function ServiceForm({ row, today, providers, vehicle, onDone, onCancel }
 }
 
 /** Creates a tire change, or edits `row`. */
-export function TireForm({ row, today, providers, vehicle, onDone, onCancel }: FormProps & { row?: TireRow }) {
+export function TireForm({ row, today, vehicle, onDone, onCancel }: FormProps & { row?: TireRow }) {
   const id = useId();
   return (
     <ActionForm
@@ -164,18 +165,17 @@ export function TireForm({ row, today, providers, vehicle, onDone, onCancel }: F
           />
         </Field>
       </Fields>
-      <Field label="Referencia" htmlFor={`${id}-reference`} required>
+      <Field label="Detalle" htmlFor={`${id}-reference`} required>
         <Input
           id={`${id}-reference`}
           name="reference"
           className={FIELD}
           autoComplete="off"
           defaultValue={row?.reference ?? ""}
-          placeholder="295/80R22.5"
+          placeholder="Llanta 295/80R22.5 Doublecoin RT606"
           required
         />
       </Field>
-      <ProviderField id={`${id}-provider`} label="Proveedor" providers={providers} defaultValue={row?.provider} />
       <Field label="Precio (opcional)" htmlFor={`${id}-price`}>
         <PesosInput id={`${id}-price`} name="price" defaultValue={row?.price} />
       </Field>
@@ -199,7 +199,7 @@ export function FuelForm({ row, today, providers, vehicle, onDone, onCancel }: F
       {!row && <VehicleField vehicle={vehicle} id={`${id}-plate`} />}
       <DateField id={`${id}-date`} today={today} defaultValue={row?.date} />
       <Fields>
-        <Field label="Galones" htmlFor={`${id}-gallons`} required>
+        <Field label="Cantidad" htmlFor={`${id}-gallons`} required>
           <Input
             id={`${id}-gallons`}
             name="gallons"

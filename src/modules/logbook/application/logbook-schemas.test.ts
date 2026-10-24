@@ -91,13 +91,13 @@ describe("tireSchema", () => {
     });
   });
 
-  it("requires a positive quantity and a reference", () => {
+  it("requires a positive quantity and a detail", () => {
     const base = { plate: "ABC-123", date: "2026-05-10", reference: "x" };
     expect(() => tireSchema.parse({ ...base, quantity: "0" })).toThrow("cantidad");
     expect(() => tireSchema.parse({ ...base, quantity: "" })).toThrow("cantidad");
     expect(() => tireSchema.parse({ ...base, quantity: "99" })).toThrow("cantidad");
     expect(() => tireSchema.parse({ plate: "ABC-123", date: "2026-05-10", quantity: "2", reference: " " })).toThrow(
-      "referencia",
+      "detalle de la llanta",
     );
   });
 
@@ -121,11 +121,11 @@ describe("fuelSchema", () => {
     expect(fuelSchema.parse({ ...base, gallons: "45" }).gallons).toBe(45);
   });
 
-  it("requires gallons and amount greater than zero", () => {
+  it("requires a quantity and amount greater than zero", () => {
     const base = { plate: "ABC-123", date: "2026-05-10" };
-    expect(() => fuelSchema.parse({ ...base, gallons: "", amount: "1000" })).toThrow("galones");
-    expect(() => fuelSchema.parse({ ...base, gallons: "0", amount: "1000" })).toThrow("galones");
-    expect(() => fuelSchema.parse({ ...base, gallons: "12,345", amount: "1000" })).toThrow("galones");
+    expect(() => fuelSchema.parse({ ...base, gallons: "", amount: "1000" })).toThrow("la cantidad");
+    expect(() => fuelSchema.parse({ ...base, gallons: "0", amount: "1000" })).toThrow("la cantidad");
+    expect(() => fuelSchema.parse({ ...base, gallons: "12,345", amount: "1000" })).toThrow("la cantidad");
     expect(() => fuelSchema.parse({ ...base, gallons: "10", amount: "" })).toThrow("valor");
     expect(() => fuelSchema.parse({ ...base, gallons: "10", amount: "0" })).toThrow("valor");
   });

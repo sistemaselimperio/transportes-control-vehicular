@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
-import { PesosInput } from "@/components/app/pesos-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import type { OilChangeValues } from "@/modules/maintenance/domain/oil-items";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
-import { OilItemsEditor } from "@/modules/maintenance/ui/oil-items-editor";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import {
   registerOilChangeAction,
@@ -55,12 +53,12 @@ export function RenewDocumentForm({
       <Field label="Documento" htmlFor="doc-type">
         <NativeSelect id="doc-type" name="type" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="SOAT">SOAT</option>
-          <option value="TECNO">TecnomecÃ¡nica</option>
-          <option value="POLICY">PÃ³liza</option>
+          <option value="TECNO">Tecnomecánica</option>
+          <option value="POLICY">Póliza</option>
         </NativeSelect>
       </Field>
       {type === "POLICY" && (
-        <Field label="Tipo de pÃ³liza" htmlFor="doc-kind">
+        <Field label="Tipo de póliza" htmlFor="doc-kind">
           <NativeSelect id="doc-kind" name="policyKind" defaultValue="TR">
             <option value="TR">Todo riesgo (TR)</option>
             <option value="RC">Responsabilidad civil (RC)</option>
@@ -89,7 +87,7 @@ export function RenewDocumentForm({
           checked={notApplicable}
           onChange={(e) => setNotApplicable(e.target.checked)}
         />
-        No aplica para este vehÃ­culo
+        No aplica para este vehículo
       </label>
     </ActionForm>
   );
@@ -107,13 +105,13 @@ export function UpdateTaxForm({ plate, ctx, onDone, onCancel }: FormProps) {
     >
       <Field label="Estado del impuesto" htmlFor="tax-kind">
         <NativeSelect id="tax-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="PAID_YEAR">Pagado (aÃ±o)</option>
+          <option value="PAID_YEAR">Pagado (año)</option>
           <option value="EXEMPT">No paga</option>
           <option value="EXEMPT_LOW_DISPLACEMENT">No paga por cilindraje inferior</option>
         </NativeSelect>
       </Field>
       {kind === "PAID_YEAR" && (
-        <Field label="AÃ±o pagado" htmlFor="tax-year">
+        <Field label="Año pagado" htmlFor="tax-year">
           <Input
             id="tax-year"
             name="year"
@@ -134,10 +132,7 @@ export type OilFormContext = Pick<
   "today" | "odometerWorking" | "currentKm" | "oilMode" | "oilInterval" | "lastOilItems"
 >;
 
-/**
- * Registers an oil change, or edits one when `editing` is given. A new change starts with the
- * supplies of the vehicle's previous one.
- */
+/** Registers an oil change, or edits one when `editing` is given. */
 export function OilChangeForm({
   plate,
   ctx,
@@ -164,7 +159,7 @@ export function OilChangeForm({
         plan.nextKm != null ? `${formatKm(plan.nextKm)} km` : null,
       ]
         .filter(Boolean)
-        .join(" Â· ") || "Sin fecha calculada";
+        .join(" · ") || "Sin fecha calculada";
   } catch {
     preview = "Completa la fecha y el kilometraje";
   }
@@ -226,13 +221,9 @@ export function OilChangeForm({
         </Field>
       </div>
       <p className="rounded-lg bg-muted p-2 text-sm" aria-live="polite">
-        <span className="text-muted-foreground">PrÃ³ximo cambio: </span>
+        <span className="text-muted-foreground">Próximo cambio: </span>
         <span className="font-medium">{preview}</span>
       </p>
-      <Field label="Precio (opcional)" htmlFor="oil-price">
-        <PesosInput id="oil-price" name="price" defaultValue={editing?.price} />
-      </Field>
-      <OilItemsEditor initial={editing ? editing.items : ctx.lastOilItems} prefilled={!editing} />
       <Field label="Notas (opcional)" htmlFor="oil-notes">
         <Textarea id="oil-notes" name="notes" rows={2} defaultValue={editing?.notes ?? ""} />
       </Field>
@@ -272,7 +263,7 @@ export function UpdateKmForm({ plate, ctx, onDone, onCancel }: FormProps) {
           checked={broken}
           onChange={(e) => setBroken(e.target.checked)}
         />
-        El odÃ³metro no funciona
+        El odómetro no funciona
       </label>
     </ActionForm>
   );

@@ -5,7 +5,6 @@ import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { LogbookRepository } from "../application/logbook-ports";
 import {
   driverAtDate,
-  monthBounds,
   type DriverPeriod,
   type FuelRow,
   type LogbookQuery,
@@ -20,12 +19,12 @@ export type LogbookScope = Partial<LogbookQuery> & { vehicleId?: number };
 
 /** Every logbook table has `vehicle_id` and `date`; the vehicle is joined for the plate filter. */
 function scopeFilter(table: { vehicleId: PgColumn; date: PgColumn }, scope: LogbookScope): SQL | undefined {
-  const bounds = scope.month ? monthBounds(scope.month) : null;
   return and(
     scope.vehicleId !== undefined ? eq(table.vehicleId, scope.vehicleId) : undefined,
     // The plate is already reduced to letters and digits, so it holds no LIKE wildcards.
     scope.plate ? sql`replace(${schema.vehicles.plate}, '-', '') like ${`%${scope.plate}%`}` : undefined,
-    bounds ? and(gte(table.date, bounds.from), lte(table.date, bounds.to)) : undefined,
+    scope.from ? gte(table.date, scope.from) : undefined,
+    scope.to ? lte(table.date, scope.to) : undefined,
     scope.group
       ? inArray(
           table.vehicleId,

@@ -80,10 +80,13 @@ export function parseTabParam(value: string | string[] | undefined): LogbookTab 
   return LOGBOOK_TABS.find((t) => t.key === v)?.key ?? "servicios";
 }
 
-/** Reads the `mes` search param ("YYYY-MM", as an `<input type="month">` sends it). */
-export function parseMonthParam(value: string | string[] | undefined): string | null {
+/** Reads a date search param ("YYYY-MM-DD", as an `<input type="date">` sends it); invalid days are dropped. */
+export function parseDateParam(value: string | string[] | undefined): IsoDate | null {
   const v = first(value);
-  return v !== undefined && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : null;
+  if (v === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, d] = v.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? v : null;
 }
 
 /** First and last day of a "YYYY-MM" month. */
@@ -99,18 +102,25 @@ export const normalizePlateQuery = (raw: string) => raw.toUpperCase().replace(/[
 /** The filters of the fleet-wide logbook; `plate` is already normalized. */
 export interface LogbookQuery {
   plate: string;
-  month: string | null;
+  /** Inclusive date range; either end may be open. */
+  from: IsoDate | null;
+  to: IsoDate | null;
   group: OwnerGroup | null;
 }
 
 export function parseLogbookQuery(params: {
   placa?: string | string[];
-  mes?: string | string[];
+  desde?: string | string[];
+  hasta?: string | string[];
   grupo?: string | string[];
 }): LogbookQuery {
+  const from = parseDateParam(params.desde);
+  const to = parseDateParam(params.hasta);
+  const inverted = from !== null && to !== null && from > to;
   return {
     plate: normalizePlateQuery(first(params.placa) ?? ""),
-    month: parseMonthParam(params.mes),
+    from: inverted ? to : from,
+    to: inverted ? from : to,
     group: parseGroupParam(params.grupo),
   };
 }

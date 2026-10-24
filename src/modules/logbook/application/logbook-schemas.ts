@@ -29,7 +29,7 @@ const serviceBody = z.object({
 const tireBody = z.object({
   date: dateField("Fecha"),
   quantity: positiveInt("La cantidad", "Ingresa la cantidad de llantas (de 1 a 50).", 50),
-  reference: requiredText("Ingresa la referencia de la llanta."),
+  reference: requiredText("Ingresa el detalle de la llanta."),
   provider: textField,
   price,
   notes: textField,
@@ -40,7 +40,7 @@ const gallons = z
   .string()
   .default("")
   .transform((v) => v.trim().replace(",", "."))
-  .refine((v) => /^\d{1,4}(\.\d{1,2})?$/.test(v) && Number(v) > 0, "Ingresa los galones (por ejemplo, 45,5).")
+  .refine((v) => /^\d{1,4}(\.\d{1,2})?$/.test(v) && Number(v) > 0, "Ingresa la cantidad (por ejemplo, 45,5).")
   .transform(Number);
 
 const fuelBody = z.object({
