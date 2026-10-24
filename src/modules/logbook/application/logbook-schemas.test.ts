@@ -46,7 +46,7 @@ describe("serviceSchema", () => {
     ).toThrow("Describe el mantenimiento");
     expect(() =>
       serviceSchema.parse({ plate: "ABC-123", date: "2026-05-10", kind: "OTHER", description: "x" }),
-    ).toThrow("tipo de servicio");
+    ).toThrow("tipo de mantenimiento");
   });
 
   it("requires the vehicle and a valid date", () => {
