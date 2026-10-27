@@ -37,6 +37,15 @@ export interface LogbookValues {
 
 export type EntryKind = keyof LogbookValues;
 
+/** The lists that can be cleared in bulk: the three kinds plus the oil changes. */
+export type BulkKind = EntryKind | "oil";
+
+/** Inclusive date range; either end may be open. */
+export interface DateRange {
+  from: IsoDate | null;
+  to: IsoDate | null;
+}
+
 /** The vehicle a record belongs to, as far as the rules need to know. */
 export interface VehicleRef {
   id: number;
@@ -50,4 +59,9 @@ export interface LogbookRepository {
   create<K extends EntryKind>(kind: K, vehicleId: number, values: LogbookValues[K]): Promise<void>;
   update<K extends EntryKind>(kind: K, id: number, values: LogbookValues[K]): Promise<void>;
   remove(kind: EntryKind, id: number): Promise<void>;
+  /**
+   * Deletes, in one transaction, the vehicle's records of a kind inside the range and returns how
+   * many went. Oil changes take their supplies with them, as deleting them one by one does.
+   */
+  removeMany(kind: BulkKind, vehicleId: number, range: DateRange): Promise<number>;
 }

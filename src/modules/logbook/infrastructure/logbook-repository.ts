@@ -248,4 +248,22 @@ export const logbookRepository: LogbookRepository = {
     const t = asEntryTable(kind);
     await db.delete(t).where(eq(t.id, id));
   },
+  async removeMany(kind, vehicleId, range) {
+    // One DELETE is atomic; the transaction keeps that true if more statements join it later.
+    return db.transaction(async (tx) => {
+      // Oil supplies go with their change (ON DELETE CASCADE), as in the single delete.
+      const t = kind === "oil" ? schema.oilChanges : asEntryTable(kind);
+      const deleted = await tx
+        .delete(t)
+        .where(
+          and(
+            eq(t.vehicleId, vehicleId),
+            range.from ? gte(t.date, range.from) : undefined,
+            range.to ? lte(t.date, range.to) : undefined,
+          ),
+        )
+        .returning({ id: t.id });
+      return deleted.length;
+    });
+  },
 };

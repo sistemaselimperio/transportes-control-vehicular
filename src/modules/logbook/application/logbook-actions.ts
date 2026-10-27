@@ -11,11 +11,13 @@ import type { ZodType } from "zod";
 import { z, ZodError } from "zod";
 import { requireSession } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
+import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
+import { parseLogbookQuery, parseTabParam, type LogbookTab } from "../domain/logbook";
 import { logbookRepository } from "../infrastructure/logbook-repository";
 import { createLogbookCommands, type CommandResult } from "./logbook-commands";
-import type { EntryKind } from "./logbook-ports";
+import type { BulkKind, EntryKind } from "./logbook-ports";
 import {
   entryIdSchema,
   fuelEditSchema,
@@ -84,6 +86,34 @@ export async function createFuelAction(fd: FormData): Promise<ActionResult> {
 
 export async function updateFuelAction(id: number, fd: FormData): Promise<ActionResult> {
   return run(async () => commands.update("fuel", parse(entryIdSchema, id), parse(fuelEditSchema, formValues(fd))));
+}
+
+const TAB_KINDS: Record<LogbookTab, BulkKind> = {
+  servicios: "service",
+  aceite: "oil",
+  llantas: "tire",
+  combustible: "fuel",
+};
+
+/**
+ * Deletes every record the Bitácora lists for one vehicle, tab and period. The scope is re-derived
+ * here from the same URL parsing the page uses; no record ids come from the client.
+ */
+export async function deleteLogbookEntriesAction(
+  tab: string,
+  plate: string,
+  from: string,
+  to: string,
+): Promise<ActionResult> {
+  return run(async () => {
+    const query = parseLogbookQuery({ placa: parse(plateSchema, plate), desde: from, hasta: to });
+    if (!query.plate) throw new RuleError("Elige una placa para eliminar sus registros.");
+    const result = await commands.removeAll(TAB_KINDS[parseTabParam(tab)], plate, { from: query.from, to: query.to });
+    // Oil changes feed the alerts, so the fleet and the dashboard change too.
+    revalidatePath("/flota");
+    revalidatePath("/");
+    return result;
+  });
 }
 
 export async function deleteLogbookEntryAction(kind: EntryKind, id: number): Promise<ActionResult> {

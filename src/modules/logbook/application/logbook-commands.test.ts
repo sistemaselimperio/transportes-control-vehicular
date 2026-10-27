@@ -6,7 +6,7 @@ import type { EntryKind, LogbookRepository, VehicleRef } from "./logbook-ports";
 const TODAY = "2026-10-17";
 
 /** In-memory fake: plates map to vehicles, entry ids map to the vehicle they belong to. */
-function fakeRepo(vehicles: Record<string, VehicleRef>, entries: Record<string, number> = {}) {
+function fakeRepo(vehicles: Record<string, VehicleRef>, entries: Record<string, number> = {}, bulkCount = 0) {
   const calls: Array<{ op: string; args: unknown }> = [];
   const repo: LogbookRepository = {
     findVehicle: async (plate) => vehicles[plate] ?? null,
@@ -17,6 +17,10 @@ function fakeRepo(vehicles: Record<string, VehicleRef>, entries: Record<string, 
     create: async (kind, vehicleId, values) => void calls.push({ op: "create", args: { kind, vehicleId, values } }),
     update: async (kind, id, values) => void calls.push({ op: "update", args: { kind, id, values } }),
     remove: async (kind, id) => void calls.push({ op: "remove", args: { kind, id } }),
+    removeMany: async (kind, vehicleId, range) => {
+      calls.push({ op: "removeMany", args: { kind, vehicleId, range } });
+      return bulkCount;
+    },
   };
   return { repo, calls };
 }
@@ -24,8 +28,8 @@ function fakeRepo(vehicles: Record<string, VehicleRef>, entries: Record<string, 
 const active: VehicleRef = { id: 1, status: "ACTIVE" };
 const sold: VehicleRef = { id: 2, status: "SOLD" };
 
-const setup = () => {
-  const { repo, calls } = fakeRepo({ "AAA-111": active, "BBB-222": sold }, { "service:7": 1, "tire:8": 2 });
+const setup = (bulkCount = 0) => {
+  const { repo, calls } = fakeRepo({ "AAA-111": active, "BBB-222": sold }, { "service:7": 1, "tire:8": 2 }, bulkCount);
   return { commands: createLogbookCommands(repo, () => TODAY), calls };
 };
 
@@ -116,5 +120,39 @@ describe("remove", () => {
   it("rejects records of sold vehicles", async () => {
     const { commands } = setup();
     await expect(commands.remove("tire", 8)).rejects.toThrow(RuleError);
+  });
+});
+
+describe("removeAll", () => {
+  const range = { from: "2026-01-01", to: null } as const;
+
+  it("deletes the vehicle's records of the kind inside the period and counts them", async () => {
+    const { commands, calls } = setup(75);
+    const result = await commands.removeAll("service", "AAA-111", range);
+    expect(result.message).toBe("Se eliminaron 75 registros de mantenimiento.");
+    expect(calls).toEqual([{ op: "removeMany", args: { kind: "service", vehicleId: 1, range } }]);
+  });
+
+  it("speaks in singular for one record and names the oil changes", async () => {
+    const { commands } = setup(1);
+    const result = await commands.removeAll("oil", "AAA-111", { from: null, to: null });
+    expect(result.message).toBe("Se eliminó 1 registro de aceite.");
+  });
+
+  it("rejects an unknown vehicle", async () => {
+    const { commands, calls } = setup(3);
+    await expect(commands.removeAll("fuel", "ZZZ-999", range)).rejects.toThrow(/no existe/);
+    expect(calls).toEqual([]);
+  });
+
+  it("rejects sold vehicles without deleting", async () => {
+    const { commands, calls } = setup(3);
+    await expect(commands.removeAll("tire", "BBB-222", range)).rejects.toThrow(RuleError);
+    expect(calls).toEqual([]);
+  });
+
+  it("says so when nothing matched", async () => {
+    const { commands } = setup(0);
+    await expect(commands.removeAll("fuel", "AAA-111", range)).rejects.toThrow(/No hay registros/);
   });
 });

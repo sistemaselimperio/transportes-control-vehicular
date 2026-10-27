@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Plus, X } from "lucide-react";
+import { CalendarRange, Plus, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { PageHeader } from "@/components/app/page-header";
@@ -25,7 +25,9 @@ import {
   type ServiceRow,
   type TireRow,
 } from "../domain/logbook";
+import { LogbookBulkDelete } from "./logbook-bulk-delete";
 import { FuelForm, ServiceForm, TireForm } from "./logbook-forms";
+import { LogbookImportFlow } from "./logbook-import";
 import { FuelList, OilList, ServiceList, TireList } from "./logbook-lists";
 import { NoticeToast, useNotice } from "./notice";
 import { OilCreateFlow, OilEditForm } from "./oil-forms";
@@ -85,6 +87,8 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
   const [from, setFrom] = useState(query.from ?? "");
   const [to, setTo] = useState(query.to ?? "");
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [notice, notify] = useNotice();
 
@@ -146,8 +150,15 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
   const filtered = Boolean(query.plate || query.from || query.to);
   const labels = NEW_LABELS[tab];
   const vehicle = { plates };
+  // The Excel import is per vehicle: it needs one plate chosen (sold vehicles are not in `plates`).
+  const importPlate = query.plate ? (plates.find((p) => normalizePlateQuery(p) === query.plate) ?? null) : null;
+  // Clearing a list is per vehicle too, and only offered when there is something listed to clear.
+  const bulkCount = data.rows.length;
+  const bulkScope = `${plural(bulkCount, "registro", "registros")} de ${LOGBOOK_TABS.find((t) => t.key === tab)?.label ?? ""} de ${importPlate ?? ""} · ${rangeText}`;
   const closeForm = () => {
     setCreating(false);
+    setImporting(false);
+    setDeletingAll(false);
     setEditing(null);
   };
   const done = (message: string) => {
@@ -168,10 +179,29 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
         title="Bitácora"
         description={`Mantenimientos, cambios de aceite, llantas y combustible de la flota${query.group ? ` · ${GROUP_LABELS[query.group]}` : ""}.`}
         actions={
-          <Button type="button" className="h-11 px-4 md:h-9" onClick={() => setCreating(true)}>
-            <Plus aria-hidden />
-            {labels.button}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {importPlate && (
+              <Button type="button" variant="outline" className="h-11 px-4 md:h-9" onClick={() => setImporting(true)}>
+                <Upload aria-hidden />
+                Importar Excel
+              </Button>
+            )}
+            {importPlate && bulkCount > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 px-4 hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive md:h-9"
+                onClick={() => setDeletingAll(true)}
+              >
+                <Trash2 aria-hidden />
+                Eliminar registros
+              </Button>
+            )}
+            <Button type="button" className="h-11 px-4 md:h-9" onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              {labels.button}
+            </Button>
+          </div>
         }
       />
 
@@ -303,11 +333,32 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
       <NoticeToast notice={notice} />
 
       <SlideOver
-        open={creating || editing !== null}
+        open={creating || importing || deletingAll || editing !== null}
         onOpenChange={(open) => !open && closeForm()}
-        title={editing ? NEW_LABELS[editing.tab].edit : labels.create}
-        description={editing?.row.plate}
+        title={
+          importing
+            ? "Importar bitácora desde Excel"
+            : deletingAll
+              ? "Eliminar registros"
+              : editing
+                ? NEW_LABELS[editing.tab].edit
+                : labels.create
+        }
+        description={importing || deletingAll ? (importPlate ?? undefined) : editing?.row.plate}
       >
+        {importing && importPlate && <LogbookImportFlow plate={importPlate} onDone={done} onCancel={closeForm} />}
+        {deletingAll && importPlate && (
+          <LogbookBulkDelete
+            tab={tab}
+            plate={importPlate}
+            from={query.from ?? ""}
+            to={query.to ?? ""}
+            count={bulkCount}
+            scopeText={bulkScope}
+            onDone={done}
+            onCancel={closeForm}
+          />
+        )}
         {creating && tab === "servicios" && <ServiceForm {...formProps} />}
         {creating && tab === "aceite" && <OilCreateFlow plates={plates} onDone={done} onCancel={closeForm} />}
         {creating && tab === "llantas" && <TireForm {...formProps} />}

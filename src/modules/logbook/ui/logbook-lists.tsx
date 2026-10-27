@@ -1,5 +1,6 @@
 "use client";
 
+import { Popover } from "@base-ui/react/popover";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
@@ -130,65 +131,76 @@ function Clamp({ text }: { text: string | null }) {
 }
 
 /**
- * Edit and delete buttons of one record. Deleting asks first, inline in the same spot
- * ("¿Eliminar? Sí / No"), and reports the outcome through `onResult`.
+ * Edit and delete buttons of one record. Deleting asks first in a small popover anchored to the
+ * trash button, so the row never changes size, and reports the outcome through `onResult`.
  */
 export function RowActions({
   noun,
   plate,
+  date,
   onEdit,
   remove,
   onResult,
 }: {
   noun: string;
   plate: string;
+  date: string;
   onEdit: () => void;
   remove: () => Promise<ActionResult>;
   onResult: (result: ActionResult) => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  if (confirming) {
-    return (
-      <div role="group" aria-label={`Confirmar eliminar ${noun} de ${plate}`} className="flex items-center gap-1 whitespace-nowrap">
-        <span className="px-1 text-sm text-destructive">¿Eliminar?</span>
-        <Button
-          type="button"
-          variant="destructive"
-          className="h-11 px-2.5 md:h-8"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await remove();
-              setConfirming(false);
-              onResult(result);
-            })
-          }
-        >
-          {pending ? <Loader2 className="animate-spin" aria-hidden /> : "Sí"}
-        </Button>
-        <Button type="button" variant="ghost" className="h-11 px-2.5 md:h-8" disabled={pending} onClick={() => setConfirming(false)}>
-          No
-        </Button>
-      </div>
-    );
-  }
   return (
     <div className="flex items-center whitespace-nowrap">
       <Button variant="ghost" size="icon" className="size-11 md:size-9" aria-label={`Editar ${noun} de ${plate}`} title="Editar" onClick={onEdit}>
         <Pencil aria-hidden />
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-11 hover:text-destructive md:size-9"
-        aria-label={`Eliminar ${noun} de ${plate}`}
-        title="Eliminar"
-        onClick={() => setConfirming(true)}
-      >
-        <Trash2 aria-hidden />
-      </Button>
+      {/* It stays open while the delete runs, so the spinner is seen and a second click cannot repeat it. */}
+      <Popover.Root open={open} onOpenChange={(next) => (!next && pending ? undefined : setOpen(next))}>
+        <Popover.Trigger
+          render={<Button variant="ghost" size="icon" className="size-11 hover:text-destructive md:size-9" />}
+          aria-label={`Eliminar ${noun} de ${plate}`}
+          title="Eliminar"
+        >
+          <Trash2 aria-hidden />
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner side="bottom" align="end" sideOffset={6} className="z-50">
+            <Popover.Popup className="w-[min(20rem,calc(100vw-2rem))] space-y-3 rounded-xl border bg-popover p-4 shadow-soft outline-none transition-[opacity,transform] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+              <div className="space-y-1 whitespace-normal">
+                <Popover.Title className="text-sm font-semibold">¿Eliminar este registro?</Popover.Title>
+                <Popover.Description className="num text-sm break-words">
+                  {noun} · {plate} · {formatDisplayDate(date)}
+                </Popover.Description>
+                <p className="text-sm text-muted-foreground">Esta acción no se puede deshacer.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" className="h-11 px-3 md:h-8" disabled={pending} onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="h-11 px-3 md:h-8"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await remove();
+                      setOpen(false);
+                      onResult(result);
+                    })
+                  }
+                >
+                  {pending && <Loader2 className="animate-spin" aria-hidden />}
+                  Eliminar
+                </Button>
+              </div>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
     </div>
   );
 }
@@ -214,7 +226,7 @@ const headerClass = <T extends Row>(c: Column<T>) => `micro-label px-4 py-3 font
 function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListProps<T> & { spec: Spec<T> }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   const actions = (r: T) => (
-    <RowActions noun={spec.noun} plate={r.plate} onEdit={() => onEdit(r)} remove={() => spec.remove(r.id)} onResult={onResult} />
+    <RowActions noun={spec.noun} plate={r.plate} date={r.date} onEdit={() => onEdit(r)} remove={() => spec.remove(r.id)} onResult={onResult} />
   );
   return (
     <>

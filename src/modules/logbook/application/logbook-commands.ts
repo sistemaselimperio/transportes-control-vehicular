@@ -5,7 +5,7 @@
  */
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { assertEditable, assertNotFuture, RuleError } from "@/modules/vehicles/domain/vehicle-rules";
-import type { EntryKind, LogbookRepository, LogbookValues, VehicleRef } from "./logbook-ports";
+import type { BulkKind, DateRange, EntryKind, LogbookRepository, LogbookValues, VehicleRef } from "./logbook-ports";
 
 export interface CommandResult {
   message: string;
@@ -15,6 +15,14 @@ const CREATED: Record<EntryKind, string> = {
   service: "Mantenimiento registrado.",
   tire: "Cambio de llantas registrado.",
   fuel: "Tanqueo registrado.",
+};
+
+/** What each list is called in the bulk-delete message. */
+const BULK_NAMES: Record<BulkKind, string> = {
+  service: "mantenimiento",
+  oil: "aceite",
+  tire: "llantas",
+  fuel: "combustible",
 };
 
 export function createLogbookCommands(repo: LogbookRepository, today: () => IsoDate) {
@@ -45,6 +53,16 @@ export function createLogbookCommands(repo: LogbookRepository, today: () => IsoD
       await loadEntryVehicle(kind, id);
       await repo.remove(kind, id);
       return { message: "Registro eliminado." };
+    },
+    /** Clears one list of one vehicle inside a period; the vehicle must still accept changes. */
+    async removeAll(kind: BulkKind, plate: string, range: DateRange): Promise<CommandResult> {
+      const vehicle = await repo.findVehicle(plate);
+      if (!vehicle) throw new RuleError(`El vehículo ${plate} no existe.`);
+      assertEditable(vehicle.status);
+      const count = await repo.removeMany(kind, vehicle.id, range);
+      if (count === 0) throw new RuleError("No hay registros para eliminar.");
+      const what = count === 1 ? "Se eliminó 1 registro" : `Se eliminaron ${count} registros`;
+      return { message: `${what} de ${BULK_NAMES[kind]}.` };
     },
   };
 }
