@@ -3,6 +3,7 @@
 import {
   Bell,
   Building2,
+  Loader2,
   LogOut,
   Menu,
   NotebookText,
@@ -88,11 +89,17 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
 
 function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
-    await authClient.signOut();
-    router.replace("/login");
-    router.refresh();
+    setSigningOut(true);
+    try {
+      await authClient.signOut();
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setSigningOut(false);
+    }
   }
 
   const focus =
@@ -173,27 +180,24 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles,
         </div>
       </nav>
 
-      <div className="mt-auto flex items-center gap-2 border-t p-3 px-4 md:py-2">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-sm font-medium text-secondary-foreground uppercase"
-        >
-          {userName.trim().charAt(0) || "?"}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm" title={userName}>
-          {userName}
-        </span>
+      {/* Account: a tone-step field at the foot, the name set as text and one flat, square sign-out bar. */}
+      <div className="mt-auto flex flex-col gap-3 bg-muted px-4 pt-4 pb-4 md:pb-3">
         <button
           type="button"
           onClick={signOut}
-          aria-label="Salir"
-          title="Salir"
+          disabled={signingOut}
+          aria-busy={signingOut}
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground md:size-9",
+            "group flex h-11 cursor-pointer rounded-sm items-center justify-between bg-foreground px-3.5 text-sm font-semibold text-background transition-colors duration-150 hover:bg-danger-foreground active:translate-y-px disabled:pointer-events-none disabled:opacity-70 motion-reduce:transition-none md:h-10",
             focus,
           )}
         >
-          <LogOut className="size-[1.125rem]" aria-hidden />
+          {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
+          {signingOut ? (
+            <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
+          ) : (
+            <LogOut className="size-4 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
+          )}
         </button>
       </div>
     </>
@@ -219,7 +223,7 @@ function BrandInline() {
 function BrandStacked() {
   return (
     <div className="flex flex-col items-center gap-2 border-b px-4 pt-4 pb-3.5 text-center">
-      <BrandMark decorative className="h-16 drop-shadow-sm" />
+      <BrandMark decorative className="h-24 drop-shadow-sm" />
       <span className="leading-tight">
         <span className="block text-base font-bold tracking-tight text-balance">
           Transportes El Imperio
