@@ -6,7 +6,7 @@ import { loadDriverRows } from "../infrastructure/driver-repository";
 /** Company-wide driver list; the page filters it by company. */
 export async function listDriverRows(): Promise<DriverRow[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("driverRows"));
 
   return sortDriverRows(await loadDriverRows());

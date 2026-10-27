@@ -65,7 +65,7 @@ export async function getLogbookPage(tab: LogbookTab, query: LogbookQuery): Prom
 /** Shared by everyone: the tab and filters (plus the day) are the cache key. */
 async function loadLogbookPage(tab: LogbookTab, query: LogbookQuery, today: IsoDate): Promise<LogbookPage> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("logbookPage"));
 
   const [data, providers, lists] = await Promise.all([loadData(tab, query), loadProviders(), loadVehicleFormLists()]);

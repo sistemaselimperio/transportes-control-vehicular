@@ -36,7 +36,7 @@ export async function getDashboard(group: OwnerGroup | null) {
 /** Shared by everyone; `today` is part of the key so the statuses roll over at midnight. */
 async function loadDashboard(today: IsoDate, group: OwnerGroup | null) {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("dashboard"));
 
   const rows = filterByGroup(await loadRows(today), group);
@@ -59,7 +59,7 @@ export async function getExpiredVehicleCounts(): Promise<ExpiredVehicleCounts> {
 
 async function loadExpiredVehicleCounts(today: IsoDate): Promise<ExpiredVehicleCounts> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("expiredCounts"));
 
   const all = await loadRows(today);

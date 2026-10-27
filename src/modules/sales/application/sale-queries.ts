@@ -6,7 +6,7 @@ import { loadSaleRows } from "../infrastructure/sale-repository";
 /** Company-wide sales list; the page filters it by group and year. */
 export async function listSaleRows(): Promise<SaleRow[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("saleRows"));
 
   return sortSaleRows(await loadSaleRows());

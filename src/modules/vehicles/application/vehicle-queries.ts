@@ -20,7 +20,7 @@ import {
 /** Company-wide fleet table. `today` is part of the cache key, so statuses roll over at midnight. */
 export async function listVehicleRows(today: IsoDate): Promise<VehicleGridRow[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("fleetRows"));
 
   const inputs = await loadVehicleRowInputs(today);
@@ -72,7 +72,7 @@ export interface VehicleEditValues {
 
 export async function getVehicleFormOptions(today: IsoDate): Promise<VehicleFormOptions> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("vehicleFormOptions"));
 
   const [lists, people] = await Promise.all([loadVehicleFormLists(), loadPeople()]);
@@ -124,7 +124,7 @@ export async function getVehicleActionContext(plate: string): Promise<VehicleAct
 /** One vehicle's file page: shared by everyone, keyed by plate and day. */
 export async function getVehicleDetail(plate: string, today: IsoDate): Promise<VehicleDetail | null> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("vehicleDetail", plate));
 
   const [input] = await loadVehicleRowInputs(today, plate);

@@ -6,7 +6,7 @@ import { loadOwnerRows } from "../infrastructure/owner-repository";
 /** Company-wide owner list; the page filters it by group. */
 export async function listOwnerRows(): Promise<OwnerRow[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("minutes");
   cacheTag(...readTags("ownerRows"));
 
   return sortOwnerRows(await loadOwnerRows());
