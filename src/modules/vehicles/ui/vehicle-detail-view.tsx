@@ -183,7 +183,7 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
         <div className="grid gap-x-10 gap-y-10 lg:grid-cols-2">
           <div className="min-w-0">
             <Section id="mantenimiento" title="Mantenimiento" actions={<ActionButtons keys={["oil", "km"]} />}>
-              <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-3">
+              <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
                 <Figure label="Kilometraje">
                   <span className="num">{kmText(r)}</span>
                   {r.km != null && <span className="ml-1 text-sm font-normal text-muted-foreground">km</span>}
