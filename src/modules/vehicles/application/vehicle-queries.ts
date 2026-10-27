@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from "next/cache";
+import { readTags } from "@/lib/cache-tags";
 import { loadVehicleLogbook } from "@/modules/logbook/infrastructure/logbook-repository";
 import type { VehicleLogbook } from "@/modules/logbook/domain/logbook";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
@@ -15,7 +17,12 @@ import {
   loadVehicleRowInputs,
 } from "../infrastructure/vehicle-repository";
 
+/** Company-wide fleet table. `today` is part of the cache key, so statuses roll over at midnight. */
 export async function listVehicleRows(today: IsoDate): Promise<VehicleGridRow[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(...readTags("fleetRows"));
+
   const inputs = await loadVehicleRowInputs(today);
   return inputs.map(buildVehicleRow);
 }
@@ -63,9 +70,13 @@ export interface VehicleEditValues {
   towingPlate: string | null;
 }
 
-export async function getVehicleFormOptions(): Promise<VehicleFormOptions> {
+export async function getVehicleFormOptions(today: IsoDate): Promise<VehicleFormOptions> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(...readTags("vehicleFormOptions"));
+
   const [lists, people] = await Promise.all([loadVehicleFormLists(), loadPeople()]);
-  return { today: todayInBogota(), ...lists, ...people };
+  return { today, ...lists, ...people };
 }
 
 export interface VehicleDetail {
@@ -110,8 +121,13 @@ export async function getVehicleActionContext(plate: string): Promise<VehicleAct
   return buildActionContext(input, people, lastOilItems);
 }
 
-export async function getVehicleDetail(plate: string): Promise<VehicleDetail | null> {
-  const [input] = await loadVehicleRowInputs(todayInBogota(), plate);
+/** One vehicle's file page: shared by everyone, keyed by plate and day. */
+export async function getVehicleDetail(plate: string, today: IsoDate): Promise<VehicleDetail | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(...readTags("vehicleDetail", plate));
+
+  const [input] = await loadVehicleRowInputs(today, plate);
   if (!input) return null;
   const [history, people, editValues, lists, files, logbook, lastOilItems] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),

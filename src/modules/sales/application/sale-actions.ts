@@ -2,10 +2,10 @@
 
 /**
  * Server action for the sales page. It re-checks the session, parses the form
- * with zod, writes and revalidates the pages that show sale data.
+ * with zod, writes and expires the cached reads that show sale data.
  */
-import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import { assertNotFuture, RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
@@ -19,9 +19,7 @@ async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
     await requireSession();
     const message = await fn();
-    revalidatePath("/ventas");
-    revalidatePath("/flota/[placa]", "page");
-    revalidatePath("/");
+    expireAfterAction({ kind: "sale" });
     return { ok: true, message };
   } catch (e) {
     if (e instanceof RuleError) return { ok: false, error: e.message };

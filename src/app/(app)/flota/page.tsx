@@ -10,11 +10,8 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [rows, options, params] = await Promise.all([
-    currentDay().then(listVehicleRows),
-    getVehicleFormOptions(),
-    searchParams,
-  ]);
+  const [today, params] = await Promise.all([currentDay(), searchParams]);
+  const [rows, options] = await Promise.all([listVehicleRows(today), getVehicleFormOptions(today)]);
   const { group } = parseFilterParams(params);
   return (
     <section className="space-y-5 md:flex md:h-[calc(100dvh-4rem)] md:flex-col md:gap-5 md:space-y-0">

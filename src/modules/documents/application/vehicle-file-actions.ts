@@ -2,10 +2,10 @@
 
 /**
  * Server actions for the files of a vehicle. Same shape as the vehicle actions:
- * re-check the session, run a command, revalidate the detail page and the fleet inventory.
+ * re-check the session, run a command, expire the cached file list of that vehicle.
  */
-import { revalidatePath } from "next/cache";
 import { z, ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
@@ -16,11 +16,12 @@ import { createVehicleFileCommands } from "./vehicle-file-commands";
 
 const commands = createVehicleFileCommands(vehicleFileRepository);
 
-async function run(fn: () => Promise<{ message: string }>): Promise<ActionResult> {
+async function run(plate: string, fn: () => Promise<{ message: string }>): Promise<ActionResult> {
   try {
     await requireSession();
     const result = await fn();
-    revalidatePath("/flota/[placa]", "page");
+    // The command only succeeds for a plate stored exactly as given, the same one the detail page tags.
+    expireAfterAction({ kind: "vehicle-file", plate });
     return { ok: true, message: result.message };
   } catch (e) {
     if (e instanceof RuleError) return { ok: false, error: e.message };
@@ -36,7 +37,7 @@ async function run(fn: () => Promise<{ message: string }>): Promise<ActionResult
 }
 
 export async function uploadVehicleFileAction(plate: string, fd: FormData): Promise<ActionResult> {
-  return run(async () => {
+  return run(plate, async () => {
     const category = String(fd.get("category") ?? "");
     const file = fd.get("file");
     if (!isFileCategory(category)) throw new RuleError("Categoría de archivo no válida.");
@@ -51,5 +52,5 @@ export async function uploadVehicleFileAction(plate: string, fd: FormData): Prom
 }
 
 export async function deleteVehicleFileAction(plate: string, fileId: string): Promise<ActionResult> {
-  return run(() => commands.deleteVehicleFile(plateSchema.parse(plate), z.uuid().parse(fileId)));
+  return run(plate, () => commands.deleteVehicleFile(plateSchema.parse(plate), z.uuid().parse(fileId)));
 }

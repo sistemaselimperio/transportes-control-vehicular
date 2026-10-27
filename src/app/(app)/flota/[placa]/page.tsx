@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { currentDay } from "@/lib/current-day";
 import { getVehicleDetail } from "@/modules/vehicles/application/vehicle-queries";
 import { VehicleDetailView } from "@/modules/vehicles/ui/vehicle-detail-view";
 
@@ -8,7 +9,7 @@ export default async function Page({
   params: Promise<{ placa: string }>;
 }) {
   const { placa } = await params;
-  const detail = await getVehicleDetail(decodeURIComponent(placa).toUpperCase());
+  const detail = await getVehicleDetail(decodeURIComponent(placa).toUpperCase(), await currentDay());
   if (!detail) notFound();
   return <VehicleDetailView detail={detail} />;
 }
