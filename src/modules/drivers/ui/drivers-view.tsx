@@ -2,11 +2,13 @@
 
 import { CheckCircle2, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { deleteAllDriversAction } from "../application/driver-actions";
 import { searchDrivers, type DriverRow } from "../domain/driver-row";
 import { DriverForm } from "./driver-form";
 import { DriverList } from "./driver-list";
@@ -31,10 +33,18 @@ export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
         title="Conductores"
         description="Datos de cada conductor y los vehículos que maneja."
         actions={
-          <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-            <Plus aria-hidden />
-            Nuevo conductor
-          </Button>
+          <>
+            <DeleteAllButton count={rows.length} title="Eliminar todos los conductores" action={deleteAllDriversAction}>
+              <p className="font-medium">Se eliminarán TODOS los conductores, no solo los que ves en pantalla.</p>
+              <p className="text-muted-foreground">
+                Se quitan también sus asignaciones a vehículos. Los vehículos no se eliminan.
+              </p>
+            </DeleteAllButton>
+            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+              <Plus aria-hidden />
+              Nuevo conductor
+            </Button>
+          </>
         }
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

@@ -57,3 +57,9 @@ export async function updateSale(id: number, values: SaleValues) {
     .returning({ id: schema.sales.id });
   return rows.length === 1;
 }
+
+/** Removes every sale; returns how many went. */
+export async function deleteAllSales() {
+  const rows = await db.delete(schema.sales).returning({ id: schema.sales.id });
+  return rows.length;
+}

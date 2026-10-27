@@ -62,3 +62,12 @@ export async function updateDriver(id: number, values: DriverValues) {
     .returning({ id: schema.drivers.id });
   return rows.length === 1;
 }
+
+/** Removes every driver and their assignments (the vehicles stay); returns how many drivers went. */
+export async function deleteAllDrivers() {
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.driverAssignments);
+    const rows = await tx.delete(schema.drivers).returning({ id: schema.drivers.id });
+    return rows.length;
+  });
+}

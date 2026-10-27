@@ -2,11 +2,13 @@
 
 import { CheckCircle2, Search } from "lucide-react";
 import { useState } from "react";
+import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { TabBar } from "@/components/app/tab-bar";
 import { Input } from "@/components/ui/input";
 import { GROUP_LABELS, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
+import { deleteAllSalesAction } from "../application/sale-actions";
 import {
   ALL_YEARS,
   countByYear,
@@ -68,6 +70,12 @@ export function SalesView({
       <PageHeader
         title="Ventas"
         description={`Vehículos vendidos y a quién${group ? ` · ${GROUP_LABELS[group]}` : ""}.`}
+        actions={
+          <DeleteAllButton count={rows.length} title="Eliminar todas las ventas" action={deleteAllSalesAction}>
+            <p className="font-medium">Se eliminarán TODOS los registros de ventas, no solo los que ves en pantalla.</p>
+            <p className="text-muted-foreground">Los vehículos no se eliminan y conservan su estado de vendido.</p>
+          </DeleteAllButton>
+        }
       />
 
       <TabBar

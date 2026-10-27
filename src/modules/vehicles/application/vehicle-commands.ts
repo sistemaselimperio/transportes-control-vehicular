@@ -425,6 +425,12 @@ export function createVehicleCommands(
       });
       return { message: "Venta registrada." };
     },
+
+    async deleteAllVehicles(): Promise<CommandResult> {
+      const count = await repo.deleteAllVehicles();
+      if (count === 0) throw new RuleError("No hay vehículos para eliminar.");
+      return { message: count === 1 ? "Se eliminó 1 vehículo." : `Se eliminaron ${count} vehículos.` };
+    },
   };
 }
 

@@ -183,3 +183,8 @@ export async function sellVehicleAction(plate: string, fd: FormData): Promise<Ac
     });
   });
 }
+
+/** Removes every vehicle and, by cascade, all its history (documents, maintenance, fuel, sales, files, links). */
+export async function deleteAllVehiclesAction(): Promise<ActionResult> {
+  return run(async () => commands.deleteAllVehicles());
+}

@@ -47,6 +47,10 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99, oi
     assignDriver: record("assignDriver"),
     transferOwnership: record("transferOwnership"),
     registerSale: record("registerSale"),
+    deleteAllVehicles: async () => {
+      calls.push({ op: "deleteAllVehicles", args: {} });
+      return vehicles.length;
+    },
   };
   return { repo, calls };
 }
@@ -55,6 +59,25 @@ const commands = (vehicles: VehicleSnapshot[], imperioId?: number | null, oilCha
   const { repo, calls } = fakeRepo(vehicles, imperioId, oilChangeOwners);
   return { ...createVehicleCommands(repo, () => TODAY), calls };
 };
+
+describe("deleteAllVehicles", () => {
+  it("removes every vehicle in one repository call and reports how many", async () => {
+    const c = commands([snapshot(), snapshot({ id: 2, plate: "BBB-222" })]);
+    const result = await c.deleteAllVehicles();
+    expect(c.calls).toEqual([{ op: "deleteAllVehicles", args: {} }]);
+    expect(result.message).toBe("Se eliminaron 2 vehículos.");
+  });
+
+  it("uses the singular for one vehicle", async () => {
+    const c = commands([snapshot()]);
+    expect((await c.deleteAllVehicles()).message).toBe("Se eliminó 1 vehículo.");
+  });
+
+  it("rejects when there is nothing to delete", async () => {
+    const c = commands([]);
+    await expect(c.deleteAllVehicles()).rejects.toThrow(RuleError);
+  });
+});
 
 describe("sellVehicle", () => {
   it("registers the sale closing ownership and driver", async () => {

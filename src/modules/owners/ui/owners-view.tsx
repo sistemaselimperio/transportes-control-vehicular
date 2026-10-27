@@ -2,12 +2,14 @@
 
 import { CheckCircle2, Plus, Search } from "lucide-react";
 import { useState } from "react";
+import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { TabBar } from "@/components/app/tab-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GROUP_LABELS, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
+import { deleteAllOwnersAction } from "../application/owner-actions";
 import {
   countOwnerViews,
   filterOwnerRows,
@@ -62,10 +64,18 @@ export function OwnersView({
         title="Propietarios"
         description={`Dueños de los vehículos y los vehículos que tienen hoy${group ? ` · ${GROUP_LABELS[group]}` : ""}.`}
         actions={
-          <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-            <Plus aria-hidden />
-            Nuevo propietario
-          </Button>
+          <>
+            <DeleteAllButton count={rows.length} title="Eliminar todos los propietarios" action={deleteAllOwnersAction}>
+              <p className="font-medium">Se eliminarán TODOS los propietarios, no solo los que ves en pantalla.</p>
+              <p className="text-muted-foreground">
+                Se quitan también los vínculos de propiedad con los vehículos. Los vehículos no se eliminan.
+              </p>
+            </DeleteAllButton>
+            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+              <Plus aria-hidden />
+              Nuevo propietario
+            </Button>
+          </>
         }
       />
 

@@ -9,6 +9,7 @@ import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
+  deleteAllDrivers,
   findDriverIdByNationalId,
   insertDriver,
   updateDriver,
@@ -60,5 +61,14 @@ export async function updateDriverAction(id: number, fd: FormData): Promise<Acti
     await ensureUniqueNationalId(input, driverId);
     if (!(await updateDriver(driverId, input))) throw new DriverError("El conductor ya no existe.");
     return `Conductor ${input.name} actualizado.`;
+  });
+}
+
+/** Removes every driver and their assignments; the vehicles stay. */
+export async function deleteAllDriversAction(): Promise<ActionResult> {
+  return run(async () => {
+    const count = await deleteAllDrivers();
+    if (count === 0) throw new DriverError("No hay conductores para eliminar.");
+    return count === 1 ? "Se eliminó 1 conductor." : `Se eliminaron ${count} conductores.`;
   });
 }

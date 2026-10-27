@@ -173,4 +173,6 @@ export interface VehicleCommandRepository {
     closeOwnership: PeriodClose | null;
     closeAssignment: PeriodClose | null;
   }): Promise<void>;
+  /** Unlinks the towing vehicles, then removes every vehicle with its history; returns how many. */
+  deleteAllVehicles(): Promise<number>;
 }

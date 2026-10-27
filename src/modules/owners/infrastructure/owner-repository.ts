@@ -60,3 +60,12 @@ export async function updateOwner(id: number, values: OwnerValues) {
     .returning({ id: schema.owners.id });
   return rows.length === 1;
 }
+
+/** Removes every owner and their ownership links (the vehicles stay); returns how many owners went. */
+export async function deleteAllOwners() {
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.ownerships);
+    const rows = await tx.delete(schema.owners).returning({ id: schema.owners.id });
+    return rows.length;
+  });
+}

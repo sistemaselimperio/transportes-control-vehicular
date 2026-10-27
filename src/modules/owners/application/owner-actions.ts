@@ -9,6 +9,7 @@ import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
+  deleteAllOwners,
   findOwnerIdByDocument,
   insertOwner,
   updateOwner,
@@ -60,5 +61,14 @@ export async function updateOwnerAction(id: number, fd: FormData): Promise<Actio
     await ensureUniqueDocument(input, ownerId);
     if (!(await updateOwner(ownerId, input))) throw new OwnerError("El propietario ya no existe.");
     return `Propietario ${input.name} actualizado.`;
+  });
+}
+
+/** Removes every owner and their ownership links; the vehicles stay. */
+export async function deleteAllOwnersAction(): Promise<ActionResult> {
+  return run(async () => {
+    const count = await deleteAllOwners();
+    if (count === 0) throw new OwnerError("No hay propietarios para eliminar.");
+    return count === 1 ? "Se eliminó 1 propietario." : `Se eliminaron ${count} propietarios.`;
   });
 }

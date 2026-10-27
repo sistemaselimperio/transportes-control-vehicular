@@ -293,6 +293,15 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
       await closeAssignment(tx, asgClose);
     });
   },
+
+  async deleteAllVehicles() {
+    return db.transaction(async (tx) => {
+      // The towing link is the only vehicle FK without ON DELETE CASCADE; everything else goes with the vehicle.
+      await tx.update(schema.vehicles).set({ towingVehicleId: null });
+      const rows = await tx.delete(schema.vehicles).returning({ id: schema.vehicles.id });
+      return rows.length;
+    });
+  },
 };
 
 /** Owners and drivers for the action pickers. */
