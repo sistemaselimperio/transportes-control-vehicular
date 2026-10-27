@@ -48,3 +48,5 @@ next-env.d.ts
 .claude/
 graphify-out/
 skills-lock.json
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
