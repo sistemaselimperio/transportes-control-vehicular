@@ -4,14 +4,26 @@ import {
   columnVisibility,
   parseHiddenGroups,
   serializeHiddenGroups,
+  SORT_ONLY_COLUMNS,
   toggleGroup,
 } from "./column-groups";
 
 describe("COLUMN_GROUPS", () => {
-  it("keeps all 15 grid columns, each in exactly one group", () => {
+  it("keeps all 14 grid columns, each in exactly one group", () => {
     const ids = COLUMN_GROUPS.flatMap((g) => g.columns);
-    expect(ids).toHaveLength(15);
-    expect(new Set(ids).size).toBe(15);
+    expect(ids).toHaveLength(14);
+    expect(new Set(ids).size).toBe(14);
+  });
+
+  it("has no status column: the fleet views already split vehicles by status", () => {
+    expect(COLUMN_GROUPS.flatMap((g) => g.columns)).not.toContain("status");
+  });
+});
+
+describe("SORT_ONLY_COLUMNS", () => {
+  it("keeps status sortable but always hidden", () => {
+    expect(SORT_ONLY_COLUMNS).toContain("status");
+    expect(columnVisibility(new Set()).status).toBe(false);
   });
 });
 

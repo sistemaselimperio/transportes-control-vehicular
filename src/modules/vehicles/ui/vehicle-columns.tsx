@@ -61,15 +61,6 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
   },
   municipality: { id: "municipality", header: "Municipio", accessorFn: (r) => r.municipality ?? "" },
   service: { id: "service", header: "Servicio", accessorFn: (r) => r.serviceLabel },
-  status: {
-    id: "status",
-    header: "Estado",
-    accessorFn: (r) => SEVERITY[r.overall],
-    sortDescFirst: true,
-    cell: ({ row }) => (
-      <StatusPill status={row.original.overall}>{row.original.statusLabel}</StatusPill>
-    ),
-  },
   owner: {
     id: "owner",
     header: "Propietario",
@@ -167,10 +158,20 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
   },
 };
 
-/** Same 15 columns, nested under their four group headers. */
-export const vehicleColumns: ColumnDef<VehicleGridRow>[] = COLUMN_GROUPS.map((group) => ({
-  id: `group-${group.key}`,
-  header: group.label,
-  meta: { groupKey: group.key },
-  columns: group.columns.map((id) => leaves[id]),
-}));
+/** Overall urgency: never shown, only sorted by ("Más urgentes primero"). */
+const statusSort: ColumnDef<VehicleGridRow> = {
+  id: "status",
+  accessorFn: (r) => SEVERITY[r.overall],
+  sortDescFirst: true,
+};
+
+/** Same 14 columns, nested under their four group headers, plus the hidden urgency sort. */
+export const vehicleColumns: ColumnDef<VehicleGridRow>[] = [
+  ...COLUMN_GROUPS.map((group) => ({
+    id: `group-${group.key}`,
+    header: group.label,
+    meta: { groupKey: group.key },
+    columns: group.columns.map((id) => leaves[id]),
+  })),
+  statusSort,
+];

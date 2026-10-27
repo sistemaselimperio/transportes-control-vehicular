@@ -1,5 +1,5 @@
 /**
- * The 15 grid columns, grouped the way people read a vehicle:
+ * The 14 grid columns, grouped the way people read a vehicle:
  * who/what it is, who is behind it, its papers, and its upkeep.
  */
 export type ColumnGroupKey = "vehicle" | "people" | "documents" | "maintenance";
@@ -17,7 +17,7 @@ export const COLUMN_GROUPS: readonly ColumnGroupDef[] = [
   {
     key: "vehicle",
     label: "Vehículo",
-    columns: ["className", "plate", "municipality", "service", "status"],
+    columns: ["className", "plate", "municipality", "service"],
     pinned: true,
   },
   { key: "people", label: "Personas", columns: ["owner", "driver", "phone"] },
@@ -57,9 +57,12 @@ export function toggleGroup(
   return next;
 }
 
+/** Columns that exist only to sort by ("Más urgentes primero") and are never shown. */
+export const SORT_ONLY_COLUMNS: readonly string[] = ["status"];
+
 /** TanStack `columnVisibility` state for the hidden groups. */
 export function columnVisibility(hidden: ReadonlySet<ColumnGroupKey>): Record<string, boolean> {
-  const out: Record<string, boolean> = {};
+  const out: Record<string, boolean> = Object.fromEntries(SORT_ONLY_COLUMNS.map((id) => [id, false]));
   for (const g of COLUMN_GROUPS) {
     for (const id of g.columns) out[id] = !hidden.has(g.key);
   }
