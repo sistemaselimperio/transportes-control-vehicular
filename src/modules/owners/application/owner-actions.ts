@@ -2,10 +2,10 @@
 
 /**
  * Server actions for the owners page. Each one re-checks the session, parses
- * the form with zod, writes and revalidates the pages that show owner data.
+ * the form with zod, writes and expires the cached reads that show owner data.
  */
-import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
@@ -29,10 +29,7 @@ async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
     await requireSession();
     const message = await fn();
-    revalidatePath("/propietarios");
-    revalidatePath("/flota");
-    revalidatePath("/flota/[placa]", "page");
-    revalidatePath("/");
+    expireAfterAction({ kind: "owner" });
     return { ok: true, message };
   } catch (e) {
     if (e instanceof OwnerError) return { ok: false, error: e.message };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { buildVehiclesWorkbook } from "@/modules/import-export/infrastructure/xlsx-writer";
+import { todayInBogota } from "@/modules/shared/domain/dates";
 import { listVehicleRows } from "@/modules/vehicles/application/vehicle-queries";
 
 const bodySchema = z.object({ plates: z.array(z.string()).max(5000) });
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return new Response("Solicitud no válida", { status: 400 });
 
-  const byPlate = new Map((await listVehicleRows()).map((r) => [r.plate, r]));
+  const byPlate = new Map((await listVehicleRows(todayInBogota())).map((r) => [r.plate, r]));
   const rows = parsed.data.plates.flatMap((p) => byPlate.get(p) ?? []);
   const data = await buildVehiclesWorkbook(rows);
 

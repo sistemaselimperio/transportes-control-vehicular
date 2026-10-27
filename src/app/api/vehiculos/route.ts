@@ -3,7 +3,7 @@ import {
   commandErrorResponse,
   hasSession,
   invalidBody,
-  revalidateVehiclePages,
+  expireVehicleReads,
   unauthorized,
   vehicleCommands,
 } from "./_lib/responses";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await vehicleCommands.createVehicle(parsed.data);
-    revalidateVehiclePages();
+    expireVehicleReads();
     return Response.json(result, { status: 201 });
   } catch (e) {
     return commandErrorResponse(e, "No se pudo crear el vehículo.");

@@ -15,8 +15,8 @@ import {
   loadVehicleRowInputs,
 } from "../infrastructure/vehicle-repository";
 
-export async function listVehicleRows(): Promise<VehicleGridRow[]> {
-  const inputs = await loadVehicleRowInputs(todayInBogota());
+export async function listVehicleRows(today: IsoDate): Promise<VehicleGridRow[]> {
+  const inputs = await loadVehicleRowInputs(today);
   return inputs.map(buildVehicleRow);
 }
 

@@ -4,7 +4,7 @@ import {
   commandErrorResponse,
   hasSession,
   invalidBody,
-  revalidateVehiclePages,
+  expireVehicleReads,
   unauthorized,
   vehicleCommands,
 } from "../_lib/responses";
@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pl
   try {
     const { placa } = await params;
     const result = await vehicleCommands.updateVehicle(normalizePlate(placa), parsed.data);
-    revalidateVehiclePages();
+    expireVehicleReads();
     return Response.json(result);
   } catch (e) {
     return commandErrorResponse(e, "No se pudo actualizar el vehículo.");

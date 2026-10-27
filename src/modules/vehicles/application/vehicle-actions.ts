@@ -3,11 +3,11 @@
 /**
  * Server actions for the vehicle detail page. Each one
  * re-checks the session, parses the form with zod, runs a command use case and
- * revalidates the pages that show vehicle data.
+ * expires the cached reads that show vehicle data.
  */
-import { revalidatePath } from "next/cache";
 import type { ZodType } from "zod";
 import { ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { RuleError } from "../domain/vehicle-rules";
@@ -43,10 +43,7 @@ async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
   try {
     await requireSession();
     const result = await fn();
-    revalidatePath("/flota");
-    revalidatePath("/flota/[placa]", "page");
-    revalidatePath("/bitacora");
-    revalidatePath("/");
+    expireAfterAction({ kind: "vehicle" });
     return { ok: true, message: result.message };
   } catch (e) {
     if (e instanceof RuleError) return { ok: false, error: e.message };

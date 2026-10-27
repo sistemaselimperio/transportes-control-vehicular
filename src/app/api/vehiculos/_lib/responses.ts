@@ -1,6 +1,6 @@
-import { revalidatePath } from "next/cache";
 import type { ZodError } from "zod";
 import { auth } from "@/lib/auth";
+import { expireAfterRoute } from "@/lib/cache-invalidation";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { createVehicleCommands } from "@/modules/vehicles/application/vehicle-commands";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
@@ -24,11 +24,9 @@ export function invalidBody(error: ZodError) {
   );
 }
 
-/** Revalidates the pages that show vehicle data after a write. */
-export function revalidateVehiclePages() {
-  revalidatePath("/flota");
-  revalidatePath("/flota/[placa]", "page");
-  revalidatePath("/");
+/** Expires the cached reads that show vehicle data after a write (`updateTag` is Server Action only). */
+export function expireVehicleReads() {
+  expireAfterRoute({ kind: "vehicle" });
 }
 
 /** Postgres unique violation (e.g. two requests racing for the same plate). */

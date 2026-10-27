@@ -3,12 +3,13 @@
 /**
  * Server actions of the logbook (services, tire changes, fuel fills). Each one
  * re-checks the session, parses the form with zod, runs a command use case and
- * revalidates the pages that show logbook data. Oil changes live in the
+ * expires the cached reads that show logbook data. Oil changes live in the
  * vehicle actions because they feed the alerts.
  */
-import { revalidatePath } from "next/cache";
 import type { ZodType } from "zod";
 import { z, ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
+import type { Change } from "@/lib/cache-tags";
 import { requireSession } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
@@ -35,12 +36,14 @@ const commands = createLogbookCommands(logbookRepository, todayInBogota);
 const parse = <T>(schema: ZodType<T>, data: unknown): T => schema.parse(data);
 const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
 
-async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
+async function run(
+  fn: () => Promise<CommandResult>,
+  change: Change = { kind: "logbook" },
+): Promise<ActionResult> {
   try {
     await requireSession();
     const result = await fn();
-    revalidatePath("/bitacora");
-    revalidatePath("/flota/[placa]", "page");
+    expireAfterAction(change);
     return { ok: true, message: result.message };
   } catch (e) {
     if (e instanceof RuleError) return { ok: false, error: e.message };
@@ -105,15 +108,16 @@ export async function deleteLogbookEntriesAction(
   from: string,
   to: string,
 ): Promise<ActionResult> {
-  return run(async () => {
-    const query = parseLogbookQuery({ placa: parse(plateSchema, plate), desde: from, hasta: to });
-    if (!query.plate) throw new RuleError("Elige una placa para eliminar sus registros.");
-    const result = await commands.removeAll(TAB_KINDS[parseTabParam(tab)], plate, { from: query.from, to: query.to });
-    // Oil changes feed the alerts, so the fleet and the dashboard change too.
-    revalidatePath("/flota");
-    revalidatePath("/");
-    return result;
-  });
+  const kind = TAB_KINDS[parseTabParam(tab)];
+  return run(
+    async () => {
+      const query = parseLogbookQuery({ placa: parse(plateSchema, plate), desde: from, hasta: to });
+      if (!query.plate) throw new RuleError("Elige una placa para eliminar sus registros.");
+      return commands.removeAll(kind, plate, { from: query.from, to: query.to });
+    },
+    // Oil changes feed the alerts, so deleting them changes the fleet and the dashboard too.
+    { kind: kind === "oil" ? "logbook-with-oil" : "logbook" },
+  );
 }
 
 export async function deleteLogbookEntryAction(kind: EntryKind, id: number): Promise<ActionResult> {

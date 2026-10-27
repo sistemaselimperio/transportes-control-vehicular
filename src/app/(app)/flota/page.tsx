@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/app/page-header";
+import { currentDay } from "@/lib/current-day";
 import { getVehicleFormOptions, listVehicleRows } from "@/modules/vehicles/application/vehicle-queries";
 import { parseFilterParams } from "@/modules/vehicles/domain/vehicle-filters";
 import { NewVehicleButton } from "@/modules/vehicles/ui/vehicle-form";
@@ -10,7 +11,7 @@ export default async function Page({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [rows, options, params] = await Promise.all([
-    listVehicleRows(),
+    currentDay().then(listVehicleRows),
     getVehicleFormOptions(),
     searchParams,
   ]);

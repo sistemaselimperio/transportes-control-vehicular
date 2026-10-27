@@ -6,8 +6,8 @@
  * server; the preview writes nothing, and the confirm re-reads the file instead
  * of trusting what the preview showed. Both re-check the session.
  */
-import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { requireSession } from "@/lib/session";
 import { readWorkbook } from "@/modules/import-export/infrastructure/xlsx-reader";
 import { todayInBogota } from "@/modules/shared/domain/dates";
@@ -61,10 +61,8 @@ export async function confirmLogbookImportAction(fd: FormData): Promise<ActionRe
     await requireSession();
     const { plate, data } = await readForm(fd);
     const result = await importer.confirm(plate, data);
-    revalidatePath("/bitacora");
-    revalidatePath("/flota/[placa]", "page");
-    revalidatePath("/flota");
-    revalidatePath("/");
+    // The import can add oil changes and move the odometer, so the fleet changes too.
+    expireAfterAction({ kind: "logbook-with-oil" });
     return { ok: true, message: result.message };
   } catch (e) {
     return failure(e);
