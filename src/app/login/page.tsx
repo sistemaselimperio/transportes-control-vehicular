@@ -1,10 +1,10 @@
 import { LockKeyhole } from "lucide-react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { BrandMark } from "@/components/app/brand-mark";
 import { LoginForm } from "@/components/app/login-form";
-import { auth } from "@/lib/auth";
+import { getRequestSession } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Iniciar sesión · Control de Flota",
@@ -12,12 +12,16 @@ export const metadata: Metadata = {
 
 const VALUES = ["Seguridad en cada viaje", "Papeles al día"];
 
-export default async function LoginPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (session) redirect("/");
-
+/**
+ * The page prerenders; only the session check reads the request, so it streams in behind a
+ * boundary (cacheComponents requires it). A signed-in visitor is sent on to the app.
+ */
+export default function LoginPage() {
   return (
     <main className="login-theme grid min-h-dvh flex-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <Suspense fallback={null}>
+        <RedirectIfSignedIn />
+      </Suspense>
       {/* Brand side: a centred poster. Logo, the plate as the hero, headline and copy beneath, road band at the foot. */}
       <section className="relative grid grid-rows-[1fr_auto] overflow-hidden bg-foreground text-background">
         <div className="flex flex-col items-center justify-between gap-8 px-5 py-8 text-center sm:px-10 lg:px-14 lg:py-10">
@@ -73,6 +77,12 @@ export default async function LoginPage() {
       </section>
     </main>
   );
+}
+
+async function RedirectIfSignedIn() {
+  const session = await getRequestSession();
+  if (session) redirect("/");
+  return null;
 }
 
 /** A Colombian plate drawn in CSS: yellow, heavy black frame, city on the bottom line. */
