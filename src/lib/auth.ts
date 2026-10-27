@@ -4,8 +4,22 @@ import { nextCookies } from "better-auth/next-js";
 import { username } from "better-auth/plugins";
 import { db, schema } from "@/db";
 
+/**
+ * Vercel serves the app under several hosts (production domain, team alias, branch and deployment
+ * URLs). BETTER_AUTH_URL names only one, so the others are trusted from Vercel's system variables;
+ * without this, auth requests from any other host fail with "Invalid origin".
+ */
+const vercelOrigins = [
+  process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  process.env.VERCEL_BRANCH_URL,
+  process.env.VERCEL_URL,
+]
+  .filter((host): host is string => !!host)
+  .map((host) => `https://${host}`);
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  trustedOrigins: vercelOrigins,
   emailAndPassword: {
     enabled: true,
     // Rocío is the only operator for now; users are created by seed/admin tooling.
