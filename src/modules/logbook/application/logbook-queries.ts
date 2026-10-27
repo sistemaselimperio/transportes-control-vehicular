@@ -1,4 +1,7 @@
-import { todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
+import { cacheLife, cacheTag } from "next/cache";
+import { readTags } from "@/lib/cache-tags";
+import { currentDay } from "@/lib/current-day";
+import type { IsoDate } from "@/modules/shared/domain/dates";
 import { loadVehicleFormLists } from "@/modules/vehicles/infrastructure/vehicle-repository";
 import {
   summarizeCost,
@@ -56,6 +59,15 @@ async function loadData(tab: LogbookTab, query: LogbookQuery): Promise<LogbookDa
 }
 
 export async function getLogbookPage(tab: LogbookTab, query: LogbookQuery): Promise<LogbookPage> {
+  return loadLogbookPage(tab, query, await currentDay());
+}
+
+/** Shared by everyone: the tab and filters (plus the day) are the cache key. */
+async function loadLogbookPage(tab: LogbookTab, query: LogbookQuery, today: IsoDate): Promise<LogbookPage> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(...readTags("logbookPage"));
+
   const [data, providers, lists] = await Promise.all([loadData(tab, query), loadProviders(), loadVehicleFormLists()]);
-  return { data, providers, plates: lists.plates, today: todayInBogota() };
+  return { data, providers, plates: lists.plates, today };
 }

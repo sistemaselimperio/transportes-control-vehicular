@@ -37,7 +37,9 @@ export async function GET(
       "Content-Type": file.mimeType,
       "Content-Length": String(file.data.length),
       "Content-Disposition": inlineContentDisposition(file.fileName),
-      "Cache-Control": "private, no-store",
+      // A file id is a random uuid that is only ever inserted or deleted, never overwritten, so the
+      // bytes behind a URL never change. `private`: the route is behind the session.
+      "Cache-Control": "private, max-age=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
     },
   });

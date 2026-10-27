@@ -8,7 +8,9 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [rows, { grupo, vista }] = await Promise.all([listOwnerRows(), searchParams]);
+  // Await the request first: the cached read must run per request, never while prerendering.
+  const { grupo, vista } = await searchParams;
+  const rows = await listOwnerRows();
   const group = parseGroupParam(grupo);
   return <OwnersView rows={filterOwnersByGroup(rows, group)} group={group} initialView={parseViewParam(vista)} />;
 }

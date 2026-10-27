@@ -8,7 +8,9 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [rows, { grupo, anio }] = await Promise.all([listSaleRows(), searchParams]);
+  // Await the request first: the cached read must run per request, never while prerendering.
+  const { grupo, anio } = await searchParams;
+  const rows = await listSaleRows();
   const group = parseGroupParam(grupo);
   return <SalesView rows={filterSalesByGroup(rows, group)} group={group} initialYear={parseYearParam(anio)} />;
 }

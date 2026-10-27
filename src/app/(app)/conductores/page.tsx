@@ -8,6 +8,8 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [rows, { grupo }] = await Promise.all([listDriverRows(), searchParams]);
+  // Await the request first: the cached read must run per request, never while prerendering.
+  const { grupo } = await searchParams;
+  const rows = await listDriverRows();
   return <DriversView rows={filterDriversByCompany(rows, parseGroupParam(grupo))} />;
 }
