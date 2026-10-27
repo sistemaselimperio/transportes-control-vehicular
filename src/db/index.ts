@@ -7,12 +7,16 @@ export type Database = PostgresJsDatabase<typeof schema>;
 
 function createClient() {
   // Hosted Supabase Postgres (shared project, `transportes` schema); there is no local database.
+  // DATABASE_URL must be the session pooler (port 5432): through the transaction pooler (6543)
+  // a connection that queues a second query never gets its result back, which hangs any page
+  // whose parallel reads outnumber `max`.
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set (see .env.example).");
   return postgres(url, {
-    // Supabase's transaction pooler (Supavisor) does not support prepared statements.
     prepare: false,
     max: process.env.NODE_ENV === "production" ? 5 : 1,
+    // Each session-pooler client holds a server connection shared with the other app; release idle ones.
+    idle_timeout: 20,
   });
 }
 
