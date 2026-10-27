@@ -33,7 +33,7 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
   {
     label: "Operación",
     items: [
-      { href: "/", label: "Hoy", icon: Bell, badge: "expired" },
+      { href: "/", label: "Alertas", icon: Bell, badge: "expired" },
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
       { href: "/bitacora", label: "Bitácora", icon: NotebookText },
