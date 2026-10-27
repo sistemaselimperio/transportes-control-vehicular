@@ -12,7 +12,7 @@ export function BrandMark({ className, decorative }: { className?: string; decor
       src={logo}
       alt={decorative ? "" : "Transportes El Imperio"}
       priority
-      className={cn("h-9 w-auto shrink-0", className)}
+      className={cn("h-20 w-auto shrink-0", className)}
     />
   );
 }
