@@ -64,7 +64,29 @@ export function technicalRows(data: VehicleTechnicalData): Array<{ label: string
     { label: "Combustible", value: text(data.fuelType) },
     { label: "Capacidad", value: text(data.capacity) },
     { label: "Cilindraje", value: unit(data.engineDisplacement, "cc") },
-    { label: "Peso bruto vehicular", value: unit(data.grossWeightKg, "kg") },
-    { label: "Color", value: text(data.color) },
+    { label: "Peso", value: unit(data.grossWeightKg, "kg") },
+  ];
+}
+
+const IDENTIFICATION = new Set(["Fecha de matrícula", "Número de motor", "Número de chasis", "Número de serie"]);
+
+export interface TechnicalGroup {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+  /** Fields of the group that are on record (not a dash). */
+  known: number;
+}
+
+/** The technical rows split into what identifies the vehicle and what describes it. */
+export function technicalGroups(data: VehicleTechnicalData): TechnicalGroup[] {
+  const rows = technicalRows(data);
+  const group = (title: string, picked: typeof rows): TechnicalGroup => ({
+    title,
+    rows: picked,
+    known: picked.filter((r) => r.value !== "—").length,
+  });
+  return [
+    group("Identificación", rows.filter((r) => IDENTIFICATION.has(r.label))),
+    group("Características", rows.filter((r) => !IDENTIFICATION.has(r.label))),
   ];
 }

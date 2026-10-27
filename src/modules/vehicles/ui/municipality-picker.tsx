@@ -66,8 +66,8 @@ export function MunicipalityPicker({
             </option>
           ))}
         </NativeSelect>
-        <input type="hidden" name="municipality" value={(code && municipalityLabel(code)) || ""} />
       </Field>
+      <input type="hidden" name="municipality" value={(code && municipalityLabel(code)) || ""} />
     </>
   );
 }

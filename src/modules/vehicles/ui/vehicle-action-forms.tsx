@@ -272,13 +272,95 @@ export function UpdateKmForm({ plate, ctx, onDone, onCancel }: FormProps) {
 }
 
 /** Edits the "Datos generales" of the vehicle's registration sheet. */
+/** The technical sheet's inputs; shared by its own form and by "Editar datos". */
+export function TechnicalFields({ values }: { values: VehicleTechnicalData }) {
+  const text = (name: keyof VehicleTechnicalData) => values[name]?.toString() ?? "";
+  return (
+    <>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Fecha de matrícula" htmlFor="tech-registration">
+            <Input
+              id="tech-registration"
+              name="registrationDate"
+              type="date"
+              className={FIELD}
+              defaultValue={text("registrationDate")}
+            />
+          </Field>
+          <Field label="Modelo" htmlFor="tech-model">
+            <Input
+              id="tech-model"
+              name="modelYear"
+              inputMode="numeric"
+              className={FIELD}
+              defaultValue={text("modelYear")}
+              placeholder="2021"
+            />
+          </Field>
+          <Field label="Número de motor" htmlFor="tech-engine">
+            <Input id="tech-engine" name="engineNumber" className={FIELD} defaultValue={text("engineNumber")} />
+          </Field>
+          <Field label="Número de chasis" htmlFor="tech-chassis">
+            <Input id="tech-chassis" name="chassisNumber" className={FIELD} defaultValue={text("chassisNumber")} />
+          </Field>
+          <Field label="Número de serie" htmlFor="tech-serial">
+            <Input id="tech-serial" name="serialNumber" className={FIELD} defaultValue={text("serialNumber")} />
+          </Field>
+          <Field label="Tipo de carrocería" htmlFor="tech-body">
+            <Input id="tech-body" name="bodyType" className={FIELD} defaultValue={text("bodyType")} />
+          </Field>
+          <Field label="Combustible" htmlFor="tech-fuel">
+            <Input
+              id="tech-fuel"
+              name="fuelType"
+              className={FIELD}
+              list="tech-fuel-options"
+              defaultValue={text("fuelType")}
+            />
+            <datalist id="tech-fuel-options">
+              {FUEL_TYPE_SUGGESTIONS.map((fuel) => (
+                <option key={fuel} value={fuel} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Capacidad" htmlFor="tech-capacity">
+            <Input
+              id="tech-capacity"
+              name="capacity"
+              className={FIELD}
+              defaultValue={text("capacity")}
+              placeholder="34 t, 40 pasajeros…"
+            />
+          </Field>
+          <Field label="Cilindraje (cc)" htmlFor="tech-displacement">
+            <Input
+              id="tech-displacement"
+              name="engineDisplacement"
+              inputMode="numeric"
+              className={FIELD}
+              defaultValue={text("engineDisplacement")}
+            />
+          </Field>
+          <Field label="Peso (kg)" htmlFor="tech-weight">
+            <Input
+              id="tech-weight"
+              name="grossWeightKg"
+              inputMode="numeric"
+              className={FIELD}
+              defaultValue={text("grossWeightKg")}
+            />
+          </Field>
+        </div>
+    </>
+  );
+}
+
 export function TechnicalDataForm({
   plate,
   values,
   onDone,
   onCancel,
 }: Omit<FormProps, "ctx"> & { values: VehicleTechnicalData }) {
-  const text = (name: keyof VehicleTechnicalData) => values[name]?.toString() ?? "";
   return (
     <ActionForm
       action={(fd) => updateTechnicalDataAction(plate, fd)}
@@ -286,83 +368,7 @@ export function TechnicalDataForm({
       onDone={onDone}
       onCancel={onCancel}
     >
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Fecha de matrícula" htmlFor="tech-registration">
-          <Input
-            id="tech-registration"
-            name="registrationDate"
-            type="date"
-            className={FIELD}
-            defaultValue={text("registrationDate")}
-          />
-        </Field>
-        <Field label="Modelo" htmlFor="tech-model">
-          <Input
-            id="tech-model"
-            name="modelYear"
-            inputMode="numeric"
-            className={FIELD}
-            defaultValue={text("modelYear")}
-            placeholder="2021"
-          />
-        </Field>
-        <Field label="Número de motor" htmlFor="tech-engine">
-          <Input id="tech-engine" name="engineNumber" className={FIELD} defaultValue={text("engineNumber")} />
-        </Field>
-        <Field label="Número de chasis" htmlFor="tech-chassis">
-          <Input id="tech-chassis" name="chassisNumber" className={FIELD} defaultValue={text("chassisNumber")} />
-        </Field>
-        <Field label="Número de serie" htmlFor="tech-serial">
-          <Input id="tech-serial" name="serialNumber" className={FIELD} defaultValue={text("serialNumber")} />
-        </Field>
-        <Field label="Tipo de carrocería" htmlFor="tech-body">
-          <Input id="tech-body" name="bodyType" className={FIELD} defaultValue={text("bodyType")} />
-        </Field>
-        <Field label="Combustible" htmlFor="tech-fuel">
-          <Input
-            id="tech-fuel"
-            name="fuelType"
-            className={FIELD}
-            list="tech-fuel-options"
-            defaultValue={text("fuelType")}
-          />
-          <datalist id="tech-fuel-options">
-            {FUEL_TYPE_SUGGESTIONS.map((fuel) => (
-              <option key={fuel} value={fuel} />
-            ))}
-          </datalist>
-        </Field>
-        <Field label="Capacidad" htmlFor="tech-capacity">
-          <Input
-            id="tech-capacity"
-            name="capacity"
-            className={FIELD}
-            defaultValue={text("capacity")}
-            placeholder="34 t, 40 pasajeros…"
-          />
-        </Field>
-        <Field label="Cilindraje (cc)" htmlFor="tech-displacement">
-          <Input
-            id="tech-displacement"
-            name="engineDisplacement"
-            inputMode="numeric"
-            className={FIELD}
-            defaultValue={text("engineDisplacement")}
-          />
-        </Field>
-        <Field label="Peso bruto vehicular (kg)" htmlFor="tech-weight">
-          <Input
-            id="tech-weight"
-            name="grossWeightKg"
-            inputMode="numeric"
-            className={FIELD}
-            defaultValue={text("grossWeightKg")}
-          />
-        </Field>
-      </div>
-      <Field label="Color" htmlFor="tech-color">
-        <Input id="tech-color" name="color" className={FIELD} defaultValue={text("color")} />
-      </Field>
+      <TechnicalFields values={values} />
     </ActionForm>
   );
 }

@@ -17,8 +17,6 @@ import type { FormProps } from "./vehicle-action-forms";
 const FIELD = "h-10 md:h-9";
 
 export function AssignDriverForm({ plate, ctx, onDone, onCancel }: FormProps) {
-  const [mode, setMode] = useState<"existing" | "new">("existing");
-
   return (
     <ActionForm
       action={(fd) => assignDriverAction(plate, fd)}
@@ -29,46 +27,20 @@ export function AssignDriverForm({ plate, ctx, onDone, onCancel }: FormProps) {
       <p className="text-sm text-muted-foreground">
         El conductor actual queda cerrado en el historial con la fecha elegida.
       </p>
-      <Field label="Conductor" htmlFor="drv-mode">
-        <NativeSelect
-          id="drv-mode"
-          name="mode"
-          value={mode}
-          onChange={(e) => setMode(e.target.value as "existing" | "new")}
-        >
-          <option value="existing">Elegir uno existente</option>
-          <option value="new">Crear conductor nuevo</option>
+      <input type="hidden" name="mode" value="existing" />
+      <Field label="Conductor" htmlFor="drv-id">
+        <NativeSelect id="drv-id" name="driverId" defaultValue="" required>
+          <option value="" disabled>
+            Buscar en la lista un conductor…
+          </option>
+          {ctx.drivers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+              {d.nationalId ? ` · ${d.nationalId}` : ""}
+            </option>
+          ))}
         </NativeSelect>
       </Field>
-      {mode === "existing" ? (
-        <Field label="Buscar en la lista" htmlFor="drv-id">
-          <NativeSelect id="drv-id" name="driverId" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona…
-            </option>
-            {ctx.drivers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-                {d.nationalId ? ` · ${d.nationalId}` : ""}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-      ) : (
-        <>
-          <Field label="Nombre completo" htmlFor="drv-name">
-            <Input id="drv-name" name="name" className={FIELD} autoComplete="off" required />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Cédula (opcional)" htmlFor="drv-national">
-              <Input id="drv-national" name="nationalId" inputMode="numeric" className={FIELD} />
-            </Field>
-            <Field label="Celular (opcional)" htmlFor="drv-phone">
-              <Input id="drv-phone" name="phone" type="tel" className={FIELD} />
-            </Field>
-          </div>
-        </>
-      )}
       <Field label="Desde" htmlFor="drv-date">
         <Input id="drv-date" name="date" type="date" className={FIELD} defaultValue={ctx.today} max={ctx.today} required />
       </Field>

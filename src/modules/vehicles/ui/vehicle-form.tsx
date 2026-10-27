@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
-import type { ActionResult } from "../application/vehicle-actions";
+import { updateTechnicalDataAction, type ActionResult } from "../application/vehicle-actions";
 import { createBodyFromForm, editBodyFromForm } from "../application/vehicle-form-body";
 import type { VehicleEditValues, VehicleFormOptions } from "../application/vehicle-queries";
+import type { VehicleTechnicalData } from "../domain/technical-data";
 import { MunicipalityPicker } from "./municipality-picker";
+import { TechnicalFields } from "./vehicle-action-forms";
 
 const FIELD = "h-10 md:h-9";
 /** Selects match the input height so paired controls line up. */
@@ -499,25 +501,29 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
   );
 }
 
-/** Edits the vehicle's own data; moves to the new URL when the plate changes. */
+/**
+ * Edits the vehicle's own data and its technical sheet in one save; moves to the new URL when
+ * the plate changes. The technical sheet is saved first, under the plate it still has.
+ */
 export function EditVehicleForm({
   values,
+  technical,
   options,
   onDone,
   onCancel,
-  otherActions,
 }: {
   values: VehicleEditValues;
+  technical: VehicleTechnicalData;
   options: VehicleFormOptions;
   onDone: (message: string) => void;
   onCancel: () => void;
-  /** Shortcuts to the history-keeping actions (owner, driver, documents…), shown after the vehicle data. */
-  otherActions?: ReactNode;
 }) {
   const router = useRouter();
   return (
     <ActionForm
       action={async (fd) => {
+        const tech = await updateTechnicalDataAction(values.plate, fd);
+        if (!tech.ok) return tech;
         const result = await sendVehicle(
           `/api/vehiculos/${encodeURIComponent(values.plate)}`,
           "PATCH",
@@ -537,14 +543,9 @@ export function EditVehicleForm({
       onCancel={onCancel}
     >
       <VehicleDataFields options={options} values={values} idPrefix="ev" />
-      {otherActions && (
-        <Section
-          title="Otros datos"
-          hint="Propietario, conductor, documentos, kilometraje y estado tienen su propia acción para conservar el historial."
-        >
-          {otherActions}
-        </Section>
-      )}
+      <Section title="Datos técnicos" hint="Motor, chasis, cilindraje, capacidad y demás características.">
+        <TechnicalFields values={technical} />
+      </Section>
     </ActionForm>
   );
 }

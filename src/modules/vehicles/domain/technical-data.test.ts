@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertModelYear, EMPTY_TECHNICAL_DATA, technicalRows } from "./technical-data";
+import { assertModelYear, EMPTY_TECHNICAL_DATA, technicalGroups, technicalRows } from "./technical-data";
 import { RuleError } from "./vehicle-rules";
 
 describe("assertModelYear", () => {
@@ -35,5 +35,25 @@ describe("technicalRows", () => {
     expect(byLabel["Cilindraje"]).toBe("14.900 cc");
     expect(byLabel["Peso bruto vehicular"]).toBe("52.000 kg");
     expect(byLabel["Color"]).toBe("BLANCO");
+  });
+});
+
+describe("technicalGroups", () => {
+  it("splits the rows into identification and characteristics, each row once", () => {
+    const groups = technicalGroups(EMPTY_TECHNICAL_DATA);
+    expect(groups.map((g) => g.title)).toEqual(["Identificación", "Características"]);
+    expect(groups[0].rows.map((r) => r.label)).toEqual([
+      "Fecha de matrícula",
+      "Número de motor",
+      "Número de chasis",
+      "Número de serie",
+    ]);
+    const labels = groups.flatMap((g) => g.rows.map((r) => r.label));
+    expect([...labels].sort()).toEqual(technicalRows(EMPTY_TECHNICAL_DATA).map((r) => r.label).sort());
+  });
+
+  it("reports how many fields are on record", () => {
+    const groups = technicalGroups({ ...EMPTY_TECHNICAL_DATA, modelYear: 2021, color: "BLANCO" });
+    expect(groups.reduce((n, g) => n + g.known, 0)).toBe(2);
   });
 });

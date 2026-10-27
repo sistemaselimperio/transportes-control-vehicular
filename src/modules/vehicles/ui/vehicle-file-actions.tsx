@@ -171,10 +171,10 @@ export function FileActions({
         {active === "edit" && (
           <EditVehicleForm
             values={edit.values}
+            technical={technical}
             options={edit.options}
             onCancel={close}
             onDone={common.onDone}
-            otherActions={<EditShortcuts onOpen={setActive} />}
           />
         )}
         {active === "technical" && <TechnicalDataForm {...common} values={technical} />}
@@ -187,31 +187,6 @@ export function FileActions({
         {active === "sell" && <SellForm {...common} current={current} />}
       </SlideOver>
     </Ctx.Provider>
-  );
-}
-
-const EDIT_SHORTCUTS: readonly ActionKey[] = ["owner", "driver", "document", "tax", "km", "oil"];
-
-/** Inside "Editar datos": jumps the open panel straight to another action. */
-function EditShortcuts({ onOpen }: { onOpen: (key: ActionKey) => void }) {
-  return (
-    <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
-      {EDIT_SHORTCUTS.map((key) => {
-        const { label, icon: Icon } = ACTIONS[key];
-        return (
-          <Button
-            key={key}
-            type="button"
-            variant="outline"
-            className="h-11 justify-start px-3.5"
-            onClick={() => onOpen(key)}
-          >
-            <Icon aria-hidden />
-            {label}
-          </Button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -248,9 +223,9 @@ export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; p
 }
 
 const STATUS_CHOICES: Array<{ value: Exclude<VehicleStatus, "SOLD">; label: string; dot: string }> = [
-  { value: "ACTIVE", label: "Activo", dot: "bg-ok-foreground" },
-  { value: "IDLE", label: "Quieta", dot: "bg-muted-foreground" },
-  { value: "IN_WORKSHOP", label: "Taller", dot: "bg-warn-foreground" },
+  { value: "ACTIVE", label: "Activo", dot: "bg-ok-foreground cursor-pointer" },
+  { value: "IDLE", label: "Quieta", dot: "bg-muted-foreground cursor-pointer" },
+  { value: "IN_WORKSHOP", label: "Taller", dot: "bg-warn-foreground cursor-pointer" },
 ];
 
 /**
@@ -330,6 +305,39 @@ export function EditDataButton() {
       <Icon aria-hidden />
       {label}
     </Button>
+  );
+}
+
+/** Small text button that opens one action beside the value it changes; hidden once sold. */
+export function InlineAction({
+  action,
+  boxed = false,
+  label,
+  children,
+}: {
+  action: ActionKey;
+  /** A small outlined button instead of underlined text. */
+  boxed?: boolean;
+  /** Accessible name and tooltip, for an icon-only button. */
+  label?: string;
+  children: ReactNode;
+}) {
+  const { sold, open } = useFileActions();
+  if (sold) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => open(action)}
+      aria-label={label}
+      title={label}
+      className={
+        boxed
+          ? `inline-flex h-11 shrink-0 cursor-pointer items-center justify-center rounded-md border text-xs font-medium text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 md:h-8 ${label ? "w-11 md:w-8" : "px-2.5"}`
+          : "inline-flex min-h-11 cursor-pointer items-center rounded-md px-1.5 text-sm text-muted-foreground underline decoration-muted-foreground/60 decoration-1 underline-offset-4 outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 md:min-h-7"
+      }
+    >
+      {children}
+    </button>
   );
 }
 

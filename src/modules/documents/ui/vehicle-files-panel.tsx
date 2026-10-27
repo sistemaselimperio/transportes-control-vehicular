@@ -1,7 +1,7 @@
 "use client";
 
 import { Popover } from "@base-ui/react/popover";
-import { FileText, Loader2, Upload, X } from "lucide-react";
+import { CircleCheck, FileText, Loader2, Upload, X } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
@@ -24,6 +24,16 @@ const ACCEPT = ALLOWED_MIME.join(",");
 type Stage = { category: FileCategory; step: "optimizing" | "uploading" };
 
 const CATEGORIES = FILE_GROUPS.flatMap((g) => g.categories);
+
+/**
+ * Card order and width on a six-column grid: SOAT, póliza and impuestos share the top row; the
+ * other categories split the row below. Any category not listed here falls in after them.
+ */
+const TOP_ROW: readonly FileCategory[] = ["SOAT", "POLICY", "TAX"];
+const LAYOUT: Array<{ category: FileCategory; span: string }> = [
+  ...TOP_ROW.map((category) => ({ category, span: "col-span-2" })),
+  ...CATEGORIES.filter((c) => !TOP_ROW.includes(c)).map((category) => ({ category, span: "col-span-3" })),
+];
 
 const uploadedOn = (at: Date) =>
   formatDisplayDate(new Date(at).toISOString().slice(0, 10));
@@ -178,7 +188,7 @@ export function VehicleFilesPanel({
     );
   }
 
-  function renderDoc(category: FileCategory) {
+  function renderDoc({ category, span }: { category: FileCategory; span: string }) {
     const { label, limit } = FILE_CATEGORIES[category];
     const list = files.filter((f) => f.category === category);
     const full = list.length >= limit;
@@ -188,26 +198,24 @@ export function VehicleFilesPanel({
     return (
       <li
         key={category}
-        className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-card py-1.5 pr-1.5 pl-3"
+        className={`${span} flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-card py-1.5 pr-1.5 pl-3`}
       >
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          <h3 className="truncate text-sm font-semibold">{label}</h3>
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+          <h3 className="text-sm leading-tight font-semibold">{label}</h3>
           <span className="num shrink-0 text-xs text-muted-foreground">
             {list.length}/{limit}
           </span>
         </div>
 
         {working ? (
-          <span
-            role="status"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground"
-          >
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            {working === "optimizing" ? "Optimizando…" : "Subiendo…"}
+          <span role="status" className="flex items-center text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            <span className="sr-only">{working === "optimizing" ? "Optimizando…" : "Subiendo…"}</span>
           </span>
         ) : done === category ? (
-          <span role="status" className="text-xs text-ok-foreground">
-            Subido
+          <span role="status" className="flex items-center text-ok-foreground">
+            <CircleCheck className="size-4" aria-hidden />
+            <span className="sr-only">Subido</span>
           </span>
         ) : null}
 
@@ -232,13 +240,7 @@ export function VehicleFilesPanel({
               </Popover.Positioner>
             </Popover.Portal>
           </Popover.Root>
-        ) : (
-          !working && (
-            <span className="px-1 text-xs text-muted-foreground">
-              Sin archivos
-            </span>
-          )
-        )}
+        ) : null}
 
         {!readOnly && (
           <>
@@ -290,8 +292,8 @@ export function VehicleFilesPanel({
 
   return (
     <div className="@container mt-3 min-w-0">
-      <ul className="grid grid-cols-1 gap-2 @md:grid-cols-2">
-        {CATEGORIES.map(renderDoc)}
+      <ul className="grid grid-cols-6 gap-2">
+        {LAYOUT.map(renderDoc)}
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
         PDF, JPG, PNG o WebP · máx. 4 MB por archivo

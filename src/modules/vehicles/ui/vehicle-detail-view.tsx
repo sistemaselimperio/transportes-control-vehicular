@@ -6,10 +6,11 @@ import { VehicleLogbookSection } from "@/modules/logbook/ui/vehicle-logbook";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
-import type { HistoryItem, VehicleDetail } from "../application/vehicle-queries";
-import { technicalRows } from "../domain/technical-data";
+import type { VehicleDetail } from "../application/vehicle-queries";
+import { technicalGroups } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
+import { PeoplePopover } from "./people-popover";
 import { TabParamScroll } from "./tab-param-scroll";
 import {
   ActionButtons,
@@ -20,68 +21,59 @@ import {
   StatusSwitch,
 } from "./vehicle-file-actions";
 
-/** Label muted on the left, value on the right, one thin rule per row. */
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/** One labelled value of the technical sheet; a missing value reads as a muted dash. */
+function Spec({ label, value }: { label: string; value: string }) {
+  const missing = value === "—";
   return (
-    <div className="flex min-h-9 items-baseline justify-between gap-4 border-b py-2">
-      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-right text-sm font-medium break-words">{children}</dd>
-    </div>
-  );
-}
-
-/** A figure with its label above, in a strip split by hairlines (no tile). */
-function Figure({ label, children, lead = false }: { label: string; children: ReactNode; lead?: boolean }) {
-  return (
-    <div className="min-w-0 border-b py-3 sm:border-b-0 sm:py-4 sm:pr-6 sm:pl-6 sm:first:pl-0 sm:[&:not(:first-child)]:border-l">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={`num mt-1 ${lead ? "text-[1.75rem] leading-8 font-semibold" : "text-base font-medium"}`}>
-        {children}
+    <div className="min-w-0 border-b py-2">
+      <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+      <dd
+        className={`mt-0.5 truncate text-sm ${missing ? "text-muted-foreground" : "font-medium"}`}
+        title={missing ? undefined : value}
+      >
+        {value}
       </dd>
     </div>
   );
 }
 
-const Empty = ({ children = "Sin registros." }: { children?: ReactNode }) => (
-  <p className="border-b py-2.5 text-sm text-muted-foreground">{children}</p>
-);
-
-function DriverValue({ r }: { r: VehicleGridRow }) {
+/**
+ * The vehicle's technical sheet in two titled groups side by side, each two rows deep on a wide
+ * screen: what identifies it, then what describes it. Every field keeps its place, so a missing one is easy to spot.
+ */
+function TechnicalSheet({ r }: { r: VehicleGridRow }) {
+  const [identification, characteristics] = technicalGroups(r.technical);
+  const registry = [
+    { label: "Municipio", value: r.municipality ?? "—" },
+    { label: "Servicio", value: r.serviceLabel },
+  ];
+  const groups = [
+    {
+      title: identification.title,
+      known: identification.known + registry.filter((x) => x.value !== "—").length,
+      rows: [...registry, ...identification.rows],
+      cols: "sm:grid-cols-3",
+    },
+    { ...characteristics, cols: "sm:grid-cols-3" },
+  ];
   return (
-    <>
-      {r.driverName ?? "—"}
-      {r.driverPhone && (
-        <>
-          {" · "}
-          <a
-            href={`tel:${r.driverPhone}`}
-            className="num inline-flex min-h-11 items-center underline decoration-muted-foreground/60 decoration-1 underline-offset-4 md:min-h-0"
-          >
-            {r.driverPhone}
-          </a>
-        </>
-      )}
-    </>
+    <div className="grid gap-x-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,3fr)]">
+      {groups.map((group) => (
+        <div key={group.title} className="min-w-0">
+          <SubHeading count={group.known}>{group.title}</SubHeading>
+          <dl className={`grid grid-cols-2 gap-x-6 ${group.cols}`}>
+            {group.rows.map((row) => (
+              <Spec key={row.label} {...row} />
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
   );
 }
 
 const kmText = (r: VehicleGridRow) =>
   r.km != null ? formatKm(r.km) : r.odometerWorking ? "—" : "Odómetro dañado";
-
-/** Every record of a list, title left and detail right, one rule per line. */
-function Records({ items, empty = "Sin registros." }: { items: HistoryItem[]; empty?: string }) {
-  if (items.length === 0) return <Empty>{empty}</Empty>;
-  return (
-    <ul>
-      {items.map((item, i) => (
-        <li key={i} className="flex flex-wrap justify-between gap-x-4 gap-y-0.5 border-b py-2 text-sm">
-          <span className="num font-medium">{item.title}</span>
-          <span className="text-muted-foreground">{item.detail}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 /** Expiry cards at the top of the file: one card per document plus the next oil change. */
 function ExpirationStrip({ r }: { r: VehicleGridRow }) {
@@ -112,6 +104,16 @@ function ExpirationStrip({ r }: { r: VehicleGridRow }) {
   );
 }
 
+/** One maintenance figure: label above, value at a reading size. */
+function Figure({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0 border-b py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-base font-medium">{children}</dd>
+    </div>
+  );
+}
+
 function FileHeader({ r }: { r: VehicleGridRow }) {
   return (
     <header className="space-y-2 border-b pb-4">
@@ -129,13 +131,17 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
         <h1 className="plate plate-lg">{r.plate}</h1>
         <div className="min-w-0 flex-1 basis-56">
           {r.className && <p className="micro-label">{r.className}</p>}
-          <p className="mt-1.5 truncate text-lg leading-tight font-semibold tracking-tight">
-            {r.brandLine ?? <span className="font-normal text-muted-foreground">Sin marca registrada</span>}
-          </p>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1">
+            <p className="truncate text-lg leading-tight font-semibold tracking-tight">
+              {r.brandLine ?? <span className="font-normal text-muted-foreground">Sin marca registrada</span>}
+            </p>
+            <PeoplePopover driverName={r.driverName} driverPhone={r.driverPhone} ownerName={r.ownerName} />
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 max-sm:w-full">
+        <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full [&_button:not(:disabled)]:cursor-pointer">
           <StatusSwitch />
           <EditDataButton />
+          <ActionButtons keys={["owner"]} />
           <SellButton />
         </div>
       </div>
@@ -145,9 +151,10 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
 }
 
 /**
- * Vehicle file as the truck's paper folder, kept as a ledger: documents on a shared expiry axis
- * with their files inline, then maintenance, with people and the ficha beside (stacked on phones).
- * Everything is visible on the page; the only overlays are the action forms.
+ * Vehicle file ordered by what the dispatcher needs first: identity, status and expiries in the
+ * header; then the technical sheet that says exactly which vehicle this is; then who runs it and
+ * how far it has gone; then its papers; then the logbook; and last the
+ * notes. The only overlays are the action forms.
  */
 export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
   const r = detail.row;
@@ -163,12 +170,36 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
       current={{ owner: r.ownerName, driver: r.driverName }}
     >
       <TabParamScroll />
-      <div className="space-y-6">
-        <FileHeader r={r} />
-        {sold && <SoldNotice />}
+      <div className="space-y-10">
+        <div className="space-y-6">
+          <FileHeader r={r} />
+          {sold && <SoldNotice />}
+        </div>
 
-        <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,44rem)_minmax(21rem,1fr)] lg:items-start">
-          <div className="min-w-0 space-y-8">
+        <Section id="datos-tecnicos" title="Datos técnicos">
+          <TechnicalSheet r={r} />
+        </Section>
+
+        <div className="grid gap-x-10 gap-y-10 lg:grid-cols-2">
+          <div className="min-w-0">
+            <Section id="mantenimiento" title="Mantenimiento" actions={<ActionButtons keys={["oil", "km"]} />}>
+              <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-3">
+                <Figure label="Kilometraje">
+                  <span className="num">{kmText(r)}</span>
+                  {r.km != null && <span className="ml-1 text-sm font-normal text-muted-foreground">km</span>}
+                </Figure>
+                <Figure label="Último cambio de aceite">
+                  <span className="num">{r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}</span>
+                </Figure>
+                <Figure label="Próximo cambio de aceite">
+                  <StatusMark status={r.nextChange.status} className="whitespace-normal">
+                    {r.nextChange.text || "—"}
+                  </StatusMark>
+                </Figure>
+              </dl>
+            </Section>
+          </div>
+          <div className="min-w-0 max-lg:border-t max-lg:pt-8 lg:border-l lg:pl-10">
             <Section
               id="documentos"
               title="Documentos"
@@ -177,73 +208,22 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
             >
               <VehicleFilesPanel plate={r.plate} files={detail.files} />
             </Section>
-
-            <Section id="mantenimiento" title="Mantenimiento" actions={<ActionButtons keys={["oil", "km"]} />}>
-              <dl className="grid sm:grid-cols-3">
-                <Figure label="Kilometraje" lead>
-                  {kmText(r)}
-                  {r.km != null && <span className="ml-1 text-sm font-normal text-muted-foreground">km</span>}
-                </Figure>
-                <Figure label="Último cambio de aceite">
-                  {r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}
-                </Figure>
-                <Figure label="Próximo cambio de aceite">
-                  <span className="font-sans">
-                    <StatusMark status={r.nextChange.status}>{r.nextChange.text || "—"}</StatusMark>
-                  </span>
-                </Figure>
-              </dl>
-            </Section>
-            <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} />
           </div>
-
-          <aside className="min-w-0 space-y-8 max-lg:border-t max-lg:pt-8 lg:self-stretch lg:border-l lg:pl-10">
-            <Section id="personas" title="Personas" actions={<ActionButtons keys={["driver", "owner"]} />}>
-              <dl>
-                <Row label="Propietario">{r.ownerName ?? "Sin propietario"}</Row>
-                <Row label="Conductor">
-                  <DriverValue r={r} />
-                </Row>
-              </dl>
-              <SubHeading count={detail.ownerships.length}>Propietarios anteriores</SubHeading>
-              <Records items={detail.ownerships} />
-              <SubHeading count={detail.drivers.length}>Conductores anteriores</SubHeading>
-              <Records items={detail.drivers} />
-            </Section>
-
-            <Section id="datos-tecnicos" title="Datos técnicos" actions={<ActionButtons keys={["technical"]} />}>
-              <dl>
-                {technicalRows(r.technical).map(({ label, value }) => (
-                  <Row key={label} label={label}>
-                    {value}
-                  </Row>
-                ))}
-              </dl>
-            </Section>
-
-            <Section title="Ficha">
-              <dl>
-                <Row label="Municipio">{r.municipality ?? "—"}</Row>
-                <Row label="Servicio">{r.serviceLabel}</Row>
-              </dl>
-              {r.notes && (
-                <>
-                  <h3 className="mt-5 border-b pb-1.5 text-sm font-semibold">Notas</h3>
-                  <p className="border-b py-2.5 text-sm whitespace-pre-line">{r.notes}</p>
-                </>
-              )}
-              {detail.sale && (
-                <>
-                  <h3 className="mt-5 border-b pb-1.5 text-sm font-semibold">Venta</h3>
-                  <p className="border-b py-2.5 text-sm">
-                    <span className="font-medium">{detail.sale.title}</span>
-                    <span className="text-muted-foreground"> · {detail.sale.detail}</span>
-                  </p>
-                </>
-              )}
-            </Section>
-          </aside>
         </div>
+
+        <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} />
+
+        {(r.notes || detail.sale) && (
+          <Section id="notas" title={detail.sale ? "Notas y venta" : "Notas"}>
+            {r.notes && <p className="border-b py-2.5 text-sm whitespace-pre-line">{r.notes}</p>}
+            {detail.sale && (
+              <p className="border-b py-2.5 text-sm">
+                <span className="font-medium">Venta: {detail.sale.title}</span>
+                <span className="text-muted-foreground"> · {detail.sale.detail}</span>
+              </p>
+            )}
+          </Section>
+        )}
       </div>
     </FileActions>
   );
