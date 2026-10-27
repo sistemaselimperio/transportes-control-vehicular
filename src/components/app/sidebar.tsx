@@ -57,7 +57,7 @@ const GROUPS: ReadonlyArray<{
 }> = [
   { value: null, label: "Todos", short: "Todos", code: "ALL" },
   { value: "IMPERIO", label: "Transportes El Imperio", short: "Imperio", code: "IMP" },
-  { value: "PAEZ", label: "Fabián Páez", short: "Páez", code: "PAE" },
+  { value: "PAEZ", label: "Fabián Páez", short: " Fabián P.", code: "PAE" },
   { value: "THIRD_PARTY", label: "Terceros", short: "Terceros", code: "TER" },
 ];
 
