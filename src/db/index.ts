@@ -6,11 +6,11 @@ import * as schema from "./schema";
 export type Database = PostgresJsDatabase<typeof schema>;
 
 function createClient() {
-  // Hosted Neon Postgres; there is no local database.
+  // Hosted Supabase Postgres (shared project, `transportes` schema); there is no local database.
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set (see .env.example).");
   return postgres(url, {
-    // Neon's pooled endpoint (PgBouncer) does not support prepared statements.
+    // Supabase's transaction pooler (Supavisor) does not support prepared statements.
     prepare: false,
     max: process.env.NODE_ENV === "production" ? 5 : 1,
   });

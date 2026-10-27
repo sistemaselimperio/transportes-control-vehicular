@@ -1,5 +1,6 @@
 /**
- * PostgreSQL schema (hosted on Neon).
+ * PostgreSQL schema, isolated in the `transportes` schema of the shared Supabase
+ * project (other apps own `public`).
  * Only standard Postgres features: no provider-specific extensions or RLS.
  * Calendar dates use `date` in string mode ("YYYY-MM-DD") to match the domain.
  */
@@ -10,8 +11,7 @@ import {
   index,
   integer,
   numeric,
-  pgEnum,
-  pgTable,
+  pgSchema,
   text,
   timestamp,
   uniqueIndex,
@@ -19,45 +19,47 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+export const transportes = pgSchema("transportes");
+
 /* ------------------------------ Enums ------------------------------ */
 
-export const ownerGroupEnum = pgEnum("owner_group", [
+export const ownerGroupEnum = transportes.enum("owner_group", [
   "IMPERIO",
   "PAEZ",
   "THIRD_PARTY",
 ]);
-export const serviceTypeEnum = pgEnum("service_type", [
+export const serviceTypeEnum = transportes.enum("service_type", [
   "PARTICULAR",
   "PUBLICO",
 ]);
-export const vehicleStatusEnum = pgEnum("vehicle_status", [
+export const vehicleStatusEnum = transportes.enum("vehicle_status", [
   "ACTIVE",
   "IDLE",
   "IN_WORKSHOP",
   "SOLD",
 ]);
-export const driverStatusEnum = pgEnum("driver_status", [
+export const driverStatusEnum = transportes.enum("driver_status", [
   "ACTIVE",
   "IN_WORKSHOP",
   "INACTIVE",
 ]);
-export const oilModeEnum = pgEnum("oil_mode", ["date", "km", "both"]);
-export const documentTypeEnum = pgEnum("document_type", [
+export const oilModeEnum = transportes.enum("oil_mode", ["date", "km", "both"]);
+export const documentTypeEnum = transportes.enum("document_type", [
   "SOAT",
   "TECNO",
   "POLICY",
 ]);
-export const policyKindEnum = pgEnum("policy_kind", ["TR", "RC"]);
-export const taxKindEnum = pgEnum("tax_kind", [
+export const policyKindEnum = transportes.enum("policy_kind", ["TR", "RC"]);
+export const taxKindEnum = transportes.enum("tax_kind", [
   "PAID_YEAR",
   "EXEMPT",
   "EXEMPT_LOW_DISPLACEMENT",
   "UNKNOWN",
 ]);
 
-export const serviceKindEnum = pgEnum("service_kind", ["PREVENTIVE", "CORRECTIVE"]);
+export const serviceKindEnum = transportes.enum("service_kind", ["PREVENTIVE", "CORRECTIVE"]);
 
-export const fileCategoryEnum = pgEnum("file_category", [
+export const fileCategoryEnum = transportes.enum("file_category", [
   "POLICY",
   "SOAT",
   "TECNO",
@@ -73,14 +75,14 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 
 /* ---------------------------- Fleet domain ---------------------------- */
 
-export const owners = pgTable("owners", {
+export const owners = transportes.table("owners", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull(),
   documentNumber: text("document_number"),
   group: ownerGroupEnum().notNull(),
 });
 
-export const vehicleClasses = pgTable("vehicle_classes", {
+export const vehicleClasses = transportes.table("vehicle_classes", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull().unique(),
   /** Null means the class has no oil change (e.g. trailers). */
@@ -92,7 +94,7 @@ export const vehicleClasses = pgTable("vehicle_classes", {
     .default(false),
 });
 
-export const vehicles = pgTable(
+export const vehicles = transportes.table(
   "vehicles",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -133,7 +135,7 @@ export const vehicles = pgTable(
   (t) => [uniqueIndex("vehicles_plate_uq").on(t.plate)],
 );
 
-export const ownerships = pgTable(
+export const ownerships = transportes.table(
   "ownerships",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -149,7 +151,7 @@ export const ownerships = pgTable(
   (t) => [index("ownerships_vehicle_idx").on(t.vehicleId)],
 );
 
-export const drivers = pgTable("drivers", {
+export const drivers = transportes.table("drivers", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: text().notNull(),
   nationalId: text("national_id"),
@@ -159,7 +161,7 @@ export const drivers = pgTable("drivers", {
   status: driverStatusEnum().notNull().default("ACTIVE"),
 });
 
-export const driverAssignments = pgTable(
+export const driverAssignments = transportes.table(
   "driver_assignments",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -176,7 +178,7 @@ export const driverAssignments = pgTable(
 );
 
 /** Renewal history: the latest row per (vehicle, type[, policy_kind]) is the current one. */
-export const vehicleDocuments = pgTable(
+export const vehicleDocuments = transportes.table(
   "vehicle_documents",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -195,7 +197,7 @@ export const vehicleDocuments = pgTable(
   (t) => [index("vehicle_documents_vehicle_idx").on(t.vehicleId)],
 );
 
-export const vehicleTaxes = pgTable(
+export const vehicleTaxes = transportes.table(
   "vehicle_taxes",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -211,7 +213,7 @@ export const vehicleTaxes = pgTable(
   (t) => [index("vehicle_taxes_vehicle_idx").on(t.vehicleId)],
 );
 
-export const oilChanges = pgTable(
+export const oilChanges = transportes.table(
   "oil_changes",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -233,7 +235,7 @@ export const oilChanges = pgTable(
 );
 
 /** Supplies used in an oil change ("48" x "CUARTOS DELO 15W40"); read in insertion order. */
-export const oilChangeItems = pgTable(
+export const oilChangeItems = transportes.table(
   "oil_change_items",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -247,7 +249,7 @@ export const oilChangeItems = pgTable(
 );
 
 /** Logbook: workshop services and repairs. */
-export const vehicleServices = pgTable(
+export const vehicleServices = transportes.table(
   "vehicle_services",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -268,7 +270,7 @@ export const vehicleServices = pgTable(
 );
 
 /** Logbook: tire changes. */
-export const tireChanges = pgTable(
+export const tireChanges = transportes.table(
   "tire_changes",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -286,7 +288,7 @@ export const tireChanges = pgTable(
 );
 
 /** Logbook: fuel fills. `provider` is the station. */
-export const fuelFills = pgTable(
+export const fuelFills = transportes.table(
   "fuel_fills",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -302,7 +304,7 @@ export const fuelFills = pgTable(
   (t) => [index("fuel_fills_vehicle_date_idx").on(t.vehicleId, t.date)],
 );
 
-export const sales = pgTable("sales", {
+export const sales = transportes.table("sales", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   vehicleId: integer("vehicle_id")
     .notNull()
@@ -315,7 +317,7 @@ export const sales = pgTable("sales", {
 });
 
 /** Scanned papers (PDF / images) of a vehicle. List queries must never select `data`. */
-export const vehicleFiles = pgTable(
+export const vehicleFiles = transportes.table(
   "vehicle_files",
   {
     id: uuid().primaryKey().defaultRandom(),
@@ -336,7 +338,7 @@ export const vehicleFiles = pgTable(
 
 /* ------------------- Better Auth (username plugin) ------------------- */
 
-export const user = pgTable("user", {
+export const user = transportes.table("user", {
   id: text().primaryKey(),
   name: text().notNull(),
   email: text().notNull().unique(),
@@ -352,7 +354,7 @@ export const user = pgTable("user", {
   displayUsername: text("display_username"),
 });
 
-export const session = pgTable("session", {
+export const session = transportes.table("session", {
   id: text().primaryKey(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   token: text().notNull().unique(),
@@ -369,7 +371,7 @@ export const session = pgTable("session", {
     .references(() => user.id, { onDelete: "cascade" }),
 });
 
-export const account = pgTable("account", {
+export const account = transportes.table("account", {
   id: text().primaryKey(),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
@@ -395,7 +397,7 @@ export const account = pgTable("account", {
     .defaultNow(),
 });
 
-export const verification = pgTable("verification", {
+export const verification = transportes.table("verification", {
   id: text().primaryKey(),
   identifier: text().notNull(),
   value: text().notNull(),
