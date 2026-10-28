@@ -53,8 +53,6 @@ export function VehicleGrid({
   const view = parseViewParam(useSearchParams().get("vista") ?? undefined);
   const [local, setLocal] = useState<LocalFilters>(NO_LOCAL_FILTERS);
   const [sorting, setSorting] = useState<SortingState>([{ id: "plate", desc: false }]);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
   const [storedHidden, setStoredHidden] = useStoredString(STORAGE_KEY);
   const hidden = useMemo(() => parseHiddenGroups(storedHidden), [storedHidden]);
 
@@ -92,29 +90,6 @@ export function VehicleGrid({
     setStoredHidden(serializeHiddenGroups(toggleGroup(hidden, key)));
   }
 
-  async function exportExcel() {
-    setExporting(true);
-    setExportError(null);
-    try {
-      const res = await fetch("/api/vehiculos/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plates: visible.map((r) => r.plate) }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `vehiculos-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setExportError("No se pudo exportar el archivo. Intenta de nuevo.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
   const clear = () => setLocal(NO_LOCAL_FILTERS);
 
   return (
@@ -138,10 +113,6 @@ export function VehicleGrid({
             const [id, dir] = value.split(":");
             setSorting([{ id, desc: dir === "desc" }]);
           }}
-          onExport={exportExcel}
-          exporting={exporting}
-          exportError={exportError}
-          canExport={visible.length > 0}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

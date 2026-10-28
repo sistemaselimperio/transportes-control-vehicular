@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,6 @@ interface Props {
   classes: string[];
   sortValue: string;
   onSortChange: (value: string) => void;
-  onExport: () => void;
-  exporting: boolean;
-  exportError: string | null;
-  canExport: boolean;
 }
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
@@ -54,10 +50,6 @@ export function VehicleFiltersBar({
   classes,
   sortValue,
   onSortChange,
-  onExport,
-  exporting,
-  exportError,
-  canExport,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const dirty = Boolean(filters.search || filters.owner || filters.className);
@@ -153,23 +145,7 @@ export function VehicleFiltersBar({
             Limpiar
           </Button>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 px-3 md:ml-auto md:h-9"
-          onClick={onExport}
-          disabled={exporting || !canExport}
-        >
-          <Download aria-hidden />
-          <span className="hidden sm:inline">{exporting ? "Exportando…" : "Exportar Excel"}</span>
-          <span className="sm:hidden">{exporting ? "…" : "Excel"}</span>
-        </Button>
       </div>
-      {exportError && (
-        <p role="alert" className="text-sm text-destructive">
-          {exportError}
-        </p>
-      )}
 
       <SlideOver open={sheetOpen} onOpenChange={setSheetOpen} title="Filtros y orden">
         <div className="space-y-4">
