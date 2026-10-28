@@ -13,15 +13,15 @@ import {
 export type FleetView = "activos" | "alertas" | "taller" | "quietas" | "vendidos" | "todos";
 
 export const FLEET_VIEWS: ReadonlyArray<{ key: FleetView; label: string }> = [
+  { key: "todos", label: "Todos" },
   { key: "activos", label: "Activos" },
   { key: "alertas", label: "Con alertas" },
   { key: "taller", label: "En taller" },
   { key: "quietas", label: "Quietas" },
   { key: "vendidos", label: "Vendidos" },
-  { key: "todos", label: "Todos" },
 ];
 
-export const DEFAULT_VIEW: FleetView = "activos";
+export const DEFAULT_VIEW: FleetView = "todos";
 
 const VIEW_FILTERS: Record<FleetView, Pick<VehicleFilters, "status" | "onlyAlerts">> = {
   activos: { status: "ACTIVE", onlyAlerts: false },

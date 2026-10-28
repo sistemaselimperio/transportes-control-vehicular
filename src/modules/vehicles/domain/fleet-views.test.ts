@@ -30,18 +30,18 @@ const rows = [
 ];
 
 describe("parseViewParam", () => {
-  it("accepts known views and defaults to activos", () => {
-    expect(parseViewParam("alertas")).toBe("alertas");
+  it("accepts known views and defaults to todos", () => {
+    expect(parseViewParam("activos")).toBe("activos");
     expect(parseViewParam("taller")).toBe("taller");
     expect(parseViewParam(["quietas", "x"])).toBe("quietas");
-    expect(parseViewParam("nope")).toBe("activos");
-    expect(parseViewParam(undefined)).toBe("activos");
+    expect(parseViewParam("nope")).toBe("todos");
+    expect(parseViewParam(undefined)).toBe("todos");
   });
 
-  it("lists every view exactly once", () => {
+  it("lists every view exactly once, the default first", () => {
     const keys = FLEET_VIEWS.map((v) => v.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(["activos", "alertas", "taller", "quietas", "vendidos", "todos"]);
+    expect(keys).toEqual(["todos", "activos", "alertas", "taller", "quietas", "vendidos"]);
   });
 });
 
