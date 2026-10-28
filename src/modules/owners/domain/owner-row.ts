@@ -11,18 +11,18 @@ export interface OwnerRow {
   plates: string[];
 }
 
-/** Which owners the list shows: those holding vehicles today, or everyone. */
-export type OwnerView = "WITH_VEHICLES" | "ALL";
+/** Which owners the list shows: everyone, or those holding vehicles today. */
+export type OwnerView = "ALL" | "WITH_VEHICLES";
 
 export const OWNER_VIEWS: ReadonlyArray<{ key: OwnerView; label: string }> = [
-  { key: "WITH_VEHICLES", label: "Con vehículos" },
   { key: "ALL", label: "Todos" },
+  { key: "WITH_VEHICLES", label: "Con vehículos" },
 ];
 
-/** Reads the `vista` search param; only "todos" widens the list. */
+/** Reads the `vista` search param; only "con-vehiculos" narrows the list. */
 export function parseViewParam(value: string | string[] | undefined): OwnerView {
   const v = Array.isArray(value) ? value[0] : value;
-  return v === "todos" ? "ALL" : "WITH_VEHICLES";
+  return v === "con-vehiculos" ? "WITH_VEHICLES" : "ALL";
 }
 
 export function filterOwnersByGroup<T extends Pick<OwnerRow, "group">>(

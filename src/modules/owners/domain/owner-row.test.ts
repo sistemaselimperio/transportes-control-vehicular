@@ -3,6 +3,7 @@ import {
   countOwnerViews,
   filterOwnerRows,
   filterOwnersByGroup,
+  OWNER_VIEWS,
   parseViewParam,
   sortOwnerRows,
   type OwnerRow,
@@ -18,14 +19,21 @@ const row = (over: Partial<OwnerRow>): OwnerRow => ({
 });
 
 describe("parseViewParam", () => {
-  it("reads 'todos' as the full list", () => {
-    expect(parseViewParam("todos")).toBe("ALL");
-    expect(parseViewParam(["todos", "x"])).toBe("ALL");
+  it("reads 'con-vehiculos' as the owners holding vehicles", () => {
+    expect(parseViewParam("con-vehiculos")).toBe("WITH_VEHICLES");
+    expect(parseViewParam(["con-vehiculos", "x"])).toBe("WITH_VEHICLES");
   });
 
-  it("falls back to owners with vehicles for anything else", () => {
-    expect(parseViewParam(undefined)).toBe("WITH_VEHICLES");
-    expect(parseViewParam("otra")).toBe("WITH_VEHICLES");
+  it("falls back to the full list for anything else", () => {
+    expect(parseViewParam(undefined)).toBe("ALL");
+    expect(parseViewParam("todos")).toBe("ALL");
+    expect(parseViewParam("otra")).toBe("ALL");
+  });
+});
+
+describe("OWNER_VIEWS", () => {
+  it("lists every owner first, then those with vehicles", () => {
+    expect(OWNER_VIEWS.map((v) => v.key)).toEqual(["ALL", "WITH_VEHICLES"]);
   });
 });
 

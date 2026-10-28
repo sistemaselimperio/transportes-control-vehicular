@@ -23,7 +23,7 @@ import { OwnerList } from "./owner-list";
 /** Keeps the tab in the URL so the list can be shared or reloaded. */
 function syncUrl(view: OwnerView) {
   const url = new URL(window.location.href);
-  if (view === "ALL") url.searchParams.set("vista", "todos");
+  if (view === "WITH_VEHICLES") url.searchParams.set("vista", "con-vehiculos");
   else url.searchParams.delete("vista");
   window.history.replaceState(null, "", url);
 }
