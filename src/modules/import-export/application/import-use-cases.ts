@@ -58,7 +58,6 @@ export function ownerLabel(ref: OwnerRef): string {
   switch (ref.kind) {
     case "IMPERIO":
     case "FABIAN":
-    case "SANDRA":
       return KNOWN_OWNERS[ref.kind].name;
     case "THIRD_PARTY":
       return ref.name;

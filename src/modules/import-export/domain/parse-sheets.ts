@@ -312,7 +312,7 @@ export function parseImperioSheet(sheet: RawSheet, today: IsoDate): SheetResult 
 
 /* ------------------------------------- PAEZ ------------------------------------- */
 
-type RightSection = "sandra" | "unknown" | "sold";
+type RightSection = "listed" | "unknown" | "sold";
 
 function parsePaezMainAndLower(
   sheet: RawSheet,
@@ -364,7 +364,8 @@ function parsePaezMainAndLower(
       continue;
     }
 
-    // Sandra's block: policy renewals live in L; E keeps the previous (older) date.
+    // Sandra's block: imported without owner (owners are assigned one by one).
+    // Policy renewals live in L; E keeps the previous (older) date.
     const plate = out.lower.plate(row, plateRaw);
     if (plate == null) continue;
     const newPolicy = cell(row, "L");
@@ -379,7 +380,7 @@ function parsePaezMainAndLower(
         sheet: sheet.name,
         rowNumber: row.rowNumber,
         plate,
-        owner: { kind: "SANDRA" },
+        owner: { kind: "UNKNOWN" },
         today,
         classCell: cls,
         policy,
@@ -397,7 +398,7 @@ function parsePaezRightBlock(
   today: IsoDate,
   out: SheetCollector,
 ) {
-  let section: RightSection = "sandra";
+  let section: RightSection = "listed";
   for (const row of sheet.rows) {
     const r = up(cell(row, "R"));
     const s = up(cell(row, "S"));
@@ -428,7 +429,7 @@ function parsePaezRightBlock(
         sheet: sheet.name,
         rowNumber: row.rowNumber,
         plate,
-        owner: section === "unknown" ? { kind: "UNKNOWN" } : { kind: "SANDRA" },
+        owner: { kind: "UNKNOWN" },
         today,
         classCell: cls,
         municipality: swapped ? cell(row, "V") : undefined,

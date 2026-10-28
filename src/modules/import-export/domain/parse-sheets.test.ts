@@ -414,12 +414,12 @@ describe("parsePaezSheet", () => {
     expect(byPlate(vehicles, "QGV-374").driver).toBeNull();
   });
 
-  it("detects the Sandra block after the separator, swapped columns included", () => {
+  it("imports the Sandra block after the separator without owner, swapped columns included", () => {
     const swift = vehicles.filter((v) => v.plate === "LNZ-709");
     expect(swift.length).toBe(2); // lower block + right block; workbook dedupes
     const lower = swift[0];
     expect(lower).toMatchObject({
-      owner: { kind: "SANDRA" },
+      owner: { kind: "UNKNOWN" },
       className: "Automóvil",
       policy: { expiresOn: "2027-05-30" },
       soat: { expiresOn: "2027-05-18" },
@@ -428,13 +428,13 @@ describe("parsePaezSheet", () => {
       driver: null,
     });
     expect(byPlate(vehicles, "PXX-516")).toMatchObject({
-      owner: { kind: "SANDRA" },
+      owner: { kind: "UNKNOWN" },
       className: "Automóvil",
       policy: null,
     });
   });
 
-  it("assigns the right-hand block to Sandra with NO UBICADO and VENDIDO sections", () => {
+  it("imports the right-hand block without owner, with NO UBICADO and VENDIDO sections", () => {
     // right block before the marker is a duplicate list (LNZ-709); after it: unknown owner
     const gtk = byPlate(vehicles, "GTK-274");
     expect(gtk.owner).toEqual({ kind: "UNKNOWN" });
@@ -444,7 +444,7 @@ describe("parsePaezSheet", () => {
     expect(byPlate(vehicles, "QFR-193")).toMatchObject({
       status: "SOLD",
       className: "Campero",
-      owner: { kind: "SANDRA" },
+      owner: { kind: "UNKNOWN" },
     });
     expect(byPlate(vehicles, "BTI-406")).toMatchObject({
       status: "SOLD",

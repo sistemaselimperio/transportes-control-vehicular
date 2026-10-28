@@ -21,7 +21,6 @@ export interface RawSheet {
 export type OwnerRef =
   | { kind: "IMPERIO" }
   | { kind: "FABIAN" }
-  | { kind: "SANDRA" }
   | { kind: "THIRD_PARTY"; name: string }
   | { kind: "UNKNOWN" };
 

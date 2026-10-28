@@ -11,11 +11,6 @@ import { db, schema } from "./index";
 const OWNERS = [
   { name: "Transportes El Imperio", documentNumber: "901838598", group: "IMPERIO" },
   { name: "Fabián Páez", documentNumber: "74439231", group: "PAEZ" },
-  {
-    name: "Sandra Marcela Páez Porras",
-    documentNumber: "1053323036",
-    group: "PAEZ",
-  },
 ] as const;
 
 const MONTHS = 2; // observed date interval for all motorized classes
