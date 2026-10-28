@@ -57,8 +57,8 @@ const GROUPS: ReadonlyArray<{
   code: string;
 }> = [
   { value: null, label: "Todos", short: "Todos", code: "ALL" },
-  { value: "IMPERIO", label: "Transportes El Imperio", short: "Imperio", code: "IMP" },
-  { value: "PAEZ", label: "Fabián Páez", short: " Fabián P.", code: "PAE" },
+  { value: "PAEZ", label: "Fabián Páez", short: "Fabián P.", code: "PAE" },
+  { value: "IMPERIO", label: "Transportes El Imperio", short: "Transportes", code: "IMP" },
   { value: "THIRD_PARTY", label: "Terceros", short: "Terceros", code: "TER" },
 ];
 
@@ -147,8 +147,8 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles,
         ))}
       </nav>
 
-      <nav aria-label="Filtrar por propietario" className="border-t p-3 md:py-2.5">
-        <span className="micro-label block px-3 pt-1 pb-2 md:pb-1.5">Propietario</span>
+      <nav aria-label="Filtrar por propietario" className="border-t p-3 md:py-2">
+        <span className="micro-label block px-2 pb-2 md:pb-1.5">Propietario</span>
         <div className="grid grid-cols-2 gap-1">
           {GROUPS.map((g) => {
             const selected = g.value === grupo;
@@ -161,7 +161,7 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles,
                 title={g.label}
                 onClick={onNavigate}
                 className={cn(
-                  "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99] md:min-h-8 md:px-2.5",
+                  "flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-[0.99] md:min-h-8",
                   focus,
                   selected && "bg-secondary font-medium text-foreground hover:bg-secondary",
                 )}
