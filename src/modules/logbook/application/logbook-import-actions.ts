@@ -8,7 +8,8 @@
  */
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
-import { requireSession } from "@/lib/session";
+import { ForbiddenError } from "@/lib/permissions";
+import { requireAdmin } from "@/lib/session";
 import { readWorkbook } from "@/modules/import-export/infrastructure/xlsx-reader";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
@@ -39,6 +40,7 @@ async function readForm(fd: FormData): Promise<{ plate: string; data: ArrayBuffe
 function failure(e: unknown): { ok: false; error: string } {
   if (e instanceof RuleError) return { ok: false, error: e.message };
   if (e instanceof ZodError) return { ok: false, error: "Revisa los datos ingresados." };
+  if (e instanceof ForbiddenError) return { ok: false, error: e.message };
   if (e instanceof Error && e.message === "No autorizado") {
     return { ok: false, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
   }
@@ -48,7 +50,7 @@ function failure(e: unknown): { ok: false; error: string } {
 
 export async function previewLogbookImportAction(fd: FormData): Promise<ImportPreviewResult> {
   try {
-    await requireSession();
+    await requireAdmin();
     const { plate, data } = await readForm(fd);
     return { ok: true, preview: await importer.preview(plate, data) };
   } catch (e) {
@@ -58,7 +60,7 @@ export async function previewLogbookImportAction(fd: FormData): Promise<ImportPr
 
 export async function confirmLogbookImportAction(fd: FormData): Promise<ActionResult> {
   try {
-    await requireSession();
+    await requireAdmin();
     const { plate, data } = await readForm(fd);
     const result = await importer.confirm(plate, data);
     // The import can add oil changes and move the odometer, so the fleet changes too.

@@ -22,8 +22,14 @@ export const auth = betterAuth({
   trustedOrigins: vercelOrigins,
   emailAndPassword: {
     enabled: true,
-    // Rocío is the only operator for now; users are created by seed/admin tooling.
+    // Users are created by seed/admin tooling, never by sign-up.
     disableSignUp: true,
+  },
+  user: {
+    additionalFields: {
+      // Read-only for clients: the role is only ever written by seed/admin tooling.
+      role: { type: "string", required: true, defaultValue: "staff", input: false },
+    },
   },
   plugins: [
     username(),

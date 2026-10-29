@@ -13,8 +13,8 @@ import { searchDrivers, type DriverRow } from "../domain/driver-row";
 import { DriverForm } from "./driver-form";
 import { DriverList } from "./driver-list";
 
-/** Drivers page: a search box, the list, and the create / edit side sheet. */
-export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
+/** Drivers page: a search box, the list, and the create / edit side sheet (hidden when `readOnly`). */
+export function DriversView({ rows, readOnly = false }: { rows: readonly DriverRow[]; readOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DriverRow | undefined>();
   const [message, setMessage] = useState<string | null>(null);
@@ -33,18 +33,20 @@ export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
         title="Conductores"
         description="Datos de cada conductor y los vehículos que maneja."
         actions={
-          <>
-            <DeleteAllButton count={rows.length} title="Eliminar todos los conductores" action={deleteAllDriversAction}>
-              <p className="font-medium">Se eliminarán TODOS los conductores, no solo los que ves en pantalla.</p>
-              <p className="text-muted-foreground">
-                Se quitan también sus asignaciones a vehículos. Los vehículos no se eliminan.
-              </p>
-            </DeleteAllButton>
-            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-              <Plus aria-hidden />
-              Nuevo conductor
-            </Button>
-          </>
+          !readOnly && (
+            <>
+              <DeleteAllButton count={rows.length} title="Eliminar todos los conductores" action={deleteAllDriversAction}>
+                <p className="font-medium">Se eliminarán TODOS los conductores, no solo los que ves en pantalla.</p>
+                <p className="text-muted-foreground">
+                  Se quitan también sus asignaciones a vehículos. Los vehículos no se eliminan.
+                </p>
+              </DeleteAllButton>
+              <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+                <Plus aria-hidden />
+                Nuevo conductor
+              </Button>
+            </>
+          )
         }
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -73,7 +75,7 @@ export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
       {query.trim() && shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ningún conductor coincide con «{query.trim()}».</p>
       ) : (
-        <DriverList rows={shown} onEdit={openForm} />
+        <DriverList rows={shown} onEdit={readOnly ? undefined : openForm} />
       )}
 
       {message && (
@@ -86,22 +88,24 @@ export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
         </p>
       )}
 
-      <SlideOver
-        open={open}
-        onOpenChange={setOpen}
-        title={editing ? "Editar conductor" : "Nuevo conductor"}
-        description={editing?.name}
-      >
-        <DriverForm
-          driver={editing}
-          onCancel={() => setOpen(false)}
-          onDone={(msg) => {
-            setMessage(msg);
-            setTimeout(() => setMessage(null), 6000);
-            setOpen(false);
-          }}
-        />
-      </SlideOver>
+      {!readOnly && (
+        <SlideOver
+          open={open}
+          onOpenChange={setOpen}
+          title={editing ? "Editar conductor" : "Nuevo conductor"}
+          description={editing?.name}
+        >
+          <DriverForm
+            driver={editing}
+            onCancel={() => setOpen(false)}
+            onDone={(msg) => {
+              setMessage(msg);
+              setTimeout(() => setMessage(null), 6000);
+              setOpen(false);
+            }}
+          />
+        </SlideOver>
+      )}
     </section>
   );
 }

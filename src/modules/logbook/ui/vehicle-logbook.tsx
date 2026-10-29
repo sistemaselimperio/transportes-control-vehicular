@@ -11,9 +11,18 @@ import { CompactFuel, CompactOilChanges, CompactServices, CompactTires } from ".
 /**
  * The vehicle's logbook inside its file: the same four records as the Bitácora page, filtered to
  * this vehicle. One tab per kind shows its read-only list below; the heading links to the
- * Bitácora on this vehicle and tab, where records are created, edited and deleted.
+ * Bitácora on this vehicle and tab, where records are created, edited and deleted (only for
+ * users who can manage it).
  */
-export function VehicleLogbookSection({ plate, logbook }: { plate: string; logbook: VehicleLogbook }) {
+export function VehicleLogbookSection({
+  plate,
+  logbook,
+  canManage = true,
+}: {
+  plate: string;
+  logbook: VehicleLogbook;
+  canManage?: boolean;
+}) {
   const [tab, setTab] = useState<LogbookTab>("servicios");
   const counts: Record<LogbookTab, number> = {
     servicios: logbook.services.length,
@@ -27,13 +36,15 @@ export function VehicleLogbookSection({ plate, logbook }: { plate: string; logbo
       id="bitacora"
       title="Bitácora"
       actions={
-        <Link
-          href={logbookHref(plate, tab)}
-          className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm text-muted-foreground underline decoration-muted-foreground/60 decoration-1 underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 md:min-h-8"
-        >
-          Gestionar en Bitácora
-          <ArrowUpRight className="size-4" aria-hidden />
-        </Link>
+        canManage && (
+          <Link
+            href={logbookHref(plate, tab)}
+            className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm text-muted-foreground underline decoration-muted-foreground/60 decoration-1 underline-offset-4 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 md:min-h-8"
+          >
+            Gestionar en Bitácora
+            <ArrowUpRight className="size-4" aria-hidden />
+          </Link>
+        )
       }
     >
       <TabBar

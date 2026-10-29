@@ -10,7 +10,8 @@ import type { ZodType } from "zod";
 import { z, ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import type { Change } from "@/lib/cache-tags";
-import { requireSession } from "@/lib/session";
+import { ForbiddenError } from "@/lib/permissions";
+import { requireAdmin } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
@@ -41,7 +42,7 @@ async function run(
   change: Change = { kind: "logbook" },
 ): Promise<ActionResult> {
   try {
-    await requireSession();
+    await requireAdmin();
     const result = await fn();
     expireAfterAction(change);
     return { ok: true, message: result.message };
@@ -50,6 +51,7 @@ async function run(
     if (e instanceof ZodError) {
       return { ok: false, error: e.issues[0]?.message ?? "Revisa los datos ingresados." };
     }
+    if (e instanceof ForbiddenError) return { ok: false, error: e.message };
     if (e instanceof Error && e.message === "No autorizado") {
       return { ok: false, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
     }

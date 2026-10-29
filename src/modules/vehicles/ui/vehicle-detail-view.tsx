@@ -154,9 +154,9 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
  * Vehicle file ordered by what the dispatcher needs first: identity, status and expiries in the
  * header; then the technical sheet that says exactly which vehicle this is; then who runs it and
  * how far it has gone; then its papers; then the logbook; and last the
- * notes. The only overlays are the action forms.
+ * notes. The only overlays are the action forms, which `readOnly` removes along with every write control.
  */
-export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
+export function VehicleDetailView({ detail, readOnly = false }: { detail: VehicleDetail; readOnly?: boolean }) {
   const r = detail.row;
   const sold = r.vehicleStatus === "SOLD";
 
@@ -168,6 +168,7 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
       edit={detail.edit}
       technical={r.technical}
       current={{ owner: r.ownerName, driver: r.driverName }}
+      readOnly={readOnly}
     >
       <TabParamScroll />
       <div className="space-y-10">
@@ -206,12 +207,12 @@ export function VehicleDetailView({ detail }: { detail: VehicleDetail }) {
               note={`${detail.files.length} ${detail.files.length === 1 ? "archivo" : "archivos"}`}
               actions={<ActionButtons keys={["document", "tax"]} primary="document" />}
             >
-              <VehicleFilesPanel plate={r.plate} files={detail.files} />
+              <VehicleFilesPanel plate={r.plate} files={detail.files} readOnly={readOnly} />
             </Section>
           </div>
         </div>
 
-        <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} />
+        <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} canManage={!readOnly} />
 
         {(r.notes || detail.sale) && (
           <Section id="notas" title={detail.sale ? "Notas y venta" : "Notas"}>

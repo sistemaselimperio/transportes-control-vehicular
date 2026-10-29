@@ -1,6 +1,7 @@
 /**
- * Idempotent seed: owners, vehicle classes and the admin user.
- * Run with `npm run db:seed` (requires SEED_ADMIN_PASSWORD for the admin user).
+ * Idempotent seed: owners, vehicle classes and the users (rocio: admin, leidy: staff).
+ * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD or
+ * SEED_LEIDY_PASSWORD; a user without one is skipped).
  */
 import "./load-env";
 
@@ -50,28 +51,34 @@ async function seedClasses() {
   }
 }
 
-async function seedAdmin() {
-  const password = process.env.SEED_ADMIN_PASSWORD;
+async function seedUser(user: {
+  username: string;
+  name: string;
+  role: "admin" | "staff";
+  passwordVar: string;
+}) {
+  const password = process.env[user.passwordVar];
   if (!password) {
-    console.warn("SEED_ADMIN_PASSWORD not set: skipping admin user.");
+    console.warn(`${user.passwordVar} not set: skipping user '${user.username}'.`);
     return;
   }
   const [existing] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(eq(schema.user.username, "rocio"));
+    .where(eq(schema.user.username, user.username));
   if (existing) {
-    console.log("Admin user 'rocio' already exists.");
+    console.log(`User '${user.username}' already exists.`);
     return;
   }
   const id = crypto.randomUUID();
   await db.insert(schema.user).values({
     id,
-    name: "Rocío",
-    email: "rocio@transportes.local",
+    name: user.name,
+    email: `${user.username}@transportes.local`,
     emailVerified: true,
-    username: "rocio",
-    displayUsername: "rocio",
+    username: user.username,
+    displayUsername: user.username,
+    role: user.role,
   });
   await db.insert(schema.account).values({
     id: crypto.randomUUID(),
@@ -80,13 +87,19 @@ async function seedAdmin() {
     userId: id,
     password: await hashPassword(password),
   });
-  console.log("Admin user 'rocio' created.");
+  console.log(`User '${user.username}' (${user.role}) created.`);
 }
+
+const seedAdmin = () =>
+  seedUser({ username: "rocio", name: "Rocío", role: "admin", passwordVar: "SEED_ADMIN_PASSWORD" });
+const seedLeidy = () =>
+  seedUser({ username: "leidy", name: "Leidy", role: "staff", passwordVar: "SEED_LEIDY_PASSWORD" });
 
 async function main() {
   await seedOwners();
   await seedClasses();
   await seedAdmin();
+  await seedLeidy();
   console.log("Seed complete.");
   process.exit(0);
 }

@@ -352,6 +352,8 @@ export const user = transportes.table("user", {
     .defaultNow(),
   username: text().unique(),
   displayUsername: text("display_username"),
+  /** "admin" does everything; "staff" only reads the fleet and the drivers (see `src/lib/permissions.ts`). */
+  role: text().notNull().default("staff"),
 });
 
 export const session = transportes.table("session", {

@@ -70,7 +70,8 @@ type Notice = { tone: "ok" | "error"; text: string };
 interface FileActionsContext {
   plate: string;
   status: VehicleStatus;
-  sold: boolean;
+  /** No action control shows: the vehicle is sold or the user may only read. */
+  locked: boolean;
   open: (key: ActionKey) => void;
   notify: (notice: Notice) => void;
 }
@@ -95,6 +96,7 @@ export function FileActions({
   edit,
   technical,
   current,
+  readOnly = false,
   children,
 }: {
   plate: string;
@@ -105,6 +107,8 @@ export function FileActions({
   technical: VehicleTechnicalData;
   /** Who the sale would close, shown in the sell form. */
   current: { owner: string | null; driver: string | null };
+  /** The user cannot change anything: every action control is hidden. */
+  readOnly?: boolean;
   children: ReactNode;
 }) {
   const [active, setActive] = useState<ActionKey | null>(null);
@@ -131,7 +135,7 @@ export function FileActions({
       value={{
         plate,
         status,
-        sold: status === "SOLD",
+        locked: readOnly || status === "SOLD",
         open: (key) => {
           setMessage(null);
           setActive(key);
@@ -195,8 +199,8 @@ export function FileActions({
  * one key drawn filled; the rest are outlined. Hidden once the vehicle is sold.
  */
 export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; primary?: ActionKey }) {
-  const { sold, open } = useFileActions();
-  if (sold) return null;
+  const { locked, open } = useFileActions();
+  if (locked) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
       {keys.map((key) => {
@@ -233,10 +237,10 @@ const STATUS_CHOICES: Array<{ value: Exclude<VehicleStatus, "SOLD">; label: stri
  * once (optimistic) and falls back if the server refuses. Hidden once the vehicle is sold.
  */
 export function StatusSwitch() {
-  const { plate, status, sold, notify } = useFileActions();
+  const { plate, status, locked, notify } = useFileActions();
   const [shown, setShown] = useOptimistic(status);
   const [pending, startTransition] = useTransition();
-  if (sold) return null;
+  if (locked) return null;
 
   function choose(next: (typeof STATUS_CHOICES)[number]) {
     if (next.value === shown || pending) return;
@@ -297,8 +301,8 @@ export function SoldNotice() {
 
 /** Header button for editing the vehicle's own data; hidden once sold. */
 export function EditDataButton() {
-  const { sold, open } = useFileActions();
-  if (sold) return null;
+  const { locked, open } = useFileActions();
+  if (locked) return null;
   const { label, icon: Icon } = ACTIONS.edit;
   return (
     <Button type="button" variant="outline" className="h-11 bg-transparent px-3 hover:bg-muted md:h-8" onClick={() => open("edit")}>
@@ -322,8 +326,8 @@ export function InlineAction({
   label?: string;
   children: ReactNode;
 }) {
-  const { sold, open } = useFileActions();
-  if (sold) return null;
+  const { locked, open } = useFileActions();
+  if (locked) return null;
   return (
     <button
       type="button"
@@ -343,8 +347,8 @@ export function InlineAction({
 
 /** Header button that opens the sale form; icon only, kept apart from daily actions. Hidden once sold. */
 export function SellButton() {
-  const { sold, open } = useFileActions();
-  if (sold) return null;
+  const { locked, open } = useFileActions();
+  if (locked) return null;
   return (
     <button
       type="button"

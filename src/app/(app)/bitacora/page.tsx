@@ -1,3 +1,4 @@
+import { requireSectionAccess } from "@/lib/session";
 import { getLogbookPage } from "@/modules/logbook/application/logbook-queries";
 import { parseLogbookQuery, parseTabParam } from "@/modules/logbook/domain/logbook";
 import { LogbookView } from "@/modules/logbook/ui/logbook-view";
@@ -7,6 +8,7 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireSectionAccess("logbook");
   const params = await searchParams;
   const tab = parseTabParam(params.tab);
   const query = parseLogbookQuery(params);

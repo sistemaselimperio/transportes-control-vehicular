@@ -1,3 +1,4 @@
+import { requireSectionAccess } from "@/lib/session";
 import {
   parseKindParam,
   parseQueryParam,
@@ -12,6 +13,7 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireSectionAccess("today");
   const { grupo, tipo, estado, placa } = await searchParams;
   const data = await getDashboard(parseGroupParam(grupo));
   return (

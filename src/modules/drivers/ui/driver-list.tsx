@@ -54,13 +54,13 @@ function EditButton({ row, onEdit }: { row: DriverRow; onEdit: (row: DriverRow) 
   );
 }
 
-/** Drivers as a table from `md`, as cards on phones. */
+/** Drivers as a table from `md`, as cards on phones. Without `onEdit` the list is read-only. */
 export function DriverList({
   rows,
   onEdit,
 }: {
   rows: readonly DriverRow[];
-  onEdit: (row: DriverRow) => void;
+  onEdit?: (row: DriverRow) => void;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No hay conductores para este filtro.</p>;
@@ -74,7 +74,7 @@ export function DriverList({
               <span className="min-w-0 font-medium">{r.name}</span>
               <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                 <Status status={r.status} />
-                <EditButton row={r} onEdit={onEdit} />
+                {onEdit && <EditButton row={r} onEdit={onEdit} />}
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
@@ -107,9 +107,11 @@ export function DriverList({
                     {h}
                   </th>
                 ))}
-                <th scope="col" className="w-12">
-                  <span className="sr-only">Acciones</span>
-                </th>
+                {onEdit && (
+                  <th scope="col" className="w-12">
+                    <span className="sr-only">Acciones</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -133,9 +135,11 @@ export function DriverList({
                   <td className="px-4 py-3">
                     <Plates plates={r.plates} />
                   </td>
-                  <td className="px-2 py-1.5 text-right">
-                    <EditButton row={r} onEdit={onEdit} />
-                  </td>
+                  {onEdit && (
+                    <td className="px-2 py-1.5 text-right">
+                      <EditButton row={r} onEdit={onEdit} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

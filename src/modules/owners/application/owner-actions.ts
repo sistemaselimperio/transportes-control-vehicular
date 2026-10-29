@@ -6,7 +6,8 @@
  */
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
-import { requireSession } from "@/lib/session";
+import { ForbiddenError } from "@/lib/permissions";
+import { requireAdmin } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
   deleteAllOwners,
@@ -28,7 +29,7 @@ async function ensureUniqueDocument(input: OwnerInput, exceptId?: number) {
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
-    await requireSession();
+    await requireAdmin();
     const message = await fn();
     expireAfterAction({ kind: "owner" });
     return { ok: true, message };
@@ -37,6 +38,7 @@ async function run(fn: () => Promise<string>): Promise<ActionResult> {
     if (e instanceof ZodError) {
       return { ok: false, error: e.issues[0]?.message ?? "Revisa los datos ingresados." };
     }
+    if (e instanceof ForbiddenError) return { ok: false, error: e.message };
     if (e instanceof Error && e.message === "No autorizado") {
       return { ok: false, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
     }

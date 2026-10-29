@@ -1,3 +1,4 @@
+import { requireSectionAccess } from "@/lib/session";
 import { parseGroupParam } from "@/modules/dashboard/domain/dashboard-metrics";
 import { listOwnerRows } from "@/modules/owners/application/owner-queries";
 import { filterOwnersByGroup, parseViewParam } from "@/modules/owners/domain/owner-row";
@@ -8,6 +9,7 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireSectionAccess("owners");
   // Await the request first: the cached read must run per request, never while prerendering.
   const { grupo, vista } = await searchParams;
   const rows = await listOwnerRows();

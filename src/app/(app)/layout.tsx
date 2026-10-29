@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/app/sidebar";
+import { canViewSection, parseRole } from "@/lib/permissions";
 import { getRequestSession } from "@/lib/session";
 import { getExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 
@@ -40,8 +41,10 @@ export default function AppLayout({
 async function SessionSidebar() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
-  const expiredCounts = await getExpiredVehicleCounts();
-  return <Sidebar userName={session.user.name} expiredCounts={expiredCounts} />;
+  const role = parseRole(session.user.role);
+  // The counts only feed the alerts entry, which staff do not see.
+  const expiredCounts = canViewSection(role, "today") ? await getExpiredVehicleCounts() : null;
+  return <Sidebar userName={session.user.name} role={role} expiredCounts={expiredCounts} />;
 }
 
 /** Renders the page only once the session is confirmed; the proxy alone just checks the cookie. */

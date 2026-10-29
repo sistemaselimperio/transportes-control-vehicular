@@ -18,6 +18,7 @@ import { useState } from "react";
 import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
 import { authClient } from "@/lib/auth-client";
+import { canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { ExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
@@ -64,6 +65,7 @@ const GROUPS: ReadonlyArray<{
 
 interface BodyProps {
   pathname: string;
+  role: Role;
   grupo: OwnerGroup | null;
   /** Query string of the current page, kept when only the group changes. */
   currentQuery: string;
@@ -87,7 +89,7 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
   return qs ? `${path}?${qs}` : path;
 }
 
-function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
+function SidebarBody({ pathname, role, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -105,10 +107,18 @@ function SidebarBody({ pathname, grupo, currentQuery, userName, expiredVehicles,
   const focus =
     "outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
 
+  const sections = SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => {
+      const target = sectionOfPath(item.href);
+      return target != null && canViewSection(role, target);
+    }),
+  })).filter((section) => section.items.length > 0);
+
   return (
     <>
       <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
             {section.items.map((item) => {
@@ -244,10 +254,13 @@ function BrandStacked() {
  */
 export function Sidebar({
   userName,
+  role,
   expiredCounts,
 }: {
   userName: string;
-  expiredCounts: ExpiredVehicleCounts;
+  role: Role;
+  /** Only the roles that see the alerts page get the counts. */
+  expiredCounts: ExpiredVehicleCounts | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -255,7 +268,14 @@ export function Sidebar({
 
   const grupo = parseGroupParam(searchParams.get("grupo") ?? undefined);
   const currentQuery = searchParams.toString();
-  const shared = { pathname, grupo, currentQuery, userName, expiredVehicles: expiredCounts[grupo ?? "ALL"] };
+  const shared = {
+    pathname,
+    role,
+    grupo,
+    currentQuery,
+    userName,
+    expiredVehicles: expiredCounts?.[grupo ?? "ALL"] ?? 0,
+  };
 
   return (
     <>

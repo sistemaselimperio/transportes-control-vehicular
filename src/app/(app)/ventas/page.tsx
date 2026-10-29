@@ -1,3 +1,4 @@
+import { requireSectionAccess } from "@/lib/session";
 import { parseGroupParam } from "@/modules/dashboard/domain/dashboard-metrics";
 import { listSaleRows } from "@/modules/sales/application/sale-queries";
 import { filterSalesByGroup, parseYearParam } from "@/modules/sales/domain/sale-row";
@@ -8,6 +9,7 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireSectionAccess("sales");
   // Await the request first: the cached read must run per request, never while prerendering.
   const { grupo, anio } = await searchParams;
   const rows = await listSaleRows();
