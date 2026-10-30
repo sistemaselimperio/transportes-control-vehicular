@@ -2,7 +2,7 @@
 
 export const MAX_IMAGE_SIDE = 1800;
 /** PDFs up to this size are uploaded untouched (digital PDFs are already small). */
-export const PDF_REASONABLE_BYTES = 1024 * 1024;
+export const PDF_REASONABLE_BYTES = 300 * 1024;
 
 export type OptimizationPlan = "image" | "pdf" | "keep";
 

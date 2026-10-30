@@ -7,10 +7,10 @@
 import { fitWithin, MAX_IMAGE_SIDE, planOptimization } from "./optimize-plan";
 
 const IMAGE_QUALITY = 0.75;
-const PDF_PAGE_QUALITY = 0.7;
+const PDF_PAGE_QUALITY = 0.6;
 /** Rasterization density for scanned PDFs (PDF user space is 72 dpi). */
-const PDF_DPI = 150;
-const PDF_MAX_SIDE = 2200;
+const PDF_DPI = 120;
+const PDF_MAX_SIDE = 1600;
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
