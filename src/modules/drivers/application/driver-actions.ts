@@ -7,10 +7,10 @@
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireDriverManager } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
-  deleteAllDrivers,
+  deleteDriver,
   findDriverIdByNationalId,
   insertDriver,
   updateDriver,
@@ -29,7 +29,7 @@ async function ensureUniqueNationalId(input: DriverInput, exceptId?: number) {
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireDriverManager();
     const message = await fn();
     expireAfterAction({ kind: "driver" });
     return { ok: true, message };
@@ -66,11 +66,13 @@ export async function updateDriverAction(id: number, fd: FormData): Promise<Acti
   });
 }
 
-/** Removes every driver and their assignments; the vehicles stay. */
-export async function deleteAllDriversAction(): Promise<ActionResult> {
+/** Removes one driver and their closed assignments; refuses while they are assigned to a vehicle. */
+export async function deleteDriverAction(id: number): Promise<ActionResult> {
   return run(async () => {
-    const count = await deleteAllDrivers();
-    if (count === 0) throw new DriverError("No hay conductores para eliminar.");
-    return count === 1 ? "Se eliminó 1 conductor." : `Se eliminaron ${count} conductores.`;
+    const driverId = driverIdSchema.parse(id);
+    const result = await deleteDriver(driverId);
+    if (result.status === "not_found") throw new DriverError("El conductor ya no existe.");
+    if (result.status === "assigned") throw new DriverError(result.message);
+    return `Conductor ${result.name} eliminado.`;
   });
 }

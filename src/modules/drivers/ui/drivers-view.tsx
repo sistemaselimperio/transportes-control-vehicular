@@ -2,21 +2,21 @@
 
 import { CheckCircle2, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deleteAllDriversAction } from "../application/driver-actions";
 import { searchDrivers, type DriverRow } from "../domain/driver-row";
+import { DeleteDriverDialog } from "./delete-driver-dialog";
 import { DriverForm } from "./driver-form";
 import { DriverList } from "./driver-list";
 
-/** Drivers page: a search box, the list, and the create / edit side sheet (hidden when `readOnly`). */
-export function DriversView({ rows, readOnly = false }: { rows: readonly DriverRow[]; readOnly?: boolean }) {
+/** Drivers page: a search box, the list, and the create / edit side sheet and the delete confirmation. */
+export function DriversView({ rows }: { rows: readonly DriverRow[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DriverRow | undefined>();
+  const [deleting, setDeleting] = useState<DriverRow | undefined>();
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const shown = useMemo(() => searchDrivers(rows, query), [rows, query]);
@@ -33,20 +33,10 @@ export function DriversView({ rows, readOnly = false }: { rows: readonly DriverR
         title="Conductores"
         description="Datos de cada conductor y los vehículos que maneja."
         actions={
-          !readOnly && (
-            <>
-              <DeleteAllButton count={rows.length} title="Eliminar todos los conductores" action={deleteAllDriversAction}>
-                <p className="font-medium">Se eliminarán TODOS los conductores, no solo los que ves en pantalla.</p>
-                <p className="text-muted-foreground">
-                  Se quitan también sus asignaciones a vehículos. Los vehículos no se eliminan.
-                </p>
-              </DeleteAllButton>
-              <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-                <Plus aria-hidden />
-                Nuevo conductor
-              </Button>
-            </>
-          )
+          <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+            <Plus aria-hidden />
+            Nuevo conductor
+          </Button>
         }
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -75,7 +65,7 @@ export function DriversView({ rows, readOnly = false }: { rows: readonly DriverR
       {query.trim() && shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">Ningún conductor coincide con «{query.trim()}».</p>
       ) : (
-        <DriverList rows={shown} onEdit={readOnly ? undefined : openForm} />
+        <DriverList rows={shown} onEdit={openForm} onDelete={setDeleting} />
       )}
 
       {message && (
@@ -88,8 +78,16 @@ export function DriversView({ rows, readOnly = false }: { rows: readonly DriverR
         </p>
       )}
 
-      {!readOnly && (
-        <SlideOver
+      <DeleteDriverDialog
+        driver={deleting}
+        onClose={() => setDeleting(undefined)}
+        onDone={(msg) => {
+          setMessage(msg);
+          setTimeout(() => setMessage(null), 6000);
+        }}
+      />
+
+      <SlideOver
           open={open}
           onOpenChange={setOpen}
           title={editing ? "Editar conductor" : "Nuevo conductor"}
@@ -105,7 +103,6 @@ export function DriversView({ rows, readOnly = false }: { rows: readonly DriverR
             }}
           />
         </SlideOver>
-      )}
     </section>
   );
 }

@@ -1,7 +1,8 @@
 /**
  * Who may do what. Pure policy, shared by the server (pages, actions, routes) and the UI.
  * `admin` can do everything; `staff` can read the fleet (list, file, documents, logbook of a
- * vehicle) and the drivers, open vehicle files, and nothing else — no writes at all.
+ * vehicle), open vehicle files, and manage the drivers (create, edit, delete); nothing else is
+ * writable for them.
  */
 export type Role = "admin" | "staff";
 
@@ -29,6 +30,11 @@ export function canViewSection(role: Role, section: Section): boolean {
 /** Create, edit, delete, upload and import. */
 export function canWrite(role: Role): boolean {
   return role === "admin";
+}
+
+/** Create, edit and delete drivers: the one write staff also has. */
+export function canManageDrivers(role: Role): boolean {
+  return role === "admin" || role === "staff";
 }
 
 /** The first section the role can see: where a redirect from a forbidden page lands. */

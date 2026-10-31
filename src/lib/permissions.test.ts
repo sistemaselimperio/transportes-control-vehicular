@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canViewSection, canWrite, ForbiddenError, homePath, parseRole, sectionOfPath } from "./permissions";
+import { canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, sectionOfPath } from "./permissions";
 
 describe("parseRole", () => {
   it("keeps the known roles", () => {
@@ -68,5 +68,16 @@ describe("ForbiddenError", () => {
     const error = new ForbiddenError();
     expect(error).toBeInstanceOf(Error);
     expect(error.message).toBe("No tienes permiso para realizar esta acción.");
+  });
+});
+
+describe("canManageDrivers", () => {
+  it("allows admins and staff to create, edit and delete drivers", () => {
+    expect(canManageDrivers("admin")).toBe(true);
+    expect(canManageDrivers("staff")).toBe(true);
+  });
+
+  it("does not widen canWrite for staff", () => {
+    expect(canWrite("staff")).toBe(false);
   });
 });

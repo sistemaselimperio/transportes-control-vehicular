@@ -1,5 +1,6 @@
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { checkDriverDeletion } from "../domain/driver-deletion";
 import type { DriverRow } from "../domain/driver-row";
 
 /** Every driver with the plates of their current (open) assignments. */
@@ -63,11 +64,38 @@ export async function updateDriver(id: number, values: DriverValues) {
   return rows.length === 1;
 }
 
-/** Removes every driver and their assignments (the vehicles stay); returns how many drivers went. */
-export async function deleteAllDrivers() {
+export type DeleteDriverResult =
+  | { status: "deleted"; name: string }
+  | { status: "not_found" }
+  | { status: "assigned"; message: string };
+
+/**
+ * Deletes a driver and their closed assignments in one transaction. A driver with a current
+ * (open, `toDate` null) assignment is refused and nothing is touched.
+ */
+export async function deleteDriver(id: number): Promise<DeleteDriverResult> {
   return db.transaction(async (tx) => {
-    await tx.delete(schema.driverAssignments);
-    const rows = await tx.delete(schema.drivers).returning({ id: schema.drivers.id });
-    return rows.length;
+    const [driver] = await tx
+      .select({ name: schema.drivers.name })
+      .from(schema.drivers)
+      .where(eq(schema.drivers.id, id))
+      .limit(1);
+    if (!driver) return { status: "not_found" };
+
+    const current = await tx
+      .select({ plate: schema.vehicles.plate })
+      .from(schema.driverAssignments)
+      .innerJoin(schema.vehicles, eq(schema.driverAssignments.vehicleId, schema.vehicles.id))
+      .where(and(eq(schema.driverAssignments.driverId, id), isNull(schema.driverAssignments.toDate)))
+      .orderBy(asc(schema.vehicles.plate));
+    const check = checkDriverDeletion(
+      driver.name,
+      current.map((a) => a.plate),
+    );
+    if (!check.ok) return { status: "assigned", message: check.message };
+
+    await tx.delete(schema.driverAssignments).where(eq(schema.driverAssignments.driverId, id));
+    await tx.delete(schema.drivers).where(eq(schema.drivers.id, id));
+    return { status: "deleted", name: driver.name };
   });
 }

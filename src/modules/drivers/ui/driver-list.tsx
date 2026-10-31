@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { AlertStatus } from "@/modules/alerts/domain/alert-status";
@@ -54,13 +54,30 @@ function EditButton({ row, onEdit }: { row: DriverRow; onEdit: (row: DriverRow) 
   );
 }
 
-/** Drivers as a table from `md`, as cards on phones. Without `onEdit` the list is read-only. */
+function DeleteButton({ row, onDelete }: { row: DriverRow; onDelete: (row: DriverRow) => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-11 text-destructive md:size-9"
+      aria-label={`Eliminar ${row.name}`}
+      title="Eliminar"
+      onClick={() => onDelete(row)}
+    >
+      <Trash2 aria-hidden />
+    </Button>
+  );
+}
+
+/** Drivers as a table from `md`, as cards on phones. */
 export function DriverList({
   rows,
   onEdit,
+  onDelete,
 }: {
   rows: readonly DriverRow[];
-  onEdit?: (row: DriverRow) => void;
+  onEdit: (row: DriverRow) => void;
+  onDelete: (row: DriverRow) => void;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No hay conductores para este filtro.</p>;
@@ -74,7 +91,8 @@ export function DriverList({
               <span className="min-w-0 font-medium">{r.name}</span>
               <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                 <Status status={r.status} />
-                {onEdit && <EditButton row={r} onEdit={onEdit} />}
+                <EditButton row={r} onEdit={onEdit} />
+                <DeleteButton row={r} onDelete={onDelete} />
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
@@ -107,11 +125,9 @@ export function DriverList({
                     {h}
                   </th>
                 ))}
-                {onEdit && (
-                  <th scope="col" className="w-12">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                )}
+                <th scope="col" className="w-24">
+                  <span className="sr-only">Acciones</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -135,11 +151,10 @@ export function DriverList({
                   <td className="px-4 py-3">
                     <Plates plates={r.plates} />
                   </td>
-                  {onEdit && (
-                    <td className="px-2 py-1.5 text-right">
-                      <EditButton row={r} onEdit={onEdit} />
-                    </td>
-                  )}
+                  <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                    <EditButton row={r} onEdit={onEdit} />
+                    <DeleteButton row={r} onDelete={onDelete} />
+                  </td>
                 </tr>
               ))}
             </tbody>

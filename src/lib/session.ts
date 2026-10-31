@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canViewSection, canWrite, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 import { parseTheme } from "@/lib/theme";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
@@ -19,6 +19,13 @@ export async function requireSession() {
 export async function requireAdmin() {
   const session = await requireSession();
   if (!canWrite(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Driver writes: open to admin and staff, still needs a signed-in user. Throws `ForbiddenError` otherwise. */
+export async function requireDriverManager() {
+  const session = await requireSession();
+  if (!canManageDrivers(parseRole(session.user.role))) throw new ForbiddenError();
   return session;
 }
 
