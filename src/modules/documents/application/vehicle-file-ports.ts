@@ -50,7 +50,6 @@ export interface VehicleFileStorage {
 
 export interface VehicleFileRepository {
   findVehicleId(plate: string): Promise<number | null>;
-  countByCategory(vehicleId: number, category: FileCategory): Promise<number>;
   listByVehicle(vehicleId: number): Promise<VehicleFileMeta[]>;
   insert(file: NewVehicleFile): Promise<void>;
   findMeta(id: string): Promise<(Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> & { storagePath: string }) | null>;

@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { VehicleFileRepository } from "../application/vehicle-file-ports";
 
@@ -21,14 +21,6 @@ export const vehicleFileRepository: VehicleFileRepository = {
       .from(schema.vehicles)
       .where(eq(schema.vehicles.plate, plate));
     return row?.id ?? null;
-  },
-
-  async countByCategory(vehicleId, category) {
-    const [row] = await db
-      .select({ n: count() })
-      .from(vehicleFiles)
-      .where(and(eq(vehicleFiles.vehicleId, vehicleId), eq(vehicleFiles.category, category)));
-    return row?.n ?? 0;
   },
 
   listByVehicle(vehicleId) {

@@ -189,9 +189,8 @@ export function VehicleFilesPanel({
   }
 
   function renderDoc({ category, span }: { category: FileCategory; span: string }) {
-    const { label, limit } = FILE_CATEGORIES[category];
+    const { label } = FILE_CATEGORIES[category];
     const list = files.filter((f) => f.category === category);
-    const full = list.length >= limit;
     const error = errors[category];
     const working = stage?.category === category ? stage.step : null;
 
@@ -202,9 +201,6 @@ export function VehicleFilesPanel({
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
           <h3 className="text-sm leading-tight font-semibold">{label}</h3>
-          <span className="num shrink-0 text-xs text-muted-foreground">
-            {list.length}/{limit}
-          </span>
         </div>
 
         {working ? (
@@ -253,7 +249,7 @@ export function VehicleFilesPanel({
               className="hidden"
               tabIndex={-1}
               aria-hidden
-              disabled={full || pending}
+              disabled={pending}
               onChange={(e) => {
                 const picked = e.target.files?.[0];
                 if (picked) upload(category, picked);
@@ -261,15 +257,9 @@ export function VehicleFilesPanel({
             />
             <button
               type="button"
-              aria-label={
-                full ? `${label}: carpeta llena` : `Subir archivo de ${label}`
-              }
-              title={
-                full
-                  ? "Carpeta llena: elimina un archivo para subir otro"
-                  : "Subir archivo"
-              }
-              disabled={full || pending}
+              aria-label={`Subir archivo de ${label}`}
+              title="Subir archivo"
+              disabled={pending}
               onClick={() => inputs.current[category]?.click()}
               className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border text-muted-foreground outline-none transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40 md:size-8"
             >

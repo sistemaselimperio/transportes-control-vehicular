@@ -9,13 +9,11 @@ import {
   formatFileSize,
 } from "./vehicle-file-rules";
 
-const ok = { category: "SOAT", mimeType: "application/pdf", size: 1000, currentCount: 0 } as const;
+const ok = { category: "SOAT", mimeType: "application/pdf", size: 1000 } as const;
 
 describe("FILE_CATEGORIES", () => {
-  it("allows 3 files per category and 1 for the ownership card", () => {
-    expect(FILE_CATEGORIES.SOAT.limit).toBe(3);
-    expect(FILE_CATEGORIES.POLICY.limit).toBe(3);
-    expect(FILE_CATEGORIES.OWNERSHIP_CARD.limit).toBe(1);
+  it("does not cap how many files a category holds", () => {
+    expect(FILE_CATEGORY_KEYS.every((k) => !("limit" in FILE_CATEGORIES[k]))).toBe(true);
   });
 
   it("has a Spanish label for every category", () => {
@@ -48,17 +46,6 @@ describe("assertCanUpload", () => {
   it("accepts exactly the size limit and rejects one byte more", () => {
     expect(() => assertCanUpload({ ...ok, size: MAX_FILE_BYTES })).not.toThrow();
     expect(() => assertCanUpload({ ...ok, size: MAX_FILE_BYTES + 1 })).toThrow(RuleError);
-  });
-
-  it("rejects when the category is full, without rotating", () => {
-    expect(() => assertCanUpload({ ...ok, currentCount: 2 })).not.toThrow();
-    expect(() => assertCanUpload({ ...ok, currentCount: 3 })).toThrow(/Elimina/);
-  });
-
-  it("rejects a second ownership card", () => {
-    const card = { ...ok, category: "OWNERSHIP_CARD" } as const;
-    expect(() => assertCanUpload({ ...card, currentCount: 0 })).not.toThrow();
-    expect(() => assertCanUpload({ ...card, currentCount: 1 })).toThrow(RuleError);
   });
 });
 

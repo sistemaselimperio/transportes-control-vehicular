@@ -11,8 +11,6 @@ function fakeRepo() {
   const files = new Map<string, NewVehicleFile>();
   const repo: VehicleFileRepository = {
     findVehicleId: async (plate) => PLATES[plate] ?? null,
-    countByCategory: async (vehicleId, category: FileCategory) =>
-      [...files.values()].filter((f) => f.vehicleId === vehicleId && f.category === category).length,
     listByVehicle: async () => [],
     insert: async (file) => void files.set(file.id, file),
     findMeta: async (id) => {
@@ -108,19 +106,11 @@ describe("uploadVehicleFile", () => {
     await expect(cmds.uploadVehicleFile("ZZZ-999", pdf())).rejects.toThrow(RuleError);
   });
 
-  it("rejects the 4th file of a category", async () => {
-    const { cmds, files, objects } = setup();
-    for (let i = 0; i < 3; i++) await cmds.uploadVehicleFile("AAA-111", pdf());
-    await expect(cmds.uploadVehicleFile("AAA-111", pdf())).rejects.toThrow(/Elimina/);
-    expect(files.size).toBe(3);
-    expect(objects.size).toBe(3);
-  });
-
-  it("counts per vehicle and per category", async () => {
-    const { cmds } = setup();
-    for (let i = 0; i < 3; i++) await cmds.uploadVehicleFile("AAA-111", pdf());
-    await expect(cmds.uploadVehicleFile("BBB-222", pdf())).resolves.toBeDefined();
-    await expect(cmds.uploadVehicleFile("AAA-111", pdf({ category: "TECNO" }))).resolves.toBeDefined();
+  it("accepts any number of files in a category", async () => {
+    const { cmds, files } = setup();
+    for (let i = 0; i < 5; i++) await cmds.uploadVehicleFile("AAA-111", pdf());
+    for (let i = 0; i < 2; i++) await cmds.uploadVehicleFile("AAA-111", pdf({ category: "OWNERSHIP_CARD" }));
+    expect(files.size).toBe(7);
   });
 
   it("rejects a disallowed type or an oversized file without storing it", async () => {

@@ -29,7 +29,6 @@ export function createVehicleFileCommands(repo: VehicleFileRepository, storage: 
         category: input.category,
         mimeType: input.mimeType,
         size: input.data.length,
-        currentCount: await repo.countByCategory(vehicleId, input.category),
       });
       // Bytes first: a row must never point at an object that does not exist.
       const id = randomUUID();
