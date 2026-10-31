@@ -1,10 +1,9 @@
-import { and, asc, count, eq, isNotNull } from "drizzle-orm";
+import { and, asc, count, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { VehicleFileRepository } from "../application/vehicle-file-ports";
 
 const { vehicleFiles } = schema;
 
-/** Columns of a file without its bytes: list queries must never select `data`. */
 const metaColumns = {
   id: vehicleFiles.id,
   vehicleId: vehicleFiles.vehicleId,
@@ -76,7 +75,6 @@ export const vehicleFileRepository: VehicleFileRepository = {
         fileName: vehicleFiles.fileName,
         mimeType: vehicleFiles.mimeType,
         storagePath: vehicleFiles.storagePath,
-        data: vehicleFiles.data,
       })
       .from(vehicleFiles)
       .where(eq(vehicleFiles.id, id));
@@ -86,9 +84,6 @@ export const vehicleFileRepository: VehicleFileRepository = {
 
 /** Storage paths of every stored file, so a bulk vehicle delete can clean the objects up afterwards. */
 export async function listAllStoragePaths(): Promise<string[]> {
-  const rows = await db
-    .select({ path: vehicleFiles.storagePath })
-    .from(vehicleFiles)
-    .where(isNotNull(vehicleFiles.storagePath));
-  return rows.flatMap((r) => (r.path ? [r.path] : []));
+  const rows = await db.select({ path: vehicleFiles.storagePath }).from(vehicleFiles);
+  return rows.map((r) => r.path);
 }

@@ -25,20 +25,19 @@ export interface NewVehicleFile {
   storagePath: string;
 }
 
-/** What the command returns: the bytes, wherever they were stored. */
+/** What the command returns: the row plus the bytes read from storage. */
 export interface VehicleFileContent {
   fileName: string;
   mimeType: string;
   data: Buffer;
 }
 
-/** A stored row as the repository sees it: new rows have `storagePath`, legacy rows have `data`. */
+/** A stored row as the repository sees it; the bytes live in storage under `storagePath`. */
 export interface StoredVehicleFile {
   fileName: string;
   mimeType: string;
   vehicleId: number;
-  storagePath: string | null;
-  data: Buffer | null;
+  storagePath: string;
 }
 
 /** Object storage for the file bytes. Paths are `<vehicleId>/<fileId>`. */
@@ -52,12 +51,9 @@ export interface VehicleFileStorage {
 export interface VehicleFileRepository {
   findVehicleId(plate: string): Promise<number | null>;
   countByCategory(vehicleId: number, category: FileCategory): Promise<number>;
-  /** Metadata only: implementations must never load `data` here. */
   listByVehicle(vehicleId: number): Promise<VehicleFileMeta[]>;
   insert(file: NewVehicleFile): Promise<void>;
-  findMeta(
-    id: string,
-  ): Promise<(Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> & { storagePath: string | null }) | null>;
+  findMeta(id: string): Promise<(Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> & { storagePath: string }) | null>;
   remove(id: string): Promise<void>;
   getContent(id: string): Promise<StoredVehicleFile | null>;
 }

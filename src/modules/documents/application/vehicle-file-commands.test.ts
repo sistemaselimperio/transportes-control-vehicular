@@ -6,17 +6,15 @@ import type { NewVehicleFile, VehicleFileRepository, VehicleFileStorage } from "
 
 const PLATES: Record<string, number> = { "AAA-111": 1, "BBB-222": 2 };
 
-type Row = Omit<NewVehicleFile, "storagePath"> & { storagePath: string | null; data: Buffer | null };
-
-/** In-memory fake that keeps files in a map. `legacy` seeds a row whose bytes live in the table. */
+/** In-memory fake that keeps file rows in a map. */
 function fakeRepo() {
-  const files = new Map<string, Row>();
+  const files = new Map<string, NewVehicleFile>();
   const repo: VehicleFileRepository = {
     findVehicleId: async (plate) => PLATES[plate] ?? null,
     countByCategory: async (vehicleId, category: FileCategory) =>
       [...files.values()].filter((f) => f.vehicleId === vehicleId && f.category === category).length,
     listByVehicle: async () => [],
-    insert: async (file) => void files.set(file.id, { ...file, data: null }),
+    insert: async (file) => void files.set(file.id, file),
     findMeta: async (id) => {
       const f = files.get(id);
       return f ? { id, vehicleId: f.vehicleId, fileName: f.fileName, storagePath: f.storagePath } : null;
@@ -24,23 +22,10 @@ function fakeRepo() {
     remove: async (id) => void files.delete(id),
     getContent: async (id) => {
       const f = files.get(id);
-      return f
-        ? { vehicleId: f.vehicleId, fileName: f.fileName, mimeType: f.mimeType, storagePath: f.storagePath, data: f.data }
-        : null;
+      return f ? { vehicleId: f.vehicleId, fileName: f.fileName, mimeType: f.mimeType, storagePath: f.storagePath } : null;
     },
   };
-  const legacy = (id: string, vehicleId: number, data: Buffer) =>
-    files.set(id, {
-      id,
-      vehicleId,
-      category: "SOAT",
-      fileName: "old.pdf",
-      mimeType: "application/pdf",
-      sizeBytes: data.length,
-      storagePath: null,
-      data,
-    });
-  return { repo, files, legacy };
+  return { repo, files };
 }
 
 /** In-memory object storage. */
@@ -55,9 +40,9 @@ function fakeStorage() {
 }
 
 function setup() {
-  const { repo, files, legacy } = fakeRepo();
+  const { repo, files } = fakeRepo();
   const { storage, objects } = fakeStorage();
-  return { repo, files, legacy, storage, objects, cmds: createVehicleFileCommands(repo, storage) };
+  return { repo, files, storage, objects, cmds: createVehicleFileCommands(repo, storage) };
 }
 
 /** The id of the only stored row. */
@@ -80,7 +65,7 @@ describe("uploadVehicleFile", () => {
     const row = [...files.values()][0];
     expect(row).toMatchObject({ vehicleId: 1, category: "SOAT", fileName: "soat.pdf", sizeBytes: 8 });
     expect(row.storagePath).toBe(`1/${row.id}`);
-    expect(objects.get(row.storagePath!)?.toString()).toBe("%PDF-1.4");
+    expect(objects.get(row.storagePath)?.toString()).toBe("%PDF-1.4");
   });
 
   it("removes the uploaded object when the insert fails", async () => {
@@ -171,15 +156,6 @@ describe("deleteVehicleFile", () => {
     expect(log).toHaveBeenCalled();
   });
 
-  it("does not call storage for a legacy row", async () => {
-    const { cmds, legacy, files, storage } = setup();
-    legacy("old1", 1, Buffer.from("x"));
-    const remove = vi.spyOn(storage, "remove");
-    await cmds.deleteVehicleFile("AAA-111", "old1");
-    expect(files.size).toBe(0);
-    expect(remove).not.toHaveBeenCalled();
-  });
-
   it("refuses a file that belongs to another vehicle", async () => {
     const { cmds, files, objects } = setup();
     await cmds.uploadVehicleFile("AAA-111", pdf());
@@ -204,15 +180,6 @@ describe("getVehicleFile", () => {
     expect(file?.data.toString()).toBe("%PDF-1.4");
     expect(await cmds.getVehicleFile("BBB-222", id)).toBeNull();
     expect(await cmds.getVehicleFile("AAA-111", "nope")).toBeNull();
-  });
-
-  it("falls back to the table bytes for legacy rows", async () => {
-    const { cmds, legacy, storage } = setup();
-    legacy("old1", 1, Buffer.from("legacy"));
-    const get = vi.spyOn(storage, "get");
-    const file = await cmds.getVehicleFile("AAA-111", "old1");
-    expect(file?.data.toString()).toBe("legacy");
-    expect(get).not.toHaveBeenCalled();
   });
 
   it("returns null when the stored object is missing", async () => {

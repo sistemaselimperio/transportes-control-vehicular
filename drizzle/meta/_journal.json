@@ -22,6 +22,13 @@
       "when": 1793456647051,
       "tag": "0002_vehicle_files_storage_path",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793461905854,
+      "tag": "0003_vehicle_files_drop_data",
+      "breakpoints": true
     }
   ]
 }

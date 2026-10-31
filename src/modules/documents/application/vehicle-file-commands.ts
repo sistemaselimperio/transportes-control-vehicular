@@ -58,9 +58,7 @@ export function createVehicleFileCommands(repo: VehicleFileRepository, storage: 
       if (!file || file.vehicleId !== vehicleId) throw new RuleError("El archivo no existe.");
       await repo.remove(file.id);
       // The row is gone; a failed removal only leaves an orphan object, so it never fails the delete.
-      if (file.storagePath) {
-        await storage.remove([file.storagePath]).catch((err) => console.error("vehicle file removal failed", err));
-      }
+      await storage.remove([file.storagePath]).catch((err) => console.error("vehicle file removal failed", err));
       return { message: "Archivo eliminado." };
     },
 
@@ -70,8 +68,7 @@ export function createVehicleFileCommands(repo: VehicleFileRepository, storage: 
       if (vehicleId == null) return null;
       const file = await repo.getContent(fileId);
       if (!file || file.vehicleId !== vehicleId) return null;
-      // New rows keep their bytes in storage; legacy rows still carry them in the table.
-      const data = file.storagePath ? await storage.get(file.storagePath) : file.data;
+      const data = await storage.get(file.storagePath);
       return data ? { fileName: file.fileName, mimeType: file.mimeType, data } : null;
     },
   };

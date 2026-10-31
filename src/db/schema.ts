@@ -6,7 +6,6 @@
  */
 import {
   boolean,
-  customType,
   date,
   index,
   integer,
@@ -67,11 +66,6 @@ export const fileCategoryEnum = transportes.enum("file_category", [
   "LOGBOOK",
   "OWNERSHIP_CARD",
 ]);
-
-/** Postgres bytea as a Node Buffer (drizzle has no built-in column for it). */
-const bytea = customType<{ data: Buffer; driverData: Buffer }>({
-  dataType: () => "bytea",
-});
 
 /* ---------------------------- Fleet domain ---------------------------- */
 
@@ -317,8 +311,7 @@ export const sales = transportes.table("sales", {
 });
 
 /**
- * Scanned papers (PDF / images) of a vehicle. New files live in Supabase Storage at `storage_path`;
- * legacy rows still hold their bytes in `data`. List queries must never select `data`.
+ * Scanned papers (PDF / images) of a vehicle. The bytes live in Supabase Storage at `storage_path`.
  */
 export const vehicleFiles = transportes.table(
   "vehicle_files",
@@ -331,8 +324,7 @@ export const vehicleFiles = transportes.table(
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    storagePath: text("storage_path"),
-    data: bytea(),
+    storagePath: text("storage_path").notNull(),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
