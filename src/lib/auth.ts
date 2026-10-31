@@ -29,6 +29,8 @@ export const auth = betterAuth({
     additionalFields: {
       // Read-only for clients: the role is only ever written by seed/admin tooling.
       role: { type: "string", required: true, defaultValue: "staff", input: false },
+      // Same for the theme.
+      theme: { type: "string", required: true, defaultValue: "yellow", input: false },
     },
   },
   plugins: [

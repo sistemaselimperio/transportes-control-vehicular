@@ -1,5 +1,5 @@
 /**
- * Idempotent seed: owners, vehicle classes and the users (rocio: admin, leidy: staff).
+ * Idempotent seed: owners, vehicle classes and the users (rocio: admin, yellow theme; leidy: staff, sky theme).
  * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD or
  * SEED_LEIDY_PASSWORD; a user without one is skipped).
  */
@@ -8,6 +8,7 @@ import "./load-env";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "./index";
+import type { Theme } from "../lib/theme";
 
 const OWNERS = [
   { name: "Transportes El Imperio", documentNumber: "901838598", group: "IMPERIO" },
@@ -55,6 +56,7 @@ async function seedUser(user: {
   username: string;
   name: string;
   role: "admin" | "staff";
+  theme: Theme;
   passwordVar: string;
 }) {
   const password = process.env[user.passwordVar];
@@ -79,6 +81,7 @@ async function seedUser(user: {
     username: user.username,
     displayUsername: user.username,
     role: user.role,
+    theme: user.theme,
   });
   await db.insert(schema.account).values({
     id: crypto.randomUUID(),
@@ -91,9 +94,9 @@ async function seedUser(user: {
 }
 
 const seedAdmin = () =>
-  seedUser({ username: "rocio", name: "Rocío", role: "admin", passwordVar: "SEED_ADMIN_PASSWORD" });
+  seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
-  seedUser({ username: "leidy", name: "Leidy", role: "staff", passwordVar: "SEED_LEIDY_PASSWORD" });
+  seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", passwordVar: "SEED_LEIDY_PASSWORD" });
 
 async function main() {
   await seedOwners();

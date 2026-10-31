@@ -29,6 +29,13 @@
       "when": 1793461905854,
       "tag": "0003_vehicle_files_drop_data",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793464021834,
+      "tag": "0004_thin_the_santerians",
+      "breakpoints": true
     }
   ]
 }

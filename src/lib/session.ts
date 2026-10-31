@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { canViewSection, canWrite, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { parseTheme } from "@/lib/theme";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -25,6 +26,12 @@ export async function requireAdmin() {
 export async function getRequestRole() {
   const session = await getRequestSession();
   return session ? parseRole(session.user.role) : null;
+}
+
+/** The theme of this request's user, `null` without a session. */
+export async function getRequestTheme() {
+  const session = await getRequestSession();
+  return session ? parseTheme(session.user.theme) : null;
 }
 
 /** For pages: sends a signed-out user to the login and a role that cannot see the section to its home. */

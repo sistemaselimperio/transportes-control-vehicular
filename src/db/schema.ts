@@ -350,6 +350,8 @@ export const user = transportes.table("user", {
   displayUsername: text("display_username"),
   /** "admin" does everything; "staff" only reads the fleet and the drivers (see `src/lib/permissions.ts`). */
   role: text().notNull().default("staff"),
+  /** "yellow" (brand default) or "sky": the palette the app shell renders in (see `src/lib/theme.ts`). */
+  theme: text().notNull().default("yellow"),
 });
 
 export const session = transportes.table("session", {

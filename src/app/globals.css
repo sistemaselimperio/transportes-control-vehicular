@@ -16,7 +16,7 @@
   --color-warn-foreground: var(--warn-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
-  --shadow-soft: 0 1px 2px oklch(0.3 0.02 105 / 0.06), 0 8px 24px -8px oklch(0.3 0.03 105 / 0.16);
+  --shadow-soft: 0 1px 2px oklch(0.3 0.02 var(--tint-hue) / 0.06), 0 8px 24px -8px oklch(0.3 0.03 var(--tint-hue) / 0.16);
   --color-rose: var(--rose);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
@@ -67,6 +67,8 @@
    * Yellow only fills surfaces with dark ink on top; lines and marks on light
    * surfaces use the olive `--brand`, since yellow on white has almost no contrast.
    */
+  /* Hue of the olive-tinted shadows and textures; themes retint it. */
+  --tint-hue: 105;
   --background: #f6f6f0;
   --foreground: #1b1d10;
   --card: #ffffff;
@@ -117,6 +119,46 @@
   /* Colombian plates are yellow: the plate chip borrows that. */
   --plate: #ffff00;
   --plate-foreground: #1b1d10;
+  --selection: #ffff6a;
+  --selection-foreground: #1b1d10;
+}
+
+/*
+ * Sky theme (per-user, `data-theme="sky"` on the app shell): #87CEEB (sky) as the fill with dark
+ * ink on top, #a9dcf1 and #cdeaf6 (tints), #1e6f8c (deep teal-blue ink for lines and marks on light
+ * surfaces, like the olive of the yellow palette). Plates, status colors, destructive and the
+ * other series colors keep their meaning and are not overridden.
+ */
+[data-theme="sky"] {
+  --tint-hue: 230;
+  --background: #f2f6f8;
+  --foreground: #0f1d24;
+  --card-foreground: #0f1d24;
+  --popover-foreground: #0f1d24;
+  --primary: #87ceeb;
+  --primary-foreground: #0f1d24;
+  --brand: #1e6f8c;
+  --brand-foreground: #ffffff;
+  --secondary: #cdeaf6;
+  --secondary-foreground: #0c3b4d;
+  --muted: #e3ecf0;
+  --muted-foreground: #44565e;
+  --accent: #a9dcf1;
+  --accent-foreground: #0f1d24;
+  --border: #ccdbe2;
+  --input: #b0c4cc;
+  --ring: #1e6f8c;
+  --chart-1: #1e6f8c;
+  --chart-4: #4fb3d9;
+  --sidebar-foreground: #0f1d24;
+  --sidebar-primary: #87ceeb;
+  --sidebar-primary-foreground: #0f1d24;
+  --sidebar-accent: #cdeaf6;
+  --sidebar-accent-foreground: #0c3b4d;
+  --sidebar-border: #ccdbe2;
+  --sidebar-ring: #1e6f8c;
+  --selection: #a9dcf1;
+  --selection-foreground: #0f1d24;
 }
 
 @layer base {
@@ -145,8 +187,8 @@
     accent-color: var(--brand);
   }
   ::selection {
-    background: #ffff6a;
-    color: #1b1d10;
+    background: var(--selection);
+    color: var(--selection-foreground);
   }
   @media (prefers-reduced-motion: reduce) {
     html {
@@ -209,7 +251,7 @@
     --ring: #a16207;
   }
   .brand-texture {
-    background-image: radial-gradient(oklch(0.3 0.02 105 / 0.1) 1px, transparent 1px);
+    background-image: radial-gradient(oklch(0.3 0.02 var(--tint-hue) / 0.1) 1px, transparent 1px);
     background-size: 18px 18px;
   }
   /* Skeleton block for loading.tsx files. */
