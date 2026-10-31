@@ -22,7 +22,7 @@ const sheet = (name: string, rows: Array<[number, Record<string, CellValue>]>): 
 
 const EMPTY: LogbookImport = { plates: [], services: [], oils: [], tires: [], fuels: [], issues: [] };
 const NO_EXISTING: ExistingRecords = { services: [], fuels: [], tires: [], oilDates: [] };
-const CTX = { today: "2026-10-27", odometerWorking: true };
+const CTX = { today: "2026-10-27" };
 
 /* ----------------------------- Mantenimiento ----------------------------- */
 
@@ -46,10 +46,59 @@ describe("parseLogbookWorkbook: MANTENIMIENTO", () => {
         date: "2026-02-13",
         description: "SERVICIO LAVADO GENERAL",
         provider: "LICETH OCHOA 1098787088",
+        km: null,
         price: 140000,
         notes: "revisar",
       },
     ]);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("finds the columns by their header, whatever their order", () => {
+    const result = parseLogbookWorkbook([
+      sheet("MANTENIMIENTO", [
+        [7, { B: "FECHA", C: "DESCRIPCION", D: "DESCRIPCION", E: "PROVEEDOR", F: "KILOMETRAJE", G: "PRECIO", H: "NOVEDAD" }],
+        [8, { B: day(2025, 7, 10), C: "JGO FRENO", D: "JGO FRENO", E: "FREDY", F: 259548, G: 540000, H: "RECIBO" }],
+        [9, { B: day(2025, 10, 15), C: "REVISION REVERSO", E: "AZAEL", F: "TRILER S769715", G: 36000 }],
+      ]),
+    ]);
+    expect(result.services.map(({ km, price, notes }) => ({ km, price, notes }))).toEqual([
+      { km: 259548, price: 540000, notes: "RECIBO" },
+      { km: null, price: 36000, notes: "TRILER S769715" },
+    ]);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("reads dates written as text in any usual format", () => {
+    const result = parseLogbookWorkbook([
+      maintenanceSheet([
+        [8, { B: "16--10-2025", C: "A" }],
+        [9, { B: "5-8-25", C: "B" }],
+        [10, { B: "05.08.2025", C: "C" }],
+        [11, { B: "2025/8/5", C: "D" }],
+        [12, { B: 45874, C: "E" }],
+        [13, { B: " 5 / 8 / 2025 ", C: "F" }],
+      ]),
+    ]);
+    expect(result.services.map((s) => s.date)).toEqual([
+      "2025-10-16",
+      "2025-08-05",
+      "2025-08-05",
+      "2025-08-05",
+      "2025-08-05",
+      "2025-08-05",
+    ]);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("takes the year of the row above when the year has a typo", () => {
+    const result = parseLogbookWorkbook([
+      maintenanceSheet([
+        [15, { B: day(2025, 8, 9), C: "LAVADA" }],
+        [16, { B: "05-08-205", C: "ENGRASE" }],
+      ]),
+    ]);
+    expect(result.services.map((s) => s.date)).toEqual(["2025-08-09", "2025-08-05"]);
     expect(result.issues).toEqual([]);
   });
 
@@ -77,11 +126,18 @@ describe("parseLogbookWorkbook: MANTENIMIENTO", () => {
 
   it("skips a row with an unreadable date and says why", () => {
     const result = parseLogbookWorkbook([
-      maintenanceSheet([[84, { B: "16--10-2026", C: "SUMINISTRO FILTRO", F: 109000 }]]),
+      maintenanceSheet([
+        [84, { B: "AYER", C: "SUMINISTRO FILTRO", F: 109000 }],
+        [85, { B: "31/02/2026", C: "SUMINISTRO FILTRO", F: 109000 }],
+      ]),
     ]);
     expect(result.services).toEqual([]);
-    expect(result.issues[0]).toMatchObject({ tab: "servicios", row: 84 });
-    expect(result.issues[0].message).toContain("16--10-2026");
+    expect(result.issues.map((i) => [i.tab, i.row])).toEqual([
+      ["servicios", 84],
+      ["servicios", 85],
+    ]);
+    expect(result.issues[0].message).toContain("AYER");
+    expect(result.issues[1].message).toContain("31/02/2026");
   });
 
   it("skips a dated row without description", () => {
@@ -200,18 +256,38 @@ describe("parseLogbookWorkbook: ACEITE", () => {
     expect(result.issues).toEqual([{ tab: "aceite", row: 26, message: "Bloque sin fecha." }]);
   });
 
-  it("ends the items at a blank row and splits consecutive blocks", () => {
+  it("keeps the items after a blank row up to the next FECHA and splits consecutive blocks", () => {
     const result = parseLogbookWorkbook([
       sheet("ACEITE", [
         ...oilBlock(14, day(2025, 6, 13), 1000, [{ B: 1, C: "A" }, { B: 1, C: "B" }]),
-        // row 22 is blank; the stray row 23 does not belong to the first block
-        [23, { C: "SUELTO" }],
+        // row 22 is blank; row 23 still belongs to the first block
+        [23, { B: "2 CANECAS ", C: "VALVULINA", D: "CARLOS BARBOSA" }],
+        [24, { D: "SOLO NOTA" }],
         ...oilBlock(26, day(2025, 9, 11), 2000, [{ B: 2, C: "C" }]),
       ]),
     ]);
-    expect(result.oils.map((o) => [o.date, o.items.map((i) => i.detail)])).toEqual([
-      ["2025-06-13", ["A", "B"]],
-      ["2025-09-11", ["C"]],
+    expect(result.oils.map((o) => [o.date, o.items.map((i) => i.detail), o.notes])).toEqual([
+      ["2025-06-13", ["A", "B", "CANECAS VALVULINA"], "CARLOS BARBOSA; SOLO NOTA"],
+      ["2025-09-11", ["C"], null],
+    ]);
+  });
+
+  it("reads the date and the km from column D when column C is empty", () => {
+    const result = parseLogbookWorkbook([
+      sheet("ACEITE", [
+        [15, { B: "FECHA", D: day(2025, 7, 1) }],
+        [17, { B: "KILOMETRAJE", D: 252486 }],
+        [20, { B: "CANTIDAD", C: "DETALLE", D: "OBSERVACIONES" }],
+        [21, { B: "48 CUARTOS", C: "DELO 15W40" }],
+        [64, { B: "FECHA", C: day(2026, 3, 16), D: day(2026, 3, 16) }],
+        [66, { B: "KILOMETRAJE", C: 316050, D: 20000 }],
+        [69, { B: "CANTIDAD", C: "DETALLE", D: "OBSERVACIONES" }],
+        [70, { B: "50 CUARTOS", C: "DELO 15W40" }],
+      ]),
+    ]);
+    expect(result.oils.map((o) => [o.date, o.km])).toEqual([
+      ["2025-07-01", 252486],
+      ["2026-03-16", 316050],
     ]);
   });
 
@@ -289,6 +365,25 @@ describe("parseLogbookWorkbook: COMBUSTIBLE", () => {
     const result = parseLogbookWorkbook([sheet("COMBUSTIBLE", [[3, { B: "PLACA ", C: "WOM-158" }]])]);
     expect(result).toMatchObject({ fuels: [], issues: [] });
   });
+
+  it("finds the columns by their header and says when a row only has urea", () => {
+    const result = parseLogbookWorkbook([
+      sheet("COMBUSTIBLE", [
+        [5, { B: "FECHA", C: "CANTIDAD", D: "UREA", E: "VALOR", F: "KILOMETRAJE", G: "PROVEEDOR" }],
+        [6, { B: day(2025, 7, 10), C: 90, E: 843759, F: 259548, G: "INVERSIONES JJENY   901787562" }],
+        [8, { B: day(2025, 7, 16), C: 98.049, D: 56.377, E: 1079878, G: "EDS EL IMPERIO" }],
+        [11, { B: day(2025, 7, 22), D: 47.666, F: 263249, G: "IMPERIO FACT.0852" }],
+        [26, { C: "TOTAL MES", E: 6058898 }],
+      ]),
+    ]);
+    expect(result.fuels).toEqual([
+      { row: 6, date: "2025-07-10", gallons: 90, amount: 843759, provider: "INVERSIONES JJENY 901787562" },
+      { row: 8, date: "2025-07-16", gallons: 98.05, amount: 1079878, provider: "EDS EL IMPERIO" },
+    ]);
+    expect(result.issues).toEqual([
+      { tab: "combustible", row: 11, message: "Solo urea, sin galones de combustible." },
+    ]);
+  });
 });
 
 /* -------------------------------- Llantas -------------------------------- */
@@ -327,6 +422,19 @@ describe("parseLogbookWorkbook: LLANTAS", () => {
       ]),
     ]);
     expect(result.tires[0]).toMatchObject({ price: 1800000, notes: null });
+  });
+
+  it("finds the columns by their header and keeps the km in the notes", () => {
+    const result = parseLogbookWorkbook([
+      sheet("LLANTAS", [
+        [15, { B: "FECHA", D: day(2026, 1, 5) }],
+        [20, { B: "CANTIDAD", C: "DETALLE", D: "KILOMETRAJE", E: "OBSERVACION", F: "VALOR" }],
+        [21, { B: 2, C: "LLANTA X", D: 316050, E: "DELANTERAS", F: "1.800.000" }],
+      ]),
+    ]);
+    expect(result.tires).toEqual([
+      { row: 21, date: "2026-01-05", quantity: 2, reference: "LLANTA X", price: 1800000, notes: "DELANTERAS; KM 316050" },
+    ]);
   });
 
   it("ignores the template and blocks without date", () => {
@@ -430,6 +538,7 @@ const service = (date: string, description: string, price: number | null, row = 
   date,
   description,
   provider: null,
+  km: null,
   price,
   notes: null,
 });
@@ -553,18 +662,14 @@ describe("planLogbookImport", () => {
     expect(planLogbookImport(parsed, NO_EXISTING, CTX).services).toHaveLength(1);
   });
 
-  it("skips an oil change without km when the odometer works, but not when it is broken", () => {
+  it("keeps an oil change the Excel has without km", () => {
     const parsed: LogbookImport = {
       ...EMPTY,
       oils: [{ row: 26, date: "2025-09-11", km: null, items: [], notes: null }],
     };
-    const working = planLogbookImport(parsed, NO_EXISTING, CTX);
-    expect(working.oils).toEqual([]);
-    expect(working.skipped[0]).toMatchObject({ tab: "aceite", row: 26 });
-    expect(working.skipped[0].message).toMatch(/kilometraje/i);
-
-    const broken = planLogbookImport(parsed, NO_EXISTING, { ...CTX, odometerWorking: false });
-    expect(broken.oils).toHaveLength(1);
+    const plan = planLogbookImport(parsed, NO_EXISTING, CTX);
+    expect(plan.oils).toHaveLength(1);
+    expect(plan.skipped).toEqual([]);
   });
 
   it("carries the parse issues into the skipped list and counts, ordered by tab and row", () => {

@@ -87,17 +87,14 @@ describe("preview", () => {
   it("counts what would be created and what is skipped, and writes nothing", async () => {
     const { importer, writes } = setup();
     const preview = await importer.preview("WOM-158", data);
-    expect(preview.total).toBe(4);
+    expect(preview.total).toBe(5);
     expect(preview.tabs.map((t) => [t.tab, t.create, t.skipped])).toEqual([
       ["servicios", 1, 1],
-      ["aceite", 1, 1], // the second change has no km and the odometer works
+      ["aceite", 2, 0], // the second change has no km in the Excel: it comes in all the same
       ["llantas", 1, 0],
       ["combustible", 1, 0],
     ]);
-    expect(preview.skipped.map((s) => [s.tab, s.row])).toEqual([
-      ["servicios", 9],
-      ["aceite", 26],
-    ]);
+    expect(preview.skipped.map((s) => [s.tab, s.row])).toEqual([["servicios", 9]]);
     expect(writes).toEqual([]);
   });
 
@@ -149,10 +146,22 @@ describe("confirm", () => {
         notes: null,
         items: [{ quantity: 48, detail: "CUARTOS DELO 15W40" }],
       },
+      {
+        // No km in the Excel: planned by date only, and the odometer is left alone.
+        date: "2025-09-11",
+        km: null,
+        intervalMonths: 6,
+        intervalKm: 20000,
+        nextDate: "2026-03-11",
+        nextKm: null,
+        price: null,
+        notes: null,
+        items: [{ quantity: 1, detail: "FILTRO" }],
+      },
     ]);
     expect(write.newCurrentKm).toEqual({ km: 407279, at: "2025-06-13" });
     expect(result.message).toBe(
-      "Se importaron 1 mantenimiento, 1 cambio de aceite, 1 cambio de llantas, 1 tanqueo.",
+      "Se importaron 1 mantenimiento, 2 cambios de aceite, 1 cambio de llantas, 1 tanqueo.",
     );
   });
 
@@ -167,7 +176,7 @@ describe("confirm", () => {
       services: [{ date: "2026-02-13", description: "SERVICIO LAVADO GENERAL", price: 140000 }],
       fuels: [{ date: "2025-07-13", gallons: 100, amount: 935000 }],
       tires: [{ date: "2025-07-17", reference: "LLANTA 295 80 22,5", quantity: 2 }],
-      oilDates: ["2025-06-13"],
+      oilDates: ["2025-06-13", "2025-09-11"],
     };
     const { importer, writes } = setup({ existing });
     const result = await importer.confirm("WOM-158", data);

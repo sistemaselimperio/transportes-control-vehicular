@@ -46,6 +46,7 @@ export interface ImportedService {
   date: IsoDate;
   description: string;
   provider: string | null;
+  km: number | null;
   price: number | null;
   notes: string | null;
 }
@@ -130,6 +131,67 @@ function parseGallons(v: CellValue | undefined): Parsed<number | null> {
   return { value: Math.round(amount * 100) / 100, error: null };
 }
 
+/** Excel day serials of 2000-01-01 and 2100-12-31; day 0 is 1899-12-30. */
+const SERIAL_MIN = 36526;
+const SERIAL_MAX = 73415;
+
+/** Year of a date text: two digits are 20yy; anything that is not a plausible year is a typo (null). */
+function textYear(digits: string): number | null {
+  const year = digits.length === 2 ? 2000 + Number(digits) : digits.length === 4 ? Number(digits) : NaN;
+  return year >= 2000 && year <= 2100 ? year : null;
+}
+
+/**
+ * A logbook date however it was typed: a date cell, an Excel day serial, or a text
+ * "d/m/yyyy", "d-m-yy", "d.m.yyyy", "yyyy-m-d" (repeated separators and spaces are fine).
+ * A year with a typo ("05-08-205") takes `fallbackYear`, the year of the row above:
+ * the logbooks are kept in order.
+ */
+function parseLogDate(v: CellValue | undefined, fallbackYear: number | null): Parsed<IsoDate | null> {
+  if (typeof v === "number" && Number.isInteger(v) && v >= SERIAL_MIN && v <= SERIAL_MAX) {
+    v = new Date(Date.UTC(1899, 11, 30) + v * 86_400_000);
+  }
+  if (typeof v !== "string") {
+    const parsed = parseDateCell(v ?? null, "Fecha");
+    return parsed.issues.length > 0 ? { value: null, error: parsed.issues[0].message } : { value: parsed.value, error: null };
+  }
+  const text = cellText(v);
+  if (text === "") return { value: null, error: null };
+  const parts = /^(\d{1,4})\s*[-/.]+\s*(\d{1,2})\s*[-/.]+\s*(\d{1,4})$/.exec(text);
+  if (!parts) return { value: null, error: `Fecha no válida: "${text}".` };
+  const [day, month, yearDigits] = parts[1].length === 4 ? [parts[3], parts[2], parts[1]] : [parts[1], parts[2], parts[3]];
+  const year = textYear(yearDigits) ?? fallbackYear;
+  if (year === null) return { value: null, error: `Fecha no válida: "${text}".` };
+  const parsed = parseDateCell(`${Number(day)}/${Number(month)}/${year}`, "Fecha");
+  return parsed.value === null ? { value: null, error: `Fecha inexistente: "${text}".` } : { value: parsed.value, error: null };
+}
+
+const yearOf = (date: IsoDate): number => Number(date.slice(0, 4));
+
+/** A header row as (label, column) pairs, left to right. */
+type Header = Array<[label: string, column: string]>;
+
+const readHeader = (cells: Record<string, CellValue>): Header =>
+  Object.keys(cells)
+    .sort((a, b) => columnIndex(a) - columnIndex(b))
+    .map((column): [string, string] => [label(cells[column]), column]);
+
+/** Column of the first header starting with one of `names`, or `fallback` (the classic layout). */
+const columnOf = (header: Header, names: readonly string[], fallback?: string): string | undefined =>
+  header.find(([text]) => names.some((n) => text.startsWith(n)))?.[1] ?? fallback;
+
+const DESCRIPTION = ["DESCRIPCION", "DETALLE"];
+const PROVIDER = ["PROVEEDOR", "ESTACION"];
+const KM = ["KILOMETRAJE", "KM"];
+const PRICE = ["PRECIO", "VALOR", "COSTO"];
+const NOTES = ["NOVEDAD", "OBSERVACION", "NOTA"];
+
+/** Joins the non-empty parts, without repeats, with "; "; null when nothing is left. */
+function joinNotes(parts: ReadonlyArray<string | null>): string | null {
+  const kept = [...new Set(parts.filter((p): p is string => !!p))];
+  return kept.length > 0 ? kept.join("; ") : null;
+}
+
 /** The sheet whose name matches `name` ignoring case, accents and surrounding spaces. */
 const findSheet = (sheets: readonly RawSheet[], name: string): RawSheet | undefined =>
   sheets.find((s) => norm(s.name) === name);
@@ -175,43 +237,59 @@ export function findPlateMismatch(found: readonly string[], selected: string): s
 function parseServices(sheet: RawSheet, issues: ImportIssue[]): ImportedService[] {
   const out: ImportedService[] = [];
   const fail = (row: number, message: string) => issues.push({ tab: "servicios", row, message });
-  let inTable = false;
+  let header: Header | null = null;
+  let lastYear: number | null = null;
 
   for (const { rowNumber, cells } of sortedRows(sheet)) {
     if (label(cells.B) === "FECHA") {
-      inTable = true; // the header (and any repetition of it)
+      header = readHeader(cells); // the header (and any repetition of it)
       continue;
     }
-    if (!inTable || label(cells.B).startsWith("MES") || norm(cells.C).startsWith("TOTAL")) continue;
+    if (!header || label(cells.B).startsWith("MES") || norm(cells.C).startsWith("TOTAL")) continue;
+    const columns = {
+      description: columnOf(header, DESCRIPTION, "C")!,
+      provider: columnOf(header, PROVIDER, "E"),
+      km: columnOf(header, KM),
+      price: columnOf(header, PRICE, "F"),
+      notes: columnOf(header, NOTES, "G"),
+    };
 
-    const description = cellText(cells.C ?? null);
+    const description = cellText(cells[columns.description] ?? null);
     if (cells.B == null && description === "") continue; // a total or a stray number
 
-    const date = parseDateCell(cells.B ?? null, "Fecha");
-    if (date.issues.length > 0) {
-      fail(rowNumber, date.issues[0].message);
+    const date = parseLogDate(cells.B, lastYear);
+    if (date.error) {
+      fail(rowNumber, date.error);
       continue;
     }
     if (date.value === null) {
       fail(rowNumber, "Sin fecha.");
       continue;
     }
+    lastYear = yearOf(date.value);
     if (description === "") {
       fail(rowNumber, "Sin descripción.");
       continue;
     }
-    const price = parseMoney(cells.F, "Precio");
+    const price = parseMoney(columns.price ? cells[columns.price] : undefined, "Precio");
     if (price.error) {
       fail(rowNumber, price.error);
       continue;
     }
+    // A km cell holding text (e.g. which trailer it was) is not lost: it goes to the notes.
+    const kmCell = columns.km ? cells[columns.km] : undefined;
+    const km = parseKmCell(kmCell ?? null).km;
     out.push({
       row: rowNumber,
       date: date.value,
       description,
-      provider: textOrNull(cells.E),
+      provider: columns.provider ? textOrNull(cells[columns.provider]) : null,
+      km,
       price: price.value,
-      notes: textOrNull(cells.G),
+      notes: joinNotes([
+        columns.notes ? textOrNull(cells[columns.notes]) : null,
+        km === null ? textOrNull(kmCell) : null,
+      ]),
     });
   }
   return out;
@@ -222,31 +300,40 @@ function parseServices(sheet: RawSheet, issues: ImportIssue[]): ImportedService[
 function parseFuels(sheet: RawSheet, issues: ImportIssue[]): ImportedFuel[] {
   const out: ImportedFuel[] = [];
   const fail = (row: number, message: string) => issues.push({ tab: "combustible", row, message });
-  let inTable = false;
+  let header: Header | null = null;
+  let lastYear: number | null = null;
 
   for (const { rowNumber, cells } of sortedRows(sheet)) {
-    if (label(cells.B) === "FECHA" && label(cells.C) === "CANTIDAD") {
-      inTable = true; // every month repeats the header
+    if (label(cells.B) === "FECHA" && Object.values(cells).some((v) => label(v) === "CANTIDAD")) {
+      header = readHeader(cells); // every month repeats the header
       continue;
     }
-    if (!inTable || label(cells.B).startsWith("MES")) continue;
+    if (!header || label(cells.B).startsWith("MES")) continue;
     if (norm(cells.B).startsWith("TOTAL") || norm(cells.C).startsWith("TOTAL")) continue;
+    const columns = {
+      gallons: columnOf(header, ["CANTIDAD", "GALONES"], "C")!,
+      urea: columnOf(header, ["UREA"]),
+      amount: columnOf(header, PRICE, "D")!,
+      provider: columnOf(header, PROVIDER, "E")!,
+    };
 
-    const date = parseDateCell(cells.B ?? null, "Fecha");
-    if (date.issues.length > 0) {
-      fail(rowNumber, date.issues[0].message);
+    const date = parseLogDate(cells.B, lastYear);
+    if (date.error) {
+      fail(rowNumber, date.error);
       continue;
     }
     if (date.value === null) {
       fail(rowNumber, "Sin fecha.");
       continue;
     }
-    const gallons = parseGallons(cells.C);
+    lastYear = yearOf(date.value);
+    const gallons = parseGallons(cells[columns.gallons]);
     if (gallons.error || gallons.value === null) {
-      fail(rowNumber, gallons.error ?? "Sin cantidad.");
+      const onlyUrea = !gallons.error && columns.urea !== undefined && cells[columns.urea] != null;
+      fail(rowNumber, gallons.error ?? (onlyUrea ? "Solo urea, sin galones de combustible." : "Sin cantidad."));
       continue;
     }
-    const amount = parseMoney(cells.D, "Valor");
+    const amount = parseMoney(cells[columns.amount], "Valor");
     if (amount.error || !amount.value) {
       fail(rowNumber, amount.error ?? "Sin valor.");
       continue;
@@ -256,7 +343,7 @@ function parseFuels(sheet: RawSheet, issues: ImportIssue[]): ImportedFuel[] {
       date: date.value,
       gallons: gallons.value,
       amount: amount.value,
-      provider: textOrNull(cells.E),
+      provider: textOrNull(cells[columns.provider]),
     });
   }
   return out;
@@ -269,56 +356,57 @@ interface Block {
   row: number;
   date: CellValue;
   km: CellValue;
-  /** Normalized header of the fourth column ("OBSERVACION", "VALOR", ...). */
-  extraHeader: string;
+  /** The CANTIDAD row: where each column of the items is. */
+  header: Header;
   items: RawRow[];
 }
 
 /**
  * Splits a sheet into its dated blocks. Whatever comes before the first FECHA row
  * (the template list of filters and tires) belongs to no block. A block's items are
- * the consecutive rows under its CANTIDAD header; a blank row ends them.
+ * every non-empty row under its CANTIDAD header up to the next FECHA, blank rows
+ * in between included. The date and the km may be typed in column C or D.
  */
 function readBlocks(sheet: RawSheet): Block[] {
   const blocks: Block[] = [];
   let current: Block | null = null;
-  let itemsFrom: number | null = null; // row number of the last header/item row while reading items
+  let readingItems = false;
 
   for (const row of sortedRows(sheet)) {
     const { rowNumber, cells } = row;
     const first = label(cells.B);
 
     if (first === "FECHA") {
-      current = { row: rowNumber, date: cells.C ?? null, km: null, extraHeader: "", items: [] };
+      current = { row: rowNumber, date: cells.C ?? cells.D ?? null, km: null, header: [], items: [] };
       blocks.push(current);
-      itemsFrom = null;
+      readingItems = false;
       continue;
     }
     if (!current) continue;
 
     if (first === "CANTIDAD") {
-      current.extraHeader = label(cells.D);
-      itemsFrom = rowNumber;
-      continue;
+      current.header = readHeader(cells);
+      readingItems = true;
+    } else if (readingItems) {
+      if (Object.keys(cells).length > 0) current.items.push(row);
+    } else if (first === "KILOMETRAJE") {
+      current.km = cells.C ?? cells.D ?? null;
     }
-    if (itemsFrom !== null && rowNumber === itemsFrom + 1) {
-      current.items.push(row);
-      itemsFrom = rowNumber;
-      continue;
-    }
-    itemsFrom = null;
-    if (first === "KILOMETRAJE") current.km = cells.C ?? null;
   }
   return blocks;
 }
 
-/** Block date; null (with an issue when there is something to lose) when it cannot be used. */
-function blockDate(block: Block, tab: LogbookTab, issues: ImportIssue[]): IsoDate | null {
-  const parsed = parseDateCell(block.date, "Fecha");
-  if (parsed.issues.length > 0) {
-    issues.push({ tab, row: block.row, message: parsed.issues[0].message });
+/**
+ * Block date; null (with an issue when there is something to lose) when it cannot be used.
+ * `lastYear` carries the year of the previous block, for dates whose year has a typo.
+ */
+function blockDate(block: Block, tab: LogbookTab, issues: ImportIssue[], lastYear: { value: number | null }): IsoDate | null {
+  const parsed = parseLogDate(block.date, lastYear.value);
+  if (parsed.error) {
+    issues.push({ tab, row: block.row, message: parsed.error });
     return null;
   }
+  if (parsed.value !== null) lastYear.value = yearOf(parsed.value);
   if (parsed.value === null) {
     // Empty template blocks are everywhere in these files: only report the ones that hold data.
     if (block.items.some((i) => Object.keys(i.cells).length > 0)) {
@@ -340,26 +428,28 @@ function parseOilQuantity(v: CellValue | undefined): { quantity: number; unit: s
 
 function parseOils(sheet: RawSheet, issues: ImportIssue[]): ImportedOil[] {
   const out: ImportedOil[] = [];
+  const lastYear = { value: null as number | null };
   for (const block of readBlocks(sheet)) {
-    const date = blockDate(block, "aceite", issues);
+    const date = blockDate(block, "aceite", issues, lastYear);
     if (date === null) continue;
+    const detailColumn = columnOf(block.header, DESCRIPTION, "C")!;
+    const notesColumn = columnOf(block.header, NOTES, "D")!;
 
     const items: OilItem[] = [];
-    const observations: string[] = [];
+    const observations: Array<string | null> = [];
     for (const { cells } of block.items) {
+      // A row with only an observation still counts: it goes to the notes.
+      observations.push(textOrNull(cells[notesColumn]));
       const { quantity, unit } = parseOilQuantity(cells.B);
-      const detail = [unit, cellText(cells.C ?? null)].filter(Boolean).join(" ");
-      if (detail === "") continue;
-      items.push({ quantity, detail });
-      const observation = cellText(cells.D ?? null);
-      if (observation && !observations.includes(observation)) observations.push(observation);
+      const detail = [unit, cellText(cells[detailColumn] ?? null)].filter(Boolean).join(" ");
+      if (detail !== "") items.push({ quantity, detail });
     }
     out.push({
       row: block.row,
       date,
       km: parseKmCell(block.km).km,
       items,
-      notes: observations.length > 0 ? observations.join("; ") : null,
+      notes: joinNotes(observations),
     });
   }
   return out;
@@ -367,11 +457,15 @@ function parseOils(sheet: RawSheet, issues: ImportIssue[]): ImportedOil[] {
 
 function parseTires(sheet: RawSheet, issues: ImportIssue[]): ImportedTire[] {
   const out: ImportedTire[] = [];
+  const lastYear = { value: null as number | null };
   for (const block of readBlocks(sheet)) {
-    const date = blockDate(block, "llantas", issues);
+    const date = blockDate(block, "llantas", issues, lastYear);
     if (date === null) continue;
     const fail = (row: number, message: string) => issues.push({ tab: "llantas", row, message });
-    const extraIsPrice = block.extraHeader.startsWith("VALOR");
+    const priceColumn = columnOf(block.header, PRICE);
+    const kmColumn = columnOf(block.header, KM);
+    // The classic layout has a fourth column with the observation when it is not the price.
+    const notesColumn = columnOf(block.header, NOTES, priceColumn === "D" || kmColumn === "D" ? undefined : "D");
 
     for (const { rowNumber, cells } of block.items) {
       if (cells.B == null && cells.C == null) continue; // a leftover note
@@ -391,22 +485,20 @@ function parseTires(sheet: RawSheet, issues: ImportIssue[]): ImportedTire[] {
         fail(rowNumber, "Sin detalle.");
         continue;
       }
-      let price: number | null = null;
-      if (extraIsPrice) {
-        const parsed = parseMoney(cells.D, "Valor");
-        if (parsed.error) {
-          fail(rowNumber, parsed.error);
-          continue;
-        }
-        price = parsed.value;
+      const price = parseMoney(priceColumn ? cells[priceColumn] : undefined, "Valor");
+      if (price.error) {
+        fail(rowNumber, price.error);
+        continue;
       }
+      // Tire changes have no km of their own: it is kept in the notes.
+      const km = kmColumn ? parseKmCell(cells[kmColumn] ?? null).km : null;
       out.push({
         row: rowNumber,
         date,
         quantity,
         reference,
-        price,
-        notes: extraIsPrice ? null : textOrNull(cells.D),
+        price: price.value,
+        notes: joinNotes([notesColumn ? textOrNull(cells[notesColumn]) : null, km === null ? null : `KM ${km}`]),
       });
     }
   }
@@ -469,60 +561,46 @@ const tireKey = (r: { date: string; reference: string; quantity: number }) =>
   `${r.date}|${textKey(r.reference)}|${r.quantity}`;
 
 /**
- * Decides what to create: rows dated after `today`, oil changes the vehicle cannot take
- * (no km while its odometer works) and rows that already exist, or repeat inside the
- * file, are left out. Planning the same file twice therefore creates nothing the second time.
+ * Decides what to create: rows dated after `today` and rows that already exist, or
+ * repeat inside the file, are left out. Oil changes come in as the Excel has them,
+ * with or without km. Planning the same file twice therefore creates nothing the second time.
  */
 export function planLogbookImport(
   parsed: LogbookImport,
   existing: ExistingRecords,
-  ctx: { today: IsoDate; odometerWorking: boolean },
+  ctx: { today: IsoDate },
 ): ImportPlan {
   const skipped: ImportIssue[] = [...parsed.issues];
   const counts = Object.fromEntries(
     LOGBOOK_TABS.map((t) => [t.key, { create: 0, duplicates: 0, skipped: 0 }]),
   ) as Record<LogbookTab, TabCounts>;
 
-  /** Keeps the rows that are neither future nor already known; `reject` adds tab-specific reasons. */
+  /** Keeps the rows that are neither future nor already known. */
   function select<T extends { row: number; date: IsoDate }>(
     tab: LogbookTab,
     rows: readonly T[],
     known: Iterable<string>,
     key: (row: T) => string,
-    reject: (row: T) => string | null = () => null,
   ): T[] {
     const seen = new Set(known);
     const kept: T[] = [];
     for (const row of rows) {
-      const reason = row.date > ctx.today ? `Fecha futura (${formatDisplayDate(row.date)}).` : null;
-      if (reason) {
-        skipped.push({ tab, row: row.row, message: reason });
+      if (row.date > ctx.today) {
+        skipped.push({ tab, row: row.row, message: `Fecha futura (${formatDisplayDate(row.date)}).` });
       } else if (seen.has(key(row))) {
         counts[tab].duplicates += 1;
       } else {
-        const rejected = reject(row);
-        if (rejected) {
-          skipped.push({ tab, row: row.row, message: rejected });
-        } else {
-          seen.add(key(row));
-          kept.push(row);
-        }
+        seen.add(key(row));
+        kept.push(row);
       }
     }
     return kept;
   }
 
   const services = select("servicios", parsed.services, existing.services.map(serviceKey), serviceKey);
-  const oils = select(
-    "aceite",
-    parsed.oils,
-    existing.oilDates,
-    (o) => o.date,
-    (o) =>
-      ctx.odometerWorking && o.km === null
-        ? "Sin kilometraje: el cambio de aceite lo necesita porque el odómetro del vehículo funciona."
-        : null,
-  ).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row));
+  const oils = select("aceite", parsed.oils, existing.oilDates, (o) => o.date).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row,
+  );
   const tires = select("llantas", parsed.tires, existing.tires.map(tireKey), tireKey);
   const fuels = select("combustible", parsed.fuels, existing.fuels.map(fuelKey), fuelKey);
 

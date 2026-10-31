@@ -61,10 +61,11 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
     assertEditable(vehicle.status);
 
     const existing = await repo.loadExisting(vehicle.id);
-    const plan = planLogbookImport(parsed, existing, { today: today(), odometerWorking: vehicle.odometerWorking });
+    const plan = planLogbookImport(parsed, existing, { today: today() });
 
     // Oil changes are planned like the "Cambio de aceite" button does, oldest first so the
     // odometer only ever rises: next due date/km come from the vehicle's current interval.
+    // One the Excel has without km is planned by date only, so the history stays complete.
     let currentKm = vehicle.currentKm;
     let newCurrentKm: ImportWrite["newCurrentKm"] = null;
     const oils: PlannedOilChange[] = [];
@@ -73,7 +74,7 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
         date: oil.date,
         km: oil.km,
         today: today(),
-        vehicle: { odometerWorking: vehicle.odometerWorking, currentKm, oilMode: vehicle.oilMode },
+        vehicle: { odometerWorking: vehicle.odometerWorking && oil.km !== null, currentKm, oilMode: vehicle.oilMode },
         interval: vehicle.oilInterval,
       });
       if (planned.newCurrentKm !== null) {
@@ -104,7 +105,7 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
           kind: "PREVENTIVE",
           description: s.description,
           provider: s.provider,
-          km: null,
+          km: s.km,
           price: s.price,
           notes: s.notes,
         })),
