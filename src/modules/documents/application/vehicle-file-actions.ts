@@ -12,10 +12,11 @@ import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { isFileCategory } from "../domain/vehicle-file-rules";
+import { supabaseFileStorage } from "../infrastructure/supabase-file-storage";
 import { vehicleFileRepository } from "../infrastructure/vehicle-file-repository";
 import { createVehicleFileCommands } from "./vehicle-file-commands";
 
-const commands = createVehicleFileCommands(vehicleFileRepository);
+const commands = createVehicleFileCommands(vehicleFileRepository, supabaseFileStorage);
 
 async function run(plate: string, fn: () => Promise<{ message: string }>): Promise<ActionResult> {
   try {

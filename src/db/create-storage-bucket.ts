@@ -7,17 +7,7 @@
 import "./load-env";
 
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "../modules/documents/domain/vehicle-file-rules";
-
-export const VEHICLE_FILES_BUCKET = "transportes-vehicle-files";
-
-/** The pooler user is `postgres.<project-ref>`; the API lives at https://<project-ref>.supabase.co. */
-function supabaseUrl(): string {
-  if (process.env.SUPABASE_URL) return process.env.SUPABASE_URL;
-  const user = decodeURIComponent(new URL(process.env.DATABASE_URL ?? "").username);
-  const ref = user.split(".")[1];
-  if (!ref) throw new Error("Set SUPABASE_URL (could not derive it from DATABASE_URL).");
-  return `https://${ref}.supabase.co`;
-}
+import { VEHICLE_FILES_BUCKET, supabaseUrl } from "../modules/documents/infrastructure/supabase-config";
 
 async function main() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

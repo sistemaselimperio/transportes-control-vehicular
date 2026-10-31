@@ -316,7 +316,10 @@ export const sales = transportes.table("sales", {
   notes: text(),
 });
 
-/** Scanned papers (PDF / images) of a vehicle. List queries must never select `data`. */
+/**
+ * Scanned papers (PDF / images) of a vehicle. New files live in Supabase Storage at `storage_path`;
+ * legacy rows still hold their bytes in `data`. List queries must never select `data`.
+ */
 export const vehicleFiles = transportes.table(
   "vehicle_files",
   {
@@ -328,7 +331,8 @@ export const vehicleFiles = transportes.table(
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    data: bytea().notNull(),
+    storagePath: text("storage_path"),
+    data: bytea(),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -14,18 +14,39 @@ export interface VehicleFileMeta {
 /** What the UI needs to list a file. */
 export type VehicleFileItem = Pick<VehicleFileMeta, "id" | "category" | "fileName" | "sizeBytes" | "uploadedAt">;
 
+/** A new file row. The bytes already live in storage under `storagePath`. */
 export interface NewVehicleFile {
+  id: string;
   vehicleId: number;
   category: FileCategory;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+}
+
+/** What the command returns: the bytes, wherever they were stored. */
+export interface VehicleFileContent {
   fileName: string;
   mimeType: string;
   data: Buffer;
 }
 
-export interface VehicleFileContent {
+/** A stored row as the repository sees it: new rows have `storagePath`, legacy rows have `data`. */
+export interface StoredVehicleFile {
   fileName: string;
   mimeType: string;
-  data: Buffer;
+  vehicleId: number;
+  storagePath: string | null;
+  data: Buffer | null;
+}
+
+/** Object storage for the file bytes. Paths are `<vehicleId>/<fileId>`. */
+export interface VehicleFileStorage {
+  put(path: string, data: Buffer, mimeType: string): Promise<void>;
+  /** The bytes, or null when the object does not exist. */
+  get(path: string): Promise<Buffer | null>;
+  remove(paths: string[]): Promise<void>;
 }
 
 export interface VehicleFileRepository {
@@ -34,7 +55,9 @@ export interface VehicleFileRepository {
   /** Metadata only: implementations must never load `data` here. */
   listByVehicle(vehicleId: number): Promise<VehicleFileMeta[]>;
   insert(file: NewVehicleFile): Promise<void>;
-  findMeta(id: string): Promise<Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> | null>;
+  findMeta(
+    id: string,
+  ): Promise<(Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> & { storagePath: string | null }) | null>;
   remove(id: string): Promise<void>;
-  getContent(id: string): Promise<(VehicleFileContent & { vehicleId: number }) | null>;
+  getContent(id: string): Promise<StoredVehicleFile | null>;
 }

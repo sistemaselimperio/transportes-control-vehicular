@@ -2,6 +2,8 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { driverKey, stripAccents } from "@/modules/import-export/domain/cell-parsers";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
+import { supabaseFileStorage } from "@/modules/documents/infrastructure/supabase-file-storage";
+import { listAllStoragePaths } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
 import type {
   DriverTarget,
@@ -295,12 +297,19 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
   },
 
   async deleteAllVehicles() {
-    return db.transaction(async (tx) => {
+    // Collected before the delete: the cascade removes the rows that know where the objects are.
+    const storagePaths = await listAllStoragePaths();
+    const count = await db.transaction(async (tx) => {
       // The towing link is the only vehicle FK without ON DELETE CASCADE; everything else goes with the vehicle.
       await tx.update(schema.vehicles).set({ towingVehicleId: null });
       const rows = await tx.delete(schema.vehicles).returning({ id: schema.vehicles.id });
       return rows.length;
     });
+    // Best effort after the commit: a failure only leaves orphan objects.
+    if (storagePaths.length > 0) {
+      await supabaseFileStorage.remove(storagePaths).catch((e) => console.error("vehicle file cleanup failed", e));
+    }
+    return count;
   },
 };
 

@@ -1,10 +1,12 @@
 /**
  * Command use cases for the files of a vehicle. They validate with the pure
- * domain rules and delegate persistence to the `VehicleFileRepository` port.
+ * domain rules and delegate persistence to the `VehicleFileRepository` port (rows) and
+ * the `VehicleFileStorage` port (bytes).
  */
+import { randomUUID } from "node:crypto";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import { assertCanUpload, type FileCategory } from "../domain/vehicle-file-rules";
-import type { VehicleFileContent, VehicleFileRepository } from "./vehicle-file-ports";
+import type { VehicleFileContent, VehicleFileRepository, VehicleFileStorage } from "./vehicle-file-ports";
 
 export interface UploadInput {
   category: FileCategory;
@@ -13,7 +15,7 @@ export interface UploadInput {
   data: Buffer;
 }
 
-export function createVehicleFileCommands(repo: VehicleFileRepository) {
+export function createVehicleFileCommands(repo: VehicleFileRepository, storage: VehicleFileStorage) {
   async function vehicleIdOf(plate: string): Promise<number> {
     const id = await repo.findVehicleId(plate);
     if (id == null) throw new RuleError(`El vehículo ${plate} no existe.`);
@@ -29,7 +31,24 @@ export function createVehicleFileCommands(repo: VehicleFileRepository) {
         size: input.data.length,
         currentCount: await repo.countByCategory(vehicleId, input.category),
       });
-      await repo.insert({ vehicleId, ...input });
+      // Bytes first: a row must never point at an object that does not exist.
+      const id = randomUUID();
+      const storagePath = `${vehicleId}/${id}`;
+      await storage.put(storagePath, input.data, input.mimeType);
+      try {
+        await repo.insert({
+          id,
+          vehicleId,
+          category: input.category,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: input.data.length,
+          storagePath,
+        });
+      } catch (e) {
+        await storage.remove([storagePath]).catch((err) => console.error("vehicle file cleanup failed", err));
+        throw e;
+      }
       return { message: "Archivo subido." };
     },
 
@@ -38,6 +57,10 @@ export function createVehicleFileCommands(repo: VehicleFileRepository) {
       const file = await repo.findMeta(fileId);
       if (!file || file.vehicleId !== vehicleId) throw new RuleError("El archivo no existe.");
       await repo.remove(file.id);
+      // The row is gone; a failed removal only leaves an orphan object, so it never fails the delete.
+      if (file.storagePath) {
+        await storage.remove([file.storagePath]).catch((err) => console.error("vehicle file removal failed", err));
+      }
       return { message: "Archivo eliminado." };
     },
 
@@ -46,7 +69,10 @@ export function createVehicleFileCommands(repo: VehicleFileRepository) {
       const vehicleId = await repo.findVehicleId(plate);
       if (vehicleId == null) return null;
       const file = await repo.getContent(fileId);
-      return file && file.vehicleId === vehicleId ? file : null;
+      if (!file || file.vehicleId !== vehicleId) return null;
+      // New rows keep their bytes in storage; legacy rows still carry them in the table.
+      const data = file.storagePath ? await storage.get(file.storagePath) : file.data;
+      return data ? { fileName: file.fileName, mimeType: file.mimeType, data } : null;
     },
   };
 }

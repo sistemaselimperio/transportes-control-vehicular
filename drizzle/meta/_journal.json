@@ -15,6 +15,13 @@
       "when": 1793283635887,
       "tag": "0001_small_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793456647051,
+      "tag": "0002_vehicle_files_storage_path",
+      "breakpoints": true
     }
   ]
 }

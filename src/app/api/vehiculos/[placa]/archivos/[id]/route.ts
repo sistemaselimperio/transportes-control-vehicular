@@ -2,10 +2,11 @@ import { z } from "zod";
 import { requireSession } from "@/lib/session";
 import { createVehicleFileCommands } from "@/modules/documents/application/vehicle-file-commands";
 import { inlineContentDisposition } from "@/modules/documents/domain/content-disposition";
+import { supabaseFileStorage } from "@/modules/documents/infrastructure/supabase-file-storage";
 import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 
-const commands = createVehicleFileCommands(vehicleFileRepository);
+const commands = createVehicleFileCommands(vehicleFileRepository, supabaseFileStorage);
 
 /** Streams a vehicle's file inline. The proxy only checks the cookie, so the session is re-checked here. */
 export async function GET(

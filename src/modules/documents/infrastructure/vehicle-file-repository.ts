@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { VehicleFileRepository } from "../application/vehicle-file-ports";
 
@@ -42,18 +42,24 @@ export const vehicleFileRepository: VehicleFileRepository = {
 
   async insert(file) {
     await db.insert(vehicleFiles).values({
+      id: file.id,
       vehicleId: file.vehicleId,
       category: file.category,
       fileName: file.fileName,
       mimeType: file.mimeType,
-      sizeBytes: file.data.length,
-      data: file.data,
+      sizeBytes: file.sizeBytes,
+      storagePath: file.storagePath,
     });
   },
 
   async findMeta(id) {
     const [row] = await db
-      .select({ id: vehicleFiles.id, vehicleId: vehicleFiles.vehicleId, fileName: vehicleFiles.fileName })
+      .select({
+        id: vehicleFiles.id,
+        vehicleId: vehicleFiles.vehicleId,
+        fileName: vehicleFiles.fileName,
+        storagePath: vehicleFiles.storagePath,
+      })
       .from(vehicleFiles)
       .where(eq(vehicleFiles.id, id));
     return row ?? null;
@@ -69,6 +75,7 @@ export const vehicleFileRepository: VehicleFileRepository = {
         vehicleId: vehicleFiles.vehicleId,
         fileName: vehicleFiles.fileName,
         mimeType: vehicleFiles.mimeType,
+        storagePath: vehicleFiles.storagePath,
         data: vehicleFiles.data,
       })
       .from(vehicleFiles)
@@ -76,3 +83,12 @@ export const vehicleFileRepository: VehicleFileRepository = {
     return row ?? null;
   },
 };
+
+/** Storage paths of every stored file, so a bulk vehicle delete can clean the objects up afterwards. */
+export async function listAllStoragePaths(): Promise<string[]> {
+  const rows = await db
+    .select({ path: vehicleFiles.storagePath })
+    .from(vehicleFiles)
+    .where(isNotNull(vehicleFiles.storagePath));
+  return rows.flatMap((r) => (r.path ? [r.path] : []));
+}
