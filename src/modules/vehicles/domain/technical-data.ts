@@ -61,10 +61,10 @@ export function technicalRows(data: VehicleTechnicalData): Array<{ label: string
     { label: "Número de chasis", value: text(data.chassisNumber) },
     { label: "Número de serie", value: text(data.serialNumber) },
     { label: "Tipo de carrocería", value: text(data.bodyType) },
-    { label: "Combustible", value: text(data.fuelType) },
-    { label: "Capacidad", value: text(data.capacity) },
     { label: "Cilindraje", value: unit(data.engineDisplacement, "cc") },
-    { label: "Peso", value: unit(data.grossWeightKg, "kg") },
+    { label: "Capacidad", value: text(data.capacity) },
+    { label: "Peso bruto vehicular", value: unit(data.grossWeightKg, "kg") },
+    { label: "Color", value: text(data.color) },
   ];
 }
 

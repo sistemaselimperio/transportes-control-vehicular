@@ -36,6 +36,11 @@ describe("technicalRows", () => {
     expect(byLabel["Peso bruto vehicular"]).toBe("52.000 kg");
     expect(byLabel["Color"]).toBe("BLANCO");
   });
+
+  it("does not show the fuel type", () => {
+    const rows = technicalRows({ ...EMPTY_TECHNICAL_DATA, fuelType: "Diésel" });
+    expect(rows.some((r) => r.label.includes("ombustible") || r.value.includes("Diésel"))).toBe(false);
+  });
 });
 
 describe("technicalGroups", () => {
