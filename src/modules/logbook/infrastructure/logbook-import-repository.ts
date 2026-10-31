@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { vehicleCommandRepository } from "@/modules/vehicles/infrastructure/vehicle-command-repository";
 import type { LogbookImportRepository } from "../application/logbook-import-ports";
@@ -21,7 +21,7 @@ export const logbookImportRepository: LogbookImportRepository = {
   },
 
   async loadExisting(vehicleId) {
-    const [services, fuels, tires, oils] = await Promise.all([
+    const [services, fuels, tires, oils, [technical]] = await Promise.all([
       db
         .select({
           date: schema.vehicleServices.date,
@@ -43,8 +43,24 @@ export const logbookImportRepository: LogbookImportRepository = {
         .from(schema.tireChanges)
         .where(eq(schema.tireChanges.vehicleId, vehicleId)),
       db.select({ date: schema.oilChanges.date }).from(schema.oilChanges).where(eq(schema.oilChanges.vehicleId, vehicleId)),
+      db
+        .select({
+          registrationDate: schema.vehicles.registrationDate,
+          modelYear: schema.vehicles.modelYear,
+          engineNumber: schema.vehicles.engineNumber,
+          chassisNumber: schema.vehicles.chassisNumber,
+          serialNumber: schema.vehicles.serialNumber,
+          bodyType: schema.vehicles.bodyType,
+          fuelType: schema.vehicles.fuelType,
+          capacity: schema.vehicles.capacity,
+          engineDisplacement: schema.vehicles.engineDisplacement,
+          grossWeightKg: schema.vehicles.grossWeightKg,
+          color: schema.vehicles.color,
+        })
+        .from(schema.vehicles)
+        .where(eq(schema.vehicles.id, vehicleId)),
     ]);
-    return { services, fuels, tires, oilDates: oils.map((o) => o.date) };
+    return { services, fuels, tires, oilDates: oils.map((o) => o.date), technical };
   },
 
   async apply(vehicleId, write) {
@@ -74,6 +90,13 @@ export const logbookImportRepository: LogbookImportRepository = {
           .update(schema.vehicles)
           .set({ currentKm: write.newCurrentKm.km, currentKmAt: write.newCurrentKm.at })
           .where(eq(schema.vehicles.id, vehicleId));
+      }
+      // COALESCE keeps a value saved by someone else since the plan was made: never overwritten.
+      const fill = (Object.keys(write.technical) as Array<keyof typeof write.technical>).map(
+        (key) => [key, sql`coalesce(${schema.vehicles[key]}, ${write.technical[key]})`] as const,
+      );
+      if (fill.length > 0) {
+        await tx.update(schema.vehicles).set(Object.fromEntries(fill)).where(eq(schema.vehicles.id, vehicleId));
       }
     });
   },

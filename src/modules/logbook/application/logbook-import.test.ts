@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CellValue } from "@/modules/import-export/domain/cell-parsers";
 import type { RawSheet } from "@/modules/import-export/domain/types";
+import { EMPTY_TECHNICAL_DATA } from "@/modules/vehicles/domain/technical-data";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import type { ExistingRecords } from "../domain/logbook-import";
 import { createLogbookImport } from "./logbook-import";
@@ -49,6 +50,16 @@ const workbook = (plate = "WOM-158"): RawSheet[] => [
     ]),
   },
 ];
+
+const generalSheet = (plate = "WOM-158"): RawSheet => ({
+  name: "DATOS GENERALES",
+  rows: rows([
+    [3, { B: "PLACA", C: plate }],
+    [6, { B: "MODELO:", C: 2023 }],
+    [8, { B: "NUMERO DE MOTOR", C: 80392200 }],
+    [14, { B: "COLOR", C: "AZUL TROPICAL" }],
+  ]),
+});
 
 const vehicle: ImportVehicle = {
   id: 7,
@@ -189,5 +200,45 @@ describe("confirm", () => {
     const { importer, writes } = setup({ sheets: workbook("ABC-123") });
     await expect(importer.confirm("WOM-158", data)).rejects.toThrow(RuleError);
     expect(writes).toEqual([]);
+  });
+});
+
+describe("technical data from DATOS GENERALES", () => {
+  it("fills the empty fields in the same write and reports them in the message", async () => {
+    const existing: ExistingRecords = { ...noExisting, technical: { ...EMPTY_TECHNICAL_DATA, color: "ROJO" } };
+    const { importer, writes } = setup({ sheets: [generalSheet()], existing });
+    const result = await importer.confirm("WOM-158", data);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0].write.technical).toEqual({ modelYear: 2023, engineNumber: "80392200" });
+    expect(result.preview.technical).toMatchObject({ count: 2, labels: ["Modelo", "Número de motor"] });
+    expect(result.preview.total).toBe(2);
+    expect(result.message).toBe("Se importaron 2 datos técnicos.");
+  });
+
+  it("previews the fields without writing", async () => {
+    const { importer, writes } = setup({ sheets: [generalSheet()] });
+    const preview = await importer.preview("WOM-158", data);
+    expect(preview.technical.labels).toEqual(["Modelo", "Número de motor", "Color"]);
+    expect(writes).toEqual([]);
+  });
+
+  it("adds them to the other records in the message", async () => {
+    const { importer } = setup({ sheets: [...workbook(), generalSheet()] });
+    const result = await importer.confirm("WOM-158", data);
+    expect(result.message).toBe(
+      "Se importaron 1 mantenimiento, 2 cambios de aceite, 1 cambio de llantas, 1 tanqueo, 3 datos técnicos.",
+    );
+  });
+
+  it("is idempotent: nothing is written once the vehicle has the data", async () => {
+    const existing: ExistingRecords = {
+      ...noExisting,
+      technical: { ...EMPTY_TECHNICAL_DATA, modelYear: 2023, engineNumber: "80392200", color: "AZUL TROPICAL" },
+    };
+    const { importer, writes } = setup({ sheets: [generalSheet()], existing });
+    const result = await importer.confirm("WOM-158", data);
+    expect(writes).toEqual([]);
+    expect(result.message).toBe("No hay registros nuevos para importar.");
   });
 });

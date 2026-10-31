@@ -14,8 +14,14 @@ import {
 } from "@/modules/import-export/domain/cell-parsers";
 import type { RawRow, RawSheet } from "@/modules/import-export/domain/types";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
-import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
+import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
+import {
+  assertModelYear,
+  EMPTY_TECHNICAL_DATA,
+  type VehicleTechnicalData,
+} from "@/modules/vehicles/domain/technical-data";
+import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import { LOGBOOK_TABS, type LogbookTab } from "./logbook";
 
 /* ---------------------------------- The file ---------------------------------- */
@@ -35,7 +41,8 @@ export function importFileProblem(file: { name: string; size: number }): string 
 
 /** A row that cannot be imported, with the reason shown to the operator. */
 export interface ImportIssue {
-  tab: LogbookTab;
+  /** A logbook tab, or "datos" for the "DATOS GENERALES" sheet. */
+  tab: LogbookTab | "datos";
   /** Row number in the Excel sheet. */
   row: number;
   message: string;
@@ -83,6 +90,8 @@ export interface LogbookImport {
   oils: ImportedOil[];
   tires: ImportedTire[];
   fuels: ImportedFuel[];
+  /** Technical data found in "DATOS GENERALES": only the fields the sheet has a usable value for. */
+  technical: Partial<VehicleTechnicalData>;
   issues: ImportIssue[];
 }
 
@@ -230,6 +239,71 @@ export function findPlateMismatch(found: readonly string[], selected: string): s
   const other = found.find((plate) => plateKey(plate) !== plateKey(selected));
   if (other) return `El archivo es de la placa ${other}, pero elegiste el vehículo ${selected}. No se importó nada.`;
   return null;
+}
+
+/* ----------------------------- DATOS GENERALES ----------------------------- */
+
+type TechnicalKey = keyof VehicleTechnicalData;
+
+/** Sheet label (normalized) to the technical field it fills; every other label is ignored. */
+const TECHNICAL_LABELS: Record<string, TechnicalKey> = {
+  "FECHA DE MATRICULA": "registrationDate",
+  MODELO: "modelYear",
+  "NUMERO DE MOTOR": "engineNumber",
+  "NUMERO DE CHASIS": "chassisNumber",
+  "NUMERO DE SERIE": "serialNumber",
+  "TIPO CARROCERIA": "bodyType",
+  "TIPO DE CARROCERIA": "bodyType",
+  COMBUSTIBLE: "fuelType",
+  CAPACIDAD: "capacity",
+  CILINDRAJE: "engineDisplacement",
+  PESO: "grossWeightKg",
+  "PESO BRUTO": "grossWeightKg",
+  COLOR: "color",
+};
+
+/** Text of a cell; a number is written without decimals ("80392200", not "80392200.0"). */
+const identifierText = (v: CellValue | undefined): string | null =>
+  typeof v === "number" && Number.isFinite(v) ? String(Math.round(v)) : textOrNull(v);
+
+function parseTechnicalValue(key: TechnicalKey, v: CellValue, today: IsoDate): Parsed<string | number | null> {
+  switch (key) {
+    case "registrationDate":
+      return parseLogDate(v, null);
+    case "modelYear": {
+      const text = cellText(v);
+      if (text === "") return { value: null, error: null };
+      const year = typeof v === "number" ? v : /^\d{4}$/.test(text) ? Number(text) : NaN;
+      if (!Number.isInteger(year)) return { value: null, error: `Modelo no válido: "${text}".` };
+      try {
+        assertModelYear(year, today);
+      } catch (e) {
+        if (e instanceof RuleError) return { value: null, error: e.message };
+        throw e;
+      }
+      return { value: year, error: null };
+    }
+    case "engineDisplacement":
+    case "grossWeightKg": {
+      const parsed = parseMoney(v, key === "grossWeightKg" ? "Peso" : "Cilindraje");
+      return parsed.value === 0 ? { value: null, error: null } : parsed;
+    }
+    default:
+      return { value: identifierText(v), error: null };
+  }
+}
+
+/** Technical data of the "DATOS GENERALES" sheet: a label in column B, its value in column C. */
+function parseTechnicalData(sheet: RawSheet, issues: ImportIssue[], today: IsoDate): Partial<VehicleTechnicalData> {
+  const found: Record<string, string | number> = {};
+  for (const { rowNumber, cells } of sortedRows(sheet)) {
+    const key = TECHNICAL_LABELS[label(cells.B)];
+    if (!key || key in found || cells.C == null) continue;
+    const parsed = parseTechnicalValue(key, cells.C, today);
+    if (parsed.error) issues.push({ tab: "datos", row: rowNumber, message: parsed.error });
+    else if (parsed.value !== null) found[key] = parsed.value;
+  }
+  return found as Partial<VehicleTechnicalData>;
 }
 
 /* ------------------------------ MANTENIMIENTO ------------------------------ */
@@ -507,24 +581,48 @@ function parseTires(sheet: RawSheet, issues: ImportIssue[]): ImportedTire[] {
 
 /* -------------------------------- Entry point -------------------------------- */
 
-/** Reads every logbook sheet of the workbook; unknown sheets (e.g. DATOS GENERALES) only feed the plate check. */
-export function parseLogbookWorkbook(sheets: readonly RawSheet[]): LogbookImport {
+/**
+ * Reads every logbook sheet of the workbook plus the technical data of "DATOS GENERALES";
+ * other sheets only feed the plate check. `ctx.today` bounds the model year.
+ */
+export function parseLogbookWorkbook(
+  sheets: readonly RawSheet[],
+  ctx: { today: IsoDate } = { today: todayInBogota() },
+): LogbookImport {
   const issues: ImportIssue[] = [];
   const services = findSheet(sheets, "MANTENIMIENTO");
   const oils = findSheet(sheets, "ACEITE");
   const tires = findSheet(sheets, "LLANTAS");
   const fuels = findSheet(sheets, "COMBUSTIBLE");
+  const general = findSheet(sheets, "DATOS GENERALES");
+  const technical = general ? parseTechnicalData(general, issues, ctx.today) : {};
   return {
     plates: collectPlates(sheets),
     services: services ? parseServices(services, issues) : [],
     oils: oils ? parseOils(oils, issues) : [],
     tires: tires ? parseTires(tires, issues) : [],
     fuels: fuels ? parseFuels(fuels, issues) : [],
+    technical,
     issues,
   };
 }
 
 /* ---------------------------------- Planning ---------------------------------- */
+
+/** Technical fields in display order, one label per field (the vehicle file may group some in one row). */
+const TECHNICAL_FIELDS: ReadonlyArray<{ key: TechnicalKey; label: string }> = [
+  { key: "registrationDate", label: "Fecha de matrícula" },
+  { key: "modelYear", label: "Modelo" },
+  { key: "engineNumber", label: "Número de motor" },
+  { key: "chassisNumber", label: "Número de chasis" },
+  { key: "serialNumber", label: "Número de serie" },
+  { key: "bodyType", label: "Tipo de carrocería" },
+  { key: "fuelType", label: "Combustible" },
+  { key: "capacity", label: "Capacidad" },
+  { key: "engineDisplacement", label: "Cilindraje" },
+  { key: "grossWeightKg", label: "Peso bruto vehicular" },
+  { key: "color", label: "Color" },
+];
 
 /** What the vehicle already has, just enough to recognize a row that was imported before. */
 export interface ExistingRecords {
@@ -532,6 +630,8 @@ export interface ExistingRecords {
   fuels: Array<{ date: IsoDate; gallons: number; amount: number }>;
   tires: Array<{ date: IsoDate; reference: string; quantity: number }>;
   oilDates: IsoDate[];
+  /** The vehicle's technical data now; absent means every field is empty. */
+  technical?: VehicleTechnicalData;
 }
 
 export interface TabCounts {
@@ -546,6 +646,8 @@ export interface ImportPlan {
   oils: ImportedOil[];
   tires: ImportedTire[];
   fuels: ImportedFuel[];
+  /** Technical fields to fill: only those the vehicle has empty. */
+  technical: Partial<VehicleTechnicalData>;
   counts: Record<LogbookTab, TabCounts>;
   /** Every row left out for a reason other than being a duplicate, by tab and row. */
   skipped: ImportIssue[];
@@ -609,11 +711,21 @@ export function planLogbookImport(
   counts.llantas.create = tires.length;
   counts.combustible.create = fuels.length;
 
-  const order = (tab: LogbookTab) => LOGBOOK_TABS.findIndex((t) => t.key === tab);
-  skipped.sort((a, b) => order(a.tab) - order(b.tab) || a.row - b.row);
-  for (const { tab } of skipped) counts[tab].skipped += 1;
+  // Fill only what the vehicle has empty: an existing value is never overwritten.
+  const current = existing.technical ?? EMPTY_TECHNICAL_DATA;
+  const technical: Partial<VehicleTechnicalData> = {};
+  for (const { key } of TECHNICAL_FIELDS) {
+    const value = parsed.technical[key];
+    if (value != null && current[key] == null) Object.assign(technical, { [key]: value });
+  }
 
-  return { services, oils, tires, fuels, counts, skipped };
+  // General-data issues come last, after the four tabs.
+  const order = (tab: ImportIssue["tab"]) =>
+    tab === "datos" ? LOGBOOK_TABS.length : LOGBOOK_TABS.findIndex((t) => t.key === tab);
+  skipped.sort((a, b) => order(a.tab) - order(b.tab) || a.row - b.row);
+  for (const { tab } of skipped) if (tab !== "datos") counts[tab].skipped += 1;
+
+  return { services, oils, tires, fuels, technical, counts, skipped };
 }
 
 /* ---------------------------------- Preview ---------------------------------- */
@@ -626,15 +738,19 @@ export interface ImportPreview {
   plate: string;
   tabs: Array<{ tab: LogbookTab; label: string } & TabCounts>;
   skipped: ImportIssue[];
+  /** "Datos generales": the fields that would be filled, and the rows of that sheet left out. */
+  technical: { count: number; labels: string[]; skipped: number };
   total: number;
 }
 
 export function previewOf(plan: ImportPlan, plate: string): ImportPreview {
   const tabs = LOGBOOK_TABS.map(({ key, label: name }) => ({ tab: key, label: name, ...plan.counts[key] }));
+  const labels = TECHNICAL_FIELDS.filter(({ key }) => plan.technical[key] != null).map((f) => f.label);
   return {
     plate,
     tabs,
     skipped: plan.skipped.slice(0, PREVIEW_SKIPPED_LIMIT),
-    total: tabs.reduce((sum, t) => sum + t.create, 0),
+    technical: { count: labels.length, labels, skipped: plan.skipped.filter((s) => s.tab === "datos").length },
+    total: tabs.reduce((sum, t) => sum + t.create, 0) + labels.length,
   };
 }

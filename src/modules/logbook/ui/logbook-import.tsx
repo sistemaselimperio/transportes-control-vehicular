@@ -70,7 +70,7 @@ export function LogbookImportFlow({
     });
   }
 
-  const skippedTotal = preview ? preview.tabs.reduce((sum, t) => sum + t.skipped, 0) : 0;
+  const skippedTotal = preview ? preview.tabs.reduce((sum, t) => sum + t.skipped, 0) + preview.technical.skipped : 0;
   const busy = reading || importing;
 
   return (
@@ -133,6 +133,16 @@ export function LogbookImportFlow({
                 </tbody>
               </table>
             </div>
+            {preview.technical.count > 0 && (
+              <p className="text-sm">
+                <span className="font-medium">
+                  Datos técnicos: {plural(preview.technical.count, "campo", "campos")}
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  ({preview.technical.labels.join(", ")}). Solo se llenan los que están vacíos.
+                </span>
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               {preview.total === 0
                 ? "No hay registros nuevos para importar."
@@ -148,7 +158,7 @@ export function LogbookImportFlow({
                   {preview.skipped.slice(0, SHOWN_SKIPPED).map((s) => (
                     <li key={`${s.tab}-${s.row}-${s.message}`}>
                       <span className="font-medium">
-                        {preview.tabs.find((t) => t.tab === s.tab)?.label}, fila {s.row}:
+                        {preview.tabs.find((t) => t.tab === s.tab)?.label ?? "Datos generales"}, fila {s.row}:
                       </span>{" "}
                       <span className="text-muted-foreground">{s.message}</span>
                     </li>

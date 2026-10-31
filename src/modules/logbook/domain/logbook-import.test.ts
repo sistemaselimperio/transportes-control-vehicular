@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CellValue } from "@/modules/import-export/domain/cell-parsers";
 import type { RawSheet } from "@/modules/import-export/domain/types";
+import { EMPTY_TECHNICAL_DATA } from "@/modules/vehicles/domain/technical-data";
 import {
   findPlateMismatch,
   importFileProblem,
@@ -20,7 +21,7 @@ const sheet = (name: string, rows: Array<[number, Record<string, CellValue>]>): 
   rows: rows.map(([rowNumber, cells]) => ({ rowNumber, cells })),
 });
 
-const EMPTY: LogbookImport = { plates: [], services: [], oils: [], tires: [], fuels: [], issues: [] };
+const EMPTY: LogbookImport = { plates: [], services: [], oils: [], tires: [], fuels: [], technical: {}, issues: [] };
 const NO_EXISTING: ExistingRecords = { services: [], fuels: [], tires: [], oilDates: [] };
 const CTX = { today: "2026-10-27" };
 
@@ -497,6 +498,102 @@ describe("parseLogbookWorkbook: names and plates", () => {
   });
 });
 
+/* ------------------------------ DATOS GENERALES ------------------------------ */
+
+const TECH_CTX = { today: "2026-10-27" };
+
+const generalSheet = (rows: Array<[number, Record<string, CellValue>]>) => sheet("DATOS GENERALES", rows);
+
+describe("parseLogbookWorkbook: DATOS GENERALES", () => {
+  it("reads the real file's technical rows and ignores the other labels", () => {
+    const result = parseLogbookWorkbook(
+      [
+        generalSheet([
+          [2, { B: "VEHICULO", C: "TRACTOCAMION" }],
+          [3, { B: "PLACA", C: "JVK-590" }],
+          [4, { B: "PROPIETARIO", C: "ACME" }],
+          [5, { B: "FECHA DE MATRICULA ", C: day(2022, 5, 13) }],
+          [6, { B: "MODELO:", C: 2023 }],
+          [7, { B: "LINEA", C: "T800" }],
+          [8, { B: "NUMERO DE MOTOR", C: 80392200 }],
+          [9, { B: "NUMERO DE CHASIS", C: 731087 }],
+          [10, { B: "Número de serie", C: 731087 }],
+          [11, { B: "TIPO CARROCERIA", C: " SRS " }],
+          [12, { B: "CAPACIDAD" }],
+          [13, { B: "CILINDRAJE", C: 14900 }],
+          [14, { B: "COLOR", C: "AZUL TROPICAL" }],
+          [15, { B: "MARCA", C: "KENWORTH" }],
+          [16, { B: "SOAT", C: day(2026, 1, 1), D: "obs" }],
+        ]),
+      ],
+      TECH_CTX,
+    );
+    expect(result.technical).toEqual({
+      registrationDate: "2022-05-13",
+      modelYear: 2023,
+      engineNumber: "80392200",
+      chassisNumber: "731087",
+      serialNumber: "731087",
+      bodyType: "SRS",
+      engineDisplacement: 14900,
+      color: "AZUL TROPICAL",
+    });
+    expect(result.issues).toEqual([]);
+  });
+
+  it("reads fuel, capacity, weight and the alternative body type label", () => {
+    const result = parseLogbookWorkbook(
+      [
+        generalSheet([
+          [1, { B: "TIPO DE CARROCERIA", C: "FURGON" }],
+          [2, { B: "COMBUSTIBLE", C: "DIESEL" }],
+          [3, { B: "CAPACIDAD", C: "34 t" }],
+          [4, { B: "PESO BRUTO", C: "52.000" }],
+        ]),
+      ],
+      TECH_CTX,
+    );
+    expect(result.technical).toEqual({
+      bodyType: "FURGON",
+      fuelType: "DIESEL",
+      capacity: "34 t",
+      grossWeightKg: 52000,
+    });
+    const peso = parseLogbookWorkbook([generalSheet([[1, { B: "PESO", C: 8000 }]])], TECH_CTX);
+    expect(peso.technical).toEqual({ grossWeightKg: 8000 });
+  });
+
+  it("accepts the registration date as an Excel serial or as text", () => {
+    const serial = parseLogbookWorkbook([generalSheet([[1, { B: "FECHA DE MATRICULA", C: 44694 }]])], TECH_CTX);
+    expect(serial.technical.registrationDate).toBe("2022-05-13");
+    const text = parseLogbookWorkbook([generalSheet([[1, { B: "FECHA DE MATRICULA", C: "13/05/2022" }]])], TECH_CTX);
+    expect(text.technical.registrationDate).toBe("2022-05-13");
+  });
+
+  it("skips an invalid model year or date with an issue and keeps the rest", () => {
+    const result = parseLogbookWorkbook(
+      [
+        generalSheet([
+          [6, { B: "MODELO", C: 1900 }],
+          [7, { B: "FECHA DE MATRICULA", C: "ayer" }],
+          [8, { B: "COLOR", C: "ROJO" }],
+        ]),
+      ],
+      TECH_CTX,
+    );
+    expect(result.technical).toEqual({ color: "ROJO" });
+    expect(result.issues.map((i) => [i.tab, i.row])).toEqual([
+      ["datos", 6],
+      ["datos", 7],
+    ]);
+    expect(result.issues[0].message).toMatch(/modelo/i);
+  });
+
+  it("does nothing without the sheet", () => {
+    expect(parseLogbookWorkbook([maintenanceSheet([])], TECH_CTX).technical).toEqual({});
+  });
+});
+
 describe("findPlateMismatch", () => {
   it("accepts the same plate however it is written", () => {
     expect(findPlateMismatch(["WOM-158"], "wom158")).toBeNull();
@@ -689,6 +786,44 @@ describe("planLogbookImport", () => {
     ]);
     expect(plan.counts.servicios.skipped).toBe(2);
     expect(plan.counts.llantas.skipped).toBe(1);
+  });
+});
+
+describe("planLogbookImport: technical data", () => {
+  const parsed: LogbookImport = {
+    ...EMPTY,
+    technical: { modelYear: 2023, color: "AZUL", engineDisplacement: 14900 },
+  };
+
+  it("fills the fields the vehicle has empty", () => {
+    const plan = planLogbookImport(parsed, { ...NO_EXISTING, technical: { ...EMPTY_TECHNICAL_DATA } }, CTX);
+    expect(plan.technical).toEqual({ modelYear: 2023, color: "AZUL", engineDisplacement: 14900 });
+  });
+
+  it("never overwrites a value the vehicle already has", () => {
+    const plan = planLogbookImport(parsed, { ...NO_EXISTING, technical: { ...EMPTY_TECHNICAL_DATA, color: "ROJO" } }, CTX);
+    expect(plan.technical).toEqual({ modelYear: 2023, engineDisplacement: 14900 });
+  });
+
+  it("is idempotent: nothing to fill once the vehicle has the data", () => {
+    const first = planLogbookImport(parsed, { ...NO_EXISTING, technical: { ...EMPTY_TECHNICAL_DATA } }, CTX);
+    const second = planLogbookImport(parsed, { ...NO_EXISTING, technical: { ...EMPTY_TECHNICAL_DATA, ...first.technical } }, CTX);
+    expect(second.technical).toEqual({});
+  });
+
+  it("counts the fields in the preview total and lists their labels", () => {
+    const preview = previewOf(planLogbookImport(parsed, { ...NO_EXISTING, technical: { ...EMPTY_TECHNICAL_DATA } }, CTX), "WOM-158");
+    expect(preview.technical.labels).toEqual(["Modelo", "Cilindraje", "Color"]);
+    expect(preview.technical.count).toBe(3);
+    expect(preview.total).toBe(3);
+  });
+
+  it("counts a skipped general-data issue apart from the four tabs", () => {
+    const withIssue: LogbookImport = { ...EMPTY, issues: [{ tab: "datos", row: 6, message: "Modelo no válido." }] };
+    const plan = planLogbookImport(withIssue, NO_EXISTING, CTX);
+    expect(plan.skipped).toHaveLength(1);
+    expect(previewOf(plan, "WOM-158").technical.skipped).toBe(1);
+    expect(plan.counts.servicios.skipped).toBe(0);
   });
 });
 

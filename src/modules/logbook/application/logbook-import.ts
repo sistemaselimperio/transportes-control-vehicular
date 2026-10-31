@@ -33,11 +33,13 @@ export interface ImportResult {
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function summaryMessage(plan: ImportPlan): string {
+  const technicalCount = Object.keys(plan.technical).length;
   const parts = [
     plan.services.length > 0 && count(plan.services.length, "mantenimiento", "mantenimientos"),
     plan.oils.length > 0 && count(plan.oils.length, "cambio de aceite", "cambios de aceite"),
     plan.tires.length > 0 && count(plan.tires.length, "cambio de llantas", "cambios de llantas"),
     plan.fuels.length > 0 && count(plan.fuels.length, "tanqueo", "tanqueos"),
+    technicalCount > 0 && count(technicalCount, "dato técnico", "datos técnicos"),
   ].filter(Boolean);
   return parts.length === 0 ? "No hay registros nuevos para importar." : `Se importaron ${parts.join(", ")}.`;
 }
@@ -51,7 +53,7 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
     } catch {
       throw new RuleError("No se pudo leer el archivo. Verifica que sea un Excel (.xlsx) válido.");
     }
-    const parsed = parseLogbookWorkbook(sheets);
+    const parsed = parseLogbookWorkbook(sheets, { today: today() });
 
     const mismatch = findPlateMismatch(parsed.plates, plate);
     if (mismatch) throw new RuleError(mismatch);
@@ -120,6 +122,7 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
         fuels: plan.fuels.map((f) => ({ date: f.date, gallons: f.gallons, amount: f.amount, provider: f.provider })),
         oils,
         newCurrentKm,
+        technical: plan.technical,
       },
     };
   }

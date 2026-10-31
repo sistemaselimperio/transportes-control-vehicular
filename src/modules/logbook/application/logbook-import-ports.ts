@@ -2,6 +2,7 @@ import type { VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import type { OilMode } from "@/modules/maintenance/domain/oil-change";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import type { VehicleTechnicalData } from "@/modules/vehicles/domain/technical-data";
 import type { ExistingRecords } from "../domain/logbook-import";
 import type { FuelValues, ServiceValues, TireValues } from "./logbook-ports";
 
@@ -38,6 +39,8 @@ export interface ImportWrite {
   oils: PlannedOilChange[];
   /** The vehicle's odometer reading when the oil changes raise it. */
   newCurrentKm: { km: number; at: IsoDate } | null;
+  /** Technical fields to fill; the repository only sets the ones still empty. */
+  technical: Partial<VehicleTechnicalData>;
 }
 
 export interface LogbookImportRepository {
