@@ -66,8 +66,9 @@ type Editing =
 
 function summaryText(data: LogbookData): string {
   if (data.tab === "combustible") {
-    const { count, gallons, amount } = data.summary;
-    return `${plural(count, "tanqueo", "tanqueos")} · ${gallons.toLocaleString("es-CO", { maximumFractionDigits: 2 })} de cantidad · ${formatPrice(amount)}`;
+    const { count, gallons, urea, amount } = data.summary;
+    const text = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+    return `${plural(count, "tanqueo", "tanqueos")} · ${text(gallons)} de cantidad · ${text(urea)} de urea · ${formatPrice(amount)}`;
   }
   if (data.tab === "aceite") return plural(data.summary.count, "cambio", "cambios");
   const { count, total, withoutPrice } = data.summary;

@@ -144,7 +144,7 @@ describe("confirm", () => {
     expect(write.tires).toEqual([
       { date: "2025-07-17", quantity: 2, reference: "LLANTA 295 80 22,5", provider: null, price: null, notes: "PENDIENTE" },
     ]);
-    expect(write.fuels).toEqual([{ date: "2025-07-13", gallons: 100, amount: 935000, provider: "EDS" }]);
+    expect(write.fuels).toEqual([{ date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: "EDS" }]);
     expect(write.oils).toEqual([
       {
         date: "2025-06-13",
@@ -185,7 +185,7 @@ describe("confirm", () => {
   it("writes nothing when everything already exists", async () => {
     const existing: ExistingRecords = {
       services: [{ date: "2026-02-13", description: "SERVICIO LAVADO GENERAL", price: 140000 }],
-      fuels: [{ date: "2025-07-13", gallons: 100, amount: 935000 }],
+      fuels: [{ date: "2025-07-13", gallons: 100, urea: null, amount: 935000 }],
       tires: [{ date: "2025-07-17", reference: "LLANTA 295 80 22,5", quantity: 2 }],
       oilDates: ["2025-06-13", "2025-09-11"],
     };

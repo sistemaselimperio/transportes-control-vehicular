@@ -4,8 +4,10 @@
  * Only standard Postgres features: no provider-specific extensions or RLS.
  * Calendar dates use `date` in string mode ("YYYY-MM-DD") to match the domain.
  */
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -290,12 +292,19 @@ export const fuelFills = transportes.table(
       .notNull()
       .references(() => vehicles.id, { onDelete: "cascade" }),
     date: date({ mode: "string" }).notNull(),
-    gallons: numeric({ precision: 8, scale: 2, mode: "number" }).notNull(),
-    /** Amount paid, whole pesos (COP). */
-    amount: integer().notNull(),
+    /** Fuel gallons; null on a urea-only fill. */
+    gallons: numeric({ precision: 8, scale: 2, mode: "number" }),
+    /** Urea (DEF) gallons; null when the fill has none. */
+    urea: numeric({ precision: 8, scale: 2, mode: "number" }),
+    /** Amount paid, whole pesos (COP); null when unknown. */
+    amount: integer(),
     provider: text(),
   },
-  (t) => [index("fuel_fills_vehicle_date_idx").on(t.vehicleId, t.date)],
+  (t) => [
+    index("fuel_fills_vehicle_date_idx").on(t.vehicleId, t.date),
+    // Unqualified column names on purpose: the generated DDL stays plain.
+    check("fuel_fills_has_product_check", sql`coalesce(gallons, 0) > 0 or coalesce(urea, 0) > 0`),
+  ],
 );
 
 export const sales = transportes.table("sales", {

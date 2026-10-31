@@ -16,6 +16,8 @@ import { SERVICE_KIND_LABELS, type FuelRow, type OilRow, type ServiceRow, type T
 const PLATE_LINK = "plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70";
 
 const gallonsText = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+const optionalGallonsText = (n: number | null) => (n === null ? "—" : gallonsText(n));
+const optionalPrice = (n: number | null) => (n === null ? "—" : formatPrice(n));
 const priceText = (n: number | null) => (n === null ? "—" : formatPrice(n));
 
 /** What a record says in one line plus an optional detail line (cards and the vehicle file). */
@@ -105,12 +107,19 @@ export const FUEL_SPEC: Spec<FuelRow> = {
   columns: [
     { header: "Fecha", cell: (r) => formatDisplayDate(r.date) },
     { header: "Placa", cell: (r) => <PlateLink plate={r.plate} /> },
-    { header: "Cantidad", cell: (r) => gallonsText(r.gallons), right: true },
-    { header: "Valor", cell: (r) => formatPrice(r.amount), right: true },
+    { header: "Cantidad", cell: (r) => optionalGallonsText(r.gallons), right: true },
+    { header: "Urea (gal)", cell: (r) => optionalGallonsText(r.urea), right: true },
+    { header: "Valor", cell: (r) => optionalPrice(r.amount), right: true },
     { header: "Estación", cell: (r) => r.provider ?? "—" },
     { header: "Conductor", cell: (r) => r.driverName ?? "—" },
   ],
-  summary: (r) => ({ title: `Cantidad ${gallonsText(r.gallons)}`, detail: r.provider, amount: formatPrice(r.amount) }),
+  summary: (r) => ({
+    title: [r.gallons !== null && `Cantidad ${gallonsText(r.gallons)}`, r.urea !== null && `Urea ${gallonsText(r.urea)}`]
+      .filter(Boolean)
+      .join(" · "),
+    detail: r.provider,
+    amount: optionalPrice(r.amount),
+  }),
   remove: (id) => deleteLogbookEntryAction("fuel", id),
 };
 

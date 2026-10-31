@@ -31,7 +31,12 @@ export const logbookImportRepository: LogbookImportRepository = {
         .from(schema.vehicleServices)
         .where(eq(schema.vehicleServices.vehicleId, vehicleId)),
       db
-        .select({ date: schema.fuelFills.date, gallons: schema.fuelFills.gallons, amount: schema.fuelFills.amount })
+        .select({
+          date: schema.fuelFills.date,
+          gallons: schema.fuelFills.gallons,
+          urea: schema.fuelFills.urea,
+          amount: schema.fuelFills.amount,
+        })
         .from(schema.fuelFills)
         .where(eq(schema.fuelFills.vehicleId, vehicleId)),
       db

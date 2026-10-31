@@ -56,7 +56,7 @@ describe("create", () => {
     expect((await commands.create("tire", "AAA-111", { date: TODAY, quantity: 2, reference: "x", provider: null, price: null, notes: null })).message).toBe(
       "Cambio de llantas registrado.",
     );
-    expect((await commands.create("fuel", "AAA-111", { date: TODAY, gallons: 10, amount: 1000, provider: null })).message).toBe(
+    expect((await commands.create("fuel", "AAA-111", { date: TODAY, gallons: 10, urea: null, amount: 1000, provider: null })).message).toBe(
       "Tanqueo registrado.",
     );
   });

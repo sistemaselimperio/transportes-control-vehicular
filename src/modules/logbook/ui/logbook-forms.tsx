@@ -199,19 +199,28 @@ export function FuelForm({ row, today, providers, vehicle, onDone, onCancel }: F
       {!row && <VehicleField vehicle={vehicle} id={`${id}-plate`} />}
       <DateField id={`${id}-date`} today={today} defaultValue={row?.date} />
       <Fields>
-        <Field label="Cantidad" htmlFor={`${id}-gallons`} required>
+        <Field label="Cantidad (gal)" htmlFor={`${id}-gallons`}>
           <Input
             id={`${id}-gallons`}
             name="gallons"
             inputMode="decimal"
             className={`${FIELD} num`}
             autoComplete="off"
-            defaultValue={row ? String(row.gallons).replace(".", ",") : ""}
-            required
+            defaultValue={row?.gallons != null ? String(row.gallons).replace(".", ",") : ""}
           />
         </Field>
-        <Field label="Valor" htmlFor={`${id}-amount`} required>
-          <PesosInput id={`${id}-amount`} name="amount" defaultValue={row?.amount} required />
+        <Field label="Urea (gal)" htmlFor={`${id}-urea`}>
+          <Input
+            id={`${id}-urea`}
+            name="urea"
+            inputMode="decimal"
+            className={`${FIELD} num`}
+            autoComplete="off"
+            defaultValue={row?.urea != null ? String(row.urea).replace(".", ",") : ""}
+          />
+        </Field>
+        <Field label="Valor" htmlFor={`${id}-amount`}>
+          <PesosInput id={`${id}-amount`} name="amount" defaultValue={row?.amount ?? undefined} />
         </Field>
       </Fields>
       <ProviderField id={`${id}-provider`} label="Estación" providers={providers} defaultValue={row?.provider} />

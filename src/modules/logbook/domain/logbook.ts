@@ -48,8 +48,9 @@ export interface TireRow extends LogRow {
 }
 
 export interface FuelRow extends LogRow {
-  gallons: number;
-  amount: number;
+  gallons: number | null;
+  urea: number | null;
+  amount: number | null;
   provider: string | null;
 }
 
@@ -166,12 +167,21 @@ export function summarizeCost(rows: readonly { price: number | null }[]): {
   return { count: rows.length, total, withoutPrice };
 }
 
-export function summarizeFuel(rows: readonly { gallons: number; amount: number }[]): {
+export function summarizeFuel(
+  rows: readonly { gallons: number | null; urea: number | null; amount: number | null }[],
+): {
   count: number;
   gallons: number;
+  urea: number;
   amount: number;
 } {
-  // Gallons have two decimals: add in hundredths to avoid float drift.
-  const hundredths = rows.reduce((sum, r) => sum + Math.round(r.gallons * 100), 0);
-  return { count: rows.length, gallons: hundredths / 100, amount: rows.reduce((sum, r) => sum + r.amount, 0) };
+  // Gallons have two decimals: add in hundredths to avoid float drift. Missing values count as zero.
+  const hundredths = (pick: (r: (typeof rows)[number]) => number | null) =>
+    rows.reduce((sum, r) => sum + Math.round((pick(r) ?? 0) * 100), 0) / 100;
+  return {
+    count: rows.length,
+    gallons: hundredths((r) => r.gallons),
+    urea: hundredths((r) => r.urea),
+    amount: rows.reduce((sum, r) => sum + (r.amount ?? 0), 0),
+  };
 }

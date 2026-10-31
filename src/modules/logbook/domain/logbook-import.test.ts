@@ -320,7 +320,7 @@ describe("parseLogbookWorkbook: COMBUSTIBLE", () => {
       ]),
     ]);
     expect(result.fuels).toEqual([
-      { row: 7, date: "2025-07-13", gallons: 100, amount: 935000, provider: "EDS NEW EL ROSARIO TRESGES" },
+      { row: 7, date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: "EDS NEW EL ROSARIO TRESGES" },
     ]);
     expect(result.issues).toEqual([]);
   });
@@ -345,10 +345,20 @@ describe("parseLogbookWorkbook: COMBUSTIBLE", () => {
     expect(result.issues).toEqual([]);
   });
 
-  it("skips a fill without value", () => {
+  it("imports a fill without value with a null amount", () => {
     const result = parseLogbookWorkbook([sheet("COMBUSTIBLE", [fuelHeader, [7, { B: day(2025, 7, 13), C: 30 }]])]);
+    expect(result.fuels).toEqual([
+      { row: 7, date: "2025-07-13", gallons: 30, urea: null, amount: null, provider: null },
+    ]);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("still reports a malformed amount", () => {
+    const result = parseLogbookWorkbook([
+      sheet("COMBUSTIBLE", [fuelHeader, [7, { B: day(2025, 7, 13), C: 30, D: "abc" }]]),
+    ]);
     expect(result.fuels).toEqual([]);
-    expect(result.issues).toEqual([{ tab: "combustible", row: 7, message: "Sin valor." }]);
+    expect(result.issues).toEqual([{ tab: "combustible", row: 7, message: 'Valor no válido: "abc".' }]);
   });
 
   it("skips a fill without date or without quantity", () => {
@@ -367,23 +377,36 @@ describe("parseLogbookWorkbook: COMBUSTIBLE", () => {
     expect(result).toMatchObject({ fuels: [], issues: [] });
   });
 
-  it("finds the columns by their header and says when a row only has urea", () => {
+  it("finds the columns by their header and reads the urea", () => {
     const result = parseLogbookWorkbook([
       sheet("COMBUSTIBLE", [
         [5, { B: "FECHA", C: "CANTIDAD", D: "UREA", E: "VALOR", F: "KILOMETRAJE", G: "PROVEEDOR" }],
         [6, { B: day(2025, 7, 10), C: 90, E: 843759, F: 259548, G: "INVERSIONES JJENY   901787562" }],
-        [8, { B: day(2025, 7, 16), C: 98.049, D: 56.377, E: 1079878, G: "EDS EL IMPERIO" }],
-        [11, { B: day(2025, 7, 22), D: 47.666, F: 263249, G: "IMPERIO FACT.0852" }],
+        [8, { B: day(2025, 7, 16), C: 98.049, D: 56.377, E: 1079878, G: "EDS EL IMPERO ( 2 FACTURAS)" }],
+        [11, { B: day(2025, 7, 22), D: 47.666, F: 263249, G: "IMPERO FACT.0852" }],
+        [12, { B: day(2025, 8, 7), D: 37500, F: 265353, G: "EDS EL IMPERIO" }],
         [26, { C: "TOTAL MES", E: 6058898 }],
       ]),
     ]);
     expect(result.fuels).toEqual([
-      { row: 6, date: "2025-07-10", gallons: 90, amount: 843759, provider: "INVERSIONES JJENY 901787562" },
-      { row: 8, date: "2025-07-16", gallons: 98.05, amount: 1079878, provider: "EDS EL IMPERIO" },
+      { row: 6, date: "2025-07-10", gallons: 90, urea: null, amount: 843759, provider: "INVERSIONES JJENY 901787562" },
+      { row: 8, date: "2025-07-16", gallons: 98.05, urea: 56.38, amount: 1079878, provider: "EDS EL IMPERO ( 2 FACTURAS)" },
+      { row: 11, date: "2025-07-22", gallons: null, urea: 47.67, amount: null, provider: "IMPERO FACT.0852" },
     ]);
     expect(result.issues).toEqual([
-      { tab: "combustible", row: 11, message: "Solo urea, sin galones de combustible." },
+      { tab: "combustible", row: 12, message: "Urea fuera de rango (¿valor en pesos en la columna UREA?)." },
     ]);
+  });
+
+  it("reports a malformed urea", () => {
+    const result = parseLogbookWorkbook([
+      sheet("COMBUSTIBLE", [
+        [5, { B: "FECHA", C: "CANTIDAD", D: "UREA", E: "VALOR" }],
+        [6, { B: day(2025, 7, 10), C: 10, D: "xx", E: 1000 }],
+      ]),
+    ]);
+    expect(result.fuels).toEqual([]);
+    expect(result.issues).toEqual([{ tab: "combustible", row: 6, message: 'Urea no válida: "xx".' }]);
   });
 });
 
@@ -645,7 +668,7 @@ describe("planLogbookImport", () => {
     const parsed: LogbookImport = {
       ...EMPTY,
       services: [service("2026-02-13", "LAVADO", 140000)],
-      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, amount: 935000, provider: null }],
+      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: null }],
     };
     const plan = planLogbookImport(parsed, NO_EXISTING, CTX);
     expect(plan.services).toHaveLength(1);
@@ -678,12 +701,12 @@ describe("planLogbookImport", () => {
   it("skips fuel and tires that already exist", () => {
     const parsed: LogbookImport = {
       ...EMPTY,
-      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, amount: 935000, provider: null }],
+      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: null }],
       tires: [{ row: 19, date: "2025-07-17", quantity: 2, reference: "Llanta X", price: null, notes: null }],
     };
     const existing: ExistingRecords = {
       ...NO_EXISTING,
-      fuels: [{ date: "2025-07-13", gallons: 100, amount: 935000 }],
+      fuels: [{ date: "2025-07-13", gallons: 100, urea: null, amount: 935000 }],
       tires: [{ date: "2025-07-17", quantity: 2, reference: "LLANTA X" }],
     };
     const plan = planLogbookImport(parsed, existing, CTX);
@@ -691,6 +714,23 @@ describe("planLogbookImport", () => {
     expect(plan.tires).toEqual([]);
     expect(plan.counts.combustible.duplicates).toBe(1);
     expect(plan.counts.llantas.duplicates).toBe(1);
+  });
+
+  it("tells a urea-only fill from a fuel fill on the same date", () => {
+    const parsed: LogbookImport = {
+      ...EMPTY,
+      fuels: [{ row: 7, date: "2025-07-22", gallons: null, urea: 47.67, amount: null, provider: null }],
+    };
+    const existing: ExistingRecords = {
+      ...NO_EXISTING,
+      fuels: [{ date: "2025-07-22", gallons: 50, urea: null, amount: 400000 }],
+    };
+    expect(planLogbookImport(parsed, existing, CTX).fuels).toHaveLength(1);
+    const same: ExistingRecords = {
+      ...NO_EXISTING,
+      fuels: [{ date: "2025-07-22", gallons: null, urea: 47.67, amount: null }],
+    };
+    expect(planLogbookImport(parsed, same, CTX).fuels).toEqual([]);
   });
 
   it("skips an oil change on a date that already has one", () => {
@@ -723,14 +763,14 @@ describe("planLogbookImport", () => {
     const parsed: LogbookImport = {
       ...EMPTY,
       services: [service("2026-02-13", "LAVADO", 140000)],
-      fuels: [{ row: 7, date: "2025-07-13", gallons: 45.5, amount: 410000, provider: null }],
+      fuels: [{ row: 7, date: "2025-07-13", gallons: 45.5, urea: null, amount: 410000, provider: null }],
       tires: [{ row: 19, date: "2025-07-17", quantity: 2, reference: "LLANTA", price: null, notes: null }],
       oils: [{ row: 14, date: "2025-06-13", km: 1000, items: [], notes: null }],
     };
     const first = planLogbookImport(parsed, NO_EXISTING, CTX);
     const existing: ExistingRecords = {
       services: first.services.map((s) => ({ date: s.date, description: s.description, price: s.price })),
-      fuels: first.fuels.map((f) => ({ date: f.date, gallons: f.gallons, amount: f.amount })),
+      fuels: first.fuels.map((f) => ({ date: f.date, gallons: f.gallons, urea: f.urea, amount: f.amount })),
       tires: first.tires.map((t) => ({ date: t.date, quantity: t.quantity, reference: t.reference })),
       oilDates: first.oils.map((o) => o.date),
     };
@@ -832,7 +872,7 @@ describe("previewOf", () => {
     const parsed: LogbookImport = {
       ...EMPTY,
       services: [service("2026-02-13", "LAVADO", 140000), service("2026-02-14", "ENGRASE", 1)],
-      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, amount: 935000, provider: null }],
+      fuels: [{ row: 7, date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: null }],
     };
     const preview = previewOf(planLogbookImport(parsed, NO_EXISTING, CTX), "WOM-158");
     expect(preview.plate).toBe("WOM-158");

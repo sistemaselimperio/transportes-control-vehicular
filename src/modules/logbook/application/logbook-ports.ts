@@ -23,8 +23,10 @@ export interface TireValues {
 
 export interface FuelValues {
   date: IsoDate;
-  gallons: number;
-  amount: number;
+  /** Fuel gallons; null on a urea-only fill. At least one of gallons and urea is set. */
+  gallons: number | null;
+  urea: number | null;
+  amount: number | null;
   provider: string | null;
 }
 

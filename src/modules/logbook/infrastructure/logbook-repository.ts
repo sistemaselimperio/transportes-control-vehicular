@@ -159,6 +159,7 @@ export async function loadFuelRows(scope: LogbookScope): Promise<FuelRow[]> {
       plate: schema.vehicles.plate,
       date: t.date,
       gallons: t.gallons,
+      urea: t.urea,
       amount: t.amount,
       provider: t.provider,
     })

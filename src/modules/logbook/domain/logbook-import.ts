@@ -78,8 +78,12 @@ export interface ImportedTire {
 export interface ImportedFuel {
   row: number;
   date: IsoDate;
-  gallons: number;
-  amount: number;
+  /** Null on a urea-only fill. */
+  gallons: number | null;
+  /** Urea (DEF) gallons; null when the row has none. */
+  urea: number | null;
+  /** Null when the sheet has no value. */
+  amount: number | null;
   provider: string | null;
 }
 
@@ -99,6 +103,8 @@ export interface LogbookImport {
 
 const MAX_MONEY = 2_000_000_000;
 const MAX_GALLONS = 9999.99;
+/** More urea than this in one fill is a peso amount typed in the urea column. */
+const MAX_UREA = 500;
 const MAX_TIRES = 50;
 
 /** Upper case, no accents, collapsed spaces: how names and labels are compared. */
@@ -130,12 +136,12 @@ function parseMoney(v: CellValue | undefined, name: string): Parsed<number | nul
 }
 
 /** Gallons with up to two decimals; a comma works as the decimal separator. */
-function parseGallons(v: CellValue | undefined): Parsed<number | null> {
+function parseGallons(v: CellValue | undefined, name = "Cantidad", max = MAX_GALLONS): Parsed<number | null> {
   const text = cellText(v ?? null);
   if (text === "") return { value: null, error: null };
   const amount = typeof v === "number" ? v : /^\d+([.,]\d+)?$/.test(text) ? Number(text.replace(",", ".")) : NaN;
-  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_GALLONS) {
-    return { value: null, error: `Cantidad no válida: "${text}".` };
+  if (!Number.isFinite(amount) || amount <= 0 || amount > max) {
+    return { value: null, error: `${name} no válida: "${text}".` };
   }
   return { value: Math.round(amount * 100) / 100, error: null };
 }
@@ -402,21 +408,35 @@ function parseFuels(sheet: RawSheet, issues: ImportIssue[]): ImportedFuel[] {
     }
     lastYear = yearOf(date.value);
     const gallons = parseGallons(cells[columns.gallons]);
-    if (gallons.error || gallons.value === null) {
-      const onlyUrea = !gallons.error && columns.urea !== undefined && cells[columns.urea] != null;
-      fail(rowNumber, gallons.error ?? (onlyUrea ? "Solo urea, sin galones de combustible." : "Sin cantidad."));
+    if (gallons.error) {
+      fail(rowNumber, gallons.error);
+      continue;
+    }
+    const ureaCell = columns.urea === undefined ? undefined : cells[columns.urea];
+    const urea = parseGallons(ureaCell, "Urea", Infinity);
+    if (urea.error) {
+      fail(rowNumber, urea.error);
+      continue;
+    }
+    if (urea.value !== null && urea.value > MAX_UREA) {
+      fail(rowNumber, "Urea fuera de rango (¿valor en pesos en la columna UREA?).");
+      continue;
+    }
+    if (gallons.value === null && urea.value === null) {
+      fail(rowNumber, "Sin cantidad.");
       continue;
     }
     const amount = parseMoney(cells[columns.amount], "Valor");
-    if (amount.error || !amount.value) {
-      fail(rowNumber, amount.error ?? "Sin valor.");
+    if (amount.error) {
+      fail(rowNumber, amount.error);
       continue;
     }
     out.push({
       row: rowNumber,
       date: date.value,
       gallons: gallons.value,
-      amount: amount.value,
+      urea: urea.value,
+      amount: amount.value || null,
       provider: textOrNull(cells[columns.provider]),
     });
   }
@@ -627,7 +647,7 @@ const TECHNICAL_FIELDS: ReadonlyArray<{ key: TechnicalKey; label: string }> = [
 /** What the vehicle already has, just enough to recognize a row that was imported before. */
 export interface ExistingRecords {
   services: Array<{ date: IsoDate; description: string; price: number | null }>;
-  fuels: Array<{ date: IsoDate; gallons: number; amount: number }>;
+  fuels: Array<{ date: IsoDate; gallons: number | null; urea: number | null; amount: number | null }>;
   tires: Array<{ date: IsoDate; reference: string; quantity: number }>;
   oilDates: IsoDate[];
   /** The vehicle's technical data now; absent means every field is empty. */
@@ -657,8 +677,8 @@ const textKey = (text: string) => stripAccents(text).toUpperCase().replace(/\s+/
 
 const serviceKey = (r: { date: string; description: string; price: number | null }) =>
   `${r.date}|${textKey(r.description)}|${r.price ?? ""}`;
-const fuelKey = (r: { date: string; gallons: number; amount: number }) =>
-  `${r.date}|${r.amount}|${r.gallons.toFixed(2)}`;
+const fuelKey = (r: { date: string; gallons: number | null; urea: number | null; amount: number | null }) =>
+  `${r.date}|${r.amount ?? ""}|${r.gallons?.toFixed(2) ?? ""}|${r.urea?.toFixed(2) ?? ""}`;
 const tireKey = (r: { date: string; reference: string; quantity: number }) =>
   `${r.date}|${textKey(r.reference)}|${r.quantity}`;
 

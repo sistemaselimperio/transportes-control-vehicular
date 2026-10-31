@@ -108,25 +108,49 @@ describe("tireSchema", () => {
 });
 
 describe("fuelSchema", () => {
-  it("reads gallons with a decimal comma or dot and the amount in pesos", () => {
+  it("reads gallons and urea with a decimal comma or dot and the amount in pesos", () => {
     const base = { plate: "ABC-123", date: "2026-05-10", amount: "250.000", provider: "Terpel" };
     expect(fuelSchema.parse({ ...base, gallons: "45,5" })).toEqual({
       plate: "ABC-123",
       date: "2026-05-10",
       gallons: 45.5,
+      urea: null,
       amount: 250_000,
       provider: "Terpel",
     });
     expect(fuelSchema.parse({ ...base, gallons: "45.25" }).gallons).toBe(45.25);
     expect(fuelSchema.parse({ ...base, gallons: "45" }).gallons).toBe(45);
+    expect(fuelSchema.parse({ ...base, gallons: "45", urea: "5,5" })).toMatchObject({ gallons: 45, urea: 5.5 });
   });
 
-  it("requires a quantity and amount greater than zero", () => {
+  it("accepts a urea-only fill, with or without amount", () => {
     const base = { plate: "ABC-123", date: "2026-05-10" };
-    expect(() => fuelSchema.parse({ ...base, gallons: "", amount: "1000" })).toThrow("la cantidad");
+    expect(fuelSchema.parse({ ...base, urea: "47,67" })).toMatchObject({ gallons: null, urea: 47.67, amount: null });
+    expect(fuelSchema.parse({ ...base, gallons: "", urea: "10", amount: "1000" })).toMatchObject({
+      gallons: null,
+      urea: 10,
+      amount: 1000,
+    });
+  });
+
+  it("accepts a fuel fill without amount", () => {
+    const parsed = fuelSchema.parse({ plate: "ABC-123", date: "2026-05-10", gallons: "10" });
+    expect(parsed.amount).toBeNull();
+  });
+
+  it("rejects a fill with neither gallons nor urea", () => {
+    const base = { plate: "ABC-123", date: "2026-05-10", amount: "1000" };
+    expect(() => fuelSchema.parse({ ...base })).toThrow("combustible o de urea");
+    expect(() => fuelSchema.parse({ ...base, gallons: "", urea: "" })).toThrow("combustible o de urea");
+    expect(() => fuelSchema.parse({ ...base, gallons: "0", urea: "0" })).toThrow();
+  });
+
+  it("validates gallons, urea and amount when present", () => {
+    const base = { plate: "ABC-123", date: "2026-05-10" };
     expect(() => fuelSchema.parse({ ...base, gallons: "0", amount: "1000" })).toThrow("la cantidad");
     expect(() => fuelSchema.parse({ ...base, gallons: "12,345", amount: "1000" })).toThrow("la cantidad");
-    expect(() => fuelSchema.parse({ ...base, gallons: "10", amount: "" })).toThrow("valor");
+    expect(() => fuelSchema.parse({ ...base, urea: "0" })).toThrow("la urea");
+    expect(() => fuelSchema.parse({ ...base, urea: "1,234" })).toThrow("la urea");
     expect(() => fuelSchema.parse({ ...base, gallons: "10", amount: "0" })).toThrow("valor");
   });
 

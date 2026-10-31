@@ -35,20 +35,27 @@ const tireBody = z.object({
   notes: textField,
 });
 
-/** Gallons: up to four digits and two decimals, with a comma or a dot as the separator. */
-const gallons = z
-  .string()
-  .default("")
-  .transform((v) => v.trim().replace(",", "."))
-  .refine((v) => /^\d{1,4}(\.\d{1,2})?$/.test(v) && Number(v) > 0, "Ingresa la cantidad (por ejemplo, 45,5).")
-  .transform(Number);
+/** Optional gallons: up to four digits and two decimals, with a comma or a dot as the separator. */
+const optionalGallons = (message: string) =>
+  z
+    .string()
+    .default("")
+    .transform((v) => v.trim().replace(",", "."))
+    .refine((v) => v === "" || (/^\d{1,4}(\.\d{1,2})?$/.test(v) && Number(v) > 0), message)
+    .transform((v) => (v === "" ? null : Number(v)));
+
+const NO_PRODUCT = "Ingresa la cantidad de combustible o de urea.";
 
 const fuelBody = z.object({
   date: dateField("Fecha"),
-  gallons,
-  amount: positiveInt("El valor", "Ingresa el valor pagado.", 2_000_000_000),
+  gallons: optionalGallons("Ingresa la cantidad (por ejemplo, 45,5)."),
+  urea: optionalGallons("Ingresa la urea (por ejemplo, 5,5)."),
+  amount: intField("El valor", 2_000_000_000).refine((v) => v === null || v > 0, "Ingresa el valor pagado."),
   provider: textField,
 });
+
+/** A fill needs fuel, urea or both. */
+const hasProduct = (v: { gallons: number | null; urea: number | null }) => v.gallons !== null || v.urea !== null;
 
 /** Creating needs the vehicle; editing keeps the one the record already has. */
 const withPlate = { plate: plateSchema };
@@ -57,8 +64,8 @@ export const serviceSchema = serviceBody.extend(withPlate);
 export const serviceEditSchema = serviceBody;
 export const tireSchema = tireBody.extend(withPlate);
 export const tireEditSchema = tireBody;
-export const fuelSchema = fuelBody.extend(withPlate);
-export const fuelEditSchema = fuelBody;
+export const fuelSchema = fuelBody.extend(withPlate).refine(hasProduct, { message: NO_PRODUCT, path: ["gallons"] });
+export const fuelEditSchema = fuelBody.refine(hasProduct, { message: NO_PRODUCT, path: ["gallons"] });
 
 export type ServiceInput = z.infer<typeof serviceEditSchema>;
 export type TireInput = z.infer<typeof tireEditSchema>;

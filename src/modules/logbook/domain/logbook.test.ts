@@ -119,12 +119,21 @@ describe("summarizeCost", () => {
 });
 
 describe("summarizeFuel", () => {
-  it("adds gallons and amounts without float noise", () => {
+  it("adds gallons, urea and amounts without float noise", () => {
     expect(
       summarizeFuel([
-        { gallons: 10.1, amount: 50000 },
-        { gallons: 20.2, amount: 100000 },
+        { gallons: 10.1, urea: 1.1, amount: 50000 },
+        { gallons: 20.2, urea: 2.2, amount: 100000 },
       ]),
-    ).toEqual({ count: 2, gallons: 30.3, amount: 150000 });
+    ).toEqual({ count: 2, gallons: 30.3, urea: 3.3, amount: 150000 });
+  });
+
+  it("ignores missing gallons, urea and amounts in the sums", () => {
+    expect(
+      summarizeFuel([
+        { gallons: 10, urea: null, amount: 50000 },
+        { gallons: null, urea: 47.67, amount: null },
+      ]),
+    ).toEqual({ count: 2, gallons: 10, urea: 47.67, amount: 50000 });
   });
 });
