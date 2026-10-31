@@ -70,7 +70,7 @@ export function LogbookImportFlow({
     });
   }
 
-  const skippedTotal = preview ? preview.tabs.reduce((sum, t) => sum + t.skipped, 0) + preview.technical.skipped : 0;
+  const skippedTotal = preview ? preview.services.skipped + preview.technical.skipped : 0;
   const busy = reading || importing;
 
   return (
@@ -79,7 +79,7 @@ export function LogbookImportFlow({
         <Field
           label="Archivo de la bitácora"
           htmlFor="logbook-import-file"
-          hint={`Excel (.xlsx) de hasta 4 MB. Debe ser la bitácora de ${plate}; lo que ya está registrado no se duplica.`}
+          hint={`Excel (.xlsx) de hasta 4 MB. Debe ser la bitácora de ${plate}. Se leen las hojas Datos generales y Mantenimiento; lo que ya está registrado no se duplica.`}
         >
           <Input
             id="logbook-import-file"
@@ -120,16 +120,14 @@ export function LogbookImportFlow({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {preview.tabs.map((t) => (
-                    <tr key={t.tab}>
-                      <th scope="row" className="px-3 py-2 text-left font-medium">
-                        {t.label}
-                      </th>
-                      <td className="num px-3 py-2 text-right font-semibold">{t.create}</td>
-                      <td className="num px-3 py-2 text-right text-muted-foreground">{t.duplicates}</td>
-                      <td className="num px-3 py-2 text-right text-muted-foreground">{t.skipped}</td>
-                    </tr>
-                  ))}
+                  <tr>
+                    <th scope="row" className="px-3 py-2 text-left font-medium">
+                      Mantenimiento
+                    </th>
+                    <td className="num px-3 py-2 text-right font-semibold">{preview.services.create}</td>
+                    <td className="num px-3 py-2 text-right text-muted-foreground">{preview.services.duplicates}</td>
+                    <td className="num px-3 py-2 text-right text-muted-foreground">{preview.services.skipped}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -158,7 +156,7 @@ export function LogbookImportFlow({
                   {preview.skipped.slice(0, SHOWN_SKIPPED).map((s) => (
                     <li key={`${s.tab}-${s.row}-${s.message}`}>
                       <span className="font-medium">
-                        {preview.tabs.find((t) => t.tab === s.tab)?.label ?? "Datos generales"}, fila {s.row}:
+                        {s.tab === "servicios" ? "Mantenimiento" : "Datos generales"}, fila {s.row}:
                       </span>{" "}
                       <span className="text-muted-foreground">{s.message}</span>
                     </li>

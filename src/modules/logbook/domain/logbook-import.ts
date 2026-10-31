@@ -13,7 +13,6 @@ import {
   type CellValue,
 } from "@/modules/import-export/domain/cell-parsers";
 import type { RawRow, RawSheet } from "@/modules/import-export/domain/types";
-import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import {
@@ -22,7 +21,6 @@ import {
   type VehicleTechnicalData,
 } from "@/modules/vehicles/domain/technical-data";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
-import { LOGBOOK_TABS, type LogbookTab } from "./logbook";
 
 /* ---------------------------------- The file ---------------------------------- */
 
@@ -41,8 +39,8 @@ export function importFileProblem(file: { name: string; size: number }): string 
 
 /** A row that cannot be imported, with the reason shown to the operator. */
 export interface ImportIssue {
-  /** A logbook tab, or "datos" for the "DATOS GENERALES" sheet. */
-  tab: LogbookTab | "datos";
+  /** "servicios" for the "MANTENIMIENTO" sheet, "datos" for the "DATOS GENERALES" sheet. */
+  tab: "servicios" | "datos";
   /** Row number in the Excel sheet. */
   row: number;
   message: string;
@@ -58,42 +56,10 @@ export interface ImportedService {
   notes: string | null;
 }
 
-export interface ImportedOil {
-  row: number;
-  date: IsoDate;
-  km: number | null;
-  items: OilItem[];
-  notes: string | null;
-}
-
-export interface ImportedTire {
-  row: number;
-  date: IsoDate;
-  quantity: number;
-  reference: string;
-  price: number | null;
-  notes: string | null;
-}
-
-export interface ImportedFuel {
-  row: number;
-  date: IsoDate;
-  /** Null on a urea-only fill. */
-  gallons: number | null;
-  /** Urea (DEF) gallons; null when the row has none. */
-  urea: number | null;
-  /** Null when the sheet has no value. */
-  amount: number | null;
-  provider: string | null;
-}
-
 export interface LogbookImport {
   /** Every distinct plate found in a "PLACA" cell of the file, canonical ("ABC-123"). */
   plates: string[];
   services: ImportedService[];
-  oils: ImportedOil[];
-  tires: ImportedTire[];
-  fuels: ImportedFuel[];
   /** Technical data found in "DATOS GENERALES": only the fields the sheet has a usable value for. */
   technical: Partial<VehicleTechnicalData>;
   issues: ImportIssue[];
@@ -102,10 +68,6 @@ export interface LogbookImport {
 /* -------------------------------- Cell helpers -------------------------------- */
 
 const MAX_MONEY = 2_000_000_000;
-const MAX_GALLONS = 9999.99;
-/** More urea than this in one fill is a peso amount typed in the urea column. */
-const MAX_UREA = 500;
-const MAX_TIRES = 50;
 
 /** Upper case, no accents, collapsed spaces: how names and labels are compared. */
 const norm = (v: CellValue | undefined): string => stripAccents(cellText(v ?? null)).toUpperCase();
@@ -133,17 +95,6 @@ function parseMoney(v: CellValue | undefined, name: string): Parsed<number | nul
     return { value: null, error: `${name} no válido: "${text}".` };
   }
   return { value: Math.round(amount), error: null };
-}
-
-/** Gallons with up to two decimals; a comma works as the decimal separator. */
-function parseGallons(v: CellValue | undefined, name = "Cantidad", max = MAX_GALLONS): Parsed<number | null> {
-  const text = cellText(v ?? null);
-  if (text === "") return { value: null, error: null };
-  const amount = typeof v === "number" ? v : /^\d+([.,]\d+)?$/.test(text) ? Number(text.replace(",", ".")) : NaN;
-  if (!Number.isFinite(amount) || amount <= 0 || amount > max) {
-    return { value: null, error: `${name} no válida: "${text}".` };
-  }
-  return { value: Math.round(amount * 100) / 100, error: null };
 }
 
 /** Excel day serials of 2000-01-01 and 2100-12-31; day 0 is 1899-12-30. */
@@ -375,235 +326,11 @@ function parseServices(sheet: RawSheet, issues: ImportIssue[]): ImportedService[
   return out;
 }
 
-/* ------------------------------- COMBUSTIBLE ------------------------------- */
-
-function parseFuels(sheet: RawSheet, issues: ImportIssue[]): ImportedFuel[] {
-  const out: ImportedFuel[] = [];
-  const fail = (row: number, message: string) => issues.push({ tab: "combustible", row, message });
-  let header: Header | null = null;
-  let lastYear: number | null = null;
-
-  for (const { rowNumber, cells } of sortedRows(sheet)) {
-    if (label(cells.B) === "FECHA" && Object.values(cells).some((v) => label(v) === "CANTIDAD")) {
-      header = readHeader(cells); // every month repeats the header
-      continue;
-    }
-    if (!header || label(cells.B).startsWith("MES")) continue;
-    if (norm(cells.B).startsWith("TOTAL") || norm(cells.C).startsWith("TOTAL")) continue;
-    const columns = {
-      gallons: columnOf(header, ["CANTIDAD", "GALONES"], "C")!,
-      urea: columnOf(header, ["UREA"]),
-      amount: columnOf(header, PRICE, "D")!,
-      provider: columnOf(header, PROVIDER, "E")!,
-    };
-
-    const date = parseLogDate(cells.B, lastYear);
-    if (date.error) {
-      fail(rowNumber, date.error);
-      continue;
-    }
-    if (date.value === null) {
-      fail(rowNumber, "Sin fecha.");
-      continue;
-    }
-    lastYear = yearOf(date.value);
-    const gallons = parseGallons(cells[columns.gallons]);
-    if (gallons.error) {
-      fail(rowNumber, gallons.error);
-      continue;
-    }
-    const ureaCell = columns.urea === undefined ? undefined : cells[columns.urea];
-    const urea = parseGallons(ureaCell, "Urea", Infinity);
-    if (urea.error) {
-      fail(rowNumber, urea.error);
-      continue;
-    }
-    if (urea.value !== null && urea.value > MAX_UREA) {
-      fail(rowNumber, "Urea fuera de rango (¿valor en pesos en la columna UREA?).");
-      continue;
-    }
-    if (gallons.value === null && urea.value === null) {
-      fail(rowNumber, "Sin cantidad.");
-      continue;
-    }
-    const amount = parseMoney(cells[columns.amount], "Valor");
-    if (amount.error) {
-      fail(rowNumber, amount.error);
-      continue;
-    }
-    out.push({
-      row: rowNumber,
-      date: date.value,
-      gallons: gallons.value,
-      urea: urea.value,
-      amount: amount.value || null,
-      provider: textOrNull(cells[columns.provider]),
-    });
-  }
-  return out;
-}
-
-/* ------------------------------ ACEITE / LLANTAS ------------------------------ */
-
-/** A "FECHA ... CANTIDAD/DETALLE" block of the oil and tire sheets. */
-interface Block {
-  row: number;
-  date: CellValue;
-  km: CellValue;
-  /** The CANTIDAD row: where each column of the items is. */
-  header: Header;
-  items: RawRow[];
-}
-
-/**
- * Splits a sheet into its dated blocks. Whatever comes before the first FECHA row
- * (the template list of filters and tires) belongs to no block. A block's items are
- * every non-empty row under its CANTIDAD header up to the next FECHA, blank rows
- * in between included. The date and the km may be typed in column C or D.
- */
-function readBlocks(sheet: RawSheet): Block[] {
-  const blocks: Block[] = [];
-  let current: Block | null = null;
-  let readingItems = false;
-
-  for (const row of sortedRows(sheet)) {
-    const { rowNumber, cells } = row;
-    const first = label(cells.B);
-
-    if (first === "FECHA") {
-      current = { row: rowNumber, date: cells.C ?? cells.D ?? null, km: null, header: [], items: [] };
-      blocks.push(current);
-      readingItems = false;
-      continue;
-    }
-    if (!current) continue;
-
-    if (first === "CANTIDAD") {
-      current.header = readHeader(cells);
-      readingItems = true;
-    } else if (readingItems) {
-      if (Object.keys(cells).length > 0) current.items.push(row);
-    } else if (first === "KILOMETRAJE") {
-      current.km = cells.C ?? cells.D ?? null;
-    }
-  }
-  return blocks;
-}
-
-/**
- * Block date; null (with an issue when there is something to lose) when it cannot be used.
- * `lastYear` carries the year of the previous block, for dates whose year has a typo.
- */
-function blockDate(block: Block, tab: LogbookTab, issues: ImportIssue[], lastYear: { value: number | null }): IsoDate | null {
-  const parsed = parseLogDate(block.date, lastYear.value);
-  if (parsed.error) {
-    issues.push({ tab, row: block.row, message: parsed.error });
-    return null;
-  }
-  if (parsed.value !== null) lastYear.value = yearOf(parsed.value);
-  if (parsed.value === null) {
-    // Empty template blocks are everywhere in these files: only report the ones that hold data.
-    if (block.items.some((i) => Object.keys(i.cells).length > 0)) {
-      issues.push({ tab, row: block.row, message: "Bloque sin fecha." });
-    }
-    return null;
-  }
-  return parsed.value;
-}
-
-/** "48 CUARTOS" -> quantity 48 and the unit text; a plain number is the quantity. */
-function parseOilQuantity(v: CellValue | undefined): { quantity: number; unit: string } {
-  if (typeof v === "number" && Number.isFinite(v) && v > 0) return { quantity: v, unit: "" };
-  const match = /^(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(cellText(v ?? null));
-  if (!match) return { quantity: 1, unit: cellText(v ?? null) };
-  const quantity = Number(match[1].replace(",", "."));
-  return { quantity: quantity > 0 ? quantity : 1, unit: match[2] };
-}
-
-function parseOils(sheet: RawSheet, issues: ImportIssue[]): ImportedOil[] {
-  const out: ImportedOil[] = [];
-  const lastYear = { value: null as number | null };
-  for (const block of readBlocks(sheet)) {
-    const date = blockDate(block, "aceite", issues, lastYear);
-    if (date === null) continue;
-    const detailColumn = columnOf(block.header, DESCRIPTION, "C")!;
-    const notesColumn = columnOf(block.header, NOTES, "D")!;
-
-    const items: OilItem[] = [];
-    const observations: Array<string | null> = [];
-    for (const { cells } of block.items) {
-      // A row with only an observation still counts: it goes to the notes.
-      observations.push(textOrNull(cells[notesColumn]));
-      const { quantity, unit } = parseOilQuantity(cells.B);
-      const detail = [unit, cellText(cells[detailColumn] ?? null)].filter(Boolean).join(" ");
-      if (detail !== "") items.push({ quantity, detail });
-    }
-    out.push({
-      row: block.row,
-      date,
-      km: parseKmCell(block.km).km,
-      items,
-      notes: joinNotes(observations),
-    });
-  }
-  return out;
-}
-
-function parseTires(sheet: RawSheet, issues: ImportIssue[]): ImportedTire[] {
-  const out: ImportedTire[] = [];
-  const lastYear = { value: null as number | null };
-  for (const block of readBlocks(sheet)) {
-    const date = blockDate(block, "llantas", issues, lastYear);
-    if (date === null) continue;
-    const fail = (row: number, message: string) => issues.push({ tab: "llantas", row, message });
-    const priceColumn = columnOf(block.header, PRICE);
-    const kmColumn = columnOf(block.header, KM);
-    // The classic layout has a fourth column with the observation when it is not the price.
-    const notesColumn = columnOf(block.header, NOTES, priceColumn === "D" || kmColumn === "D" ? undefined : "D");
-
-    for (const { rowNumber, cells } of block.items) {
-      if (cells.B == null && cells.C == null) continue; // a leftover note
-
-      const quantityText = cellText(cells.B ?? null);
-      if (quantityText === "") {
-        fail(rowNumber, "Sin cantidad.");
-        continue;
-      }
-      const quantity = typeof cells.B === "number" ? Math.round(cells.B) : Number(/^\d+/.exec(quantityText)?.[0] ?? NaN);
-      if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_TIRES) {
-        fail(rowNumber, `Cantidad no válida: "${quantityText}".`);
-        continue;
-      }
-      const reference = cellText(cells.C ?? null);
-      if (reference === "") {
-        fail(rowNumber, "Sin detalle.");
-        continue;
-      }
-      const price = parseMoney(priceColumn ? cells[priceColumn] : undefined, "Valor");
-      if (price.error) {
-        fail(rowNumber, price.error);
-        continue;
-      }
-      // Tire changes have no km of their own: it is kept in the notes.
-      const km = kmColumn ? parseKmCell(cells[kmColumn] ?? null).km : null;
-      out.push({
-        row: rowNumber,
-        date,
-        quantity,
-        reference,
-        price: price.value,
-        notes: joinNotes([notesColumn ? textOrNull(cells[notesColumn]) : null, km === null ? null : `KM ${km}`]),
-      });
-    }
-  }
-  return out;
-}
-
 /* -------------------------------- Entry point -------------------------------- */
 
 /**
- * Reads every logbook sheet of the workbook plus the technical data of "DATOS GENERALES";
- * other sheets only feed the plate check. `ctx.today` bounds the model year.
+ * Reads the services of "MANTENIMIENTO" and the technical data of "DATOS GENERALES";
+ * every other sheet (ACEITE, LLANTAS, COMBUSTIBLE...) is ignored and only feeds the plate check. `ctx.today` bounds the model year.
  */
 export function parseLogbookWorkbook(
   sheets: readonly RawSheet[],
@@ -611,17 +338,11 @@ export function parseLogbookWorkbook(
 ): LogbookImport {
   const issues: ImportIssue[] = [];
   const services = findSheet(sheets, "MANTENIMIENTO");
-  const oils = findSheet(sheets, "ACEITE");
-  const tires = findSheet(sheets, "LLANTAS");
-  const fuels = findSheet(sheets, "COMBUSTIBLE");
   const general = findSheet(sheets, "DATOS GENERALES");
   const technical = general ? parseTechnicalData(general, issues, ctx.today) : {};
   return {
     plates: collectPlates(sheets),
     services: services ? parseServices(services, issues) : [],
-    oils: oils ? parseOils(oils, issues) : [],
-    tires: tires ? parseTires(tires, issues) : [],
-    fuels: fuels ? parseFuels(fuels, issues) : [],
     technical,
     issues,
   };
@@ -647,14 +368,11 @@ const TECHNICAL_FIELDS: ReadonlyArray<{ key: TechnicalKey; label: string }> = [
 /** What the vehicle already has, just enough to recognize a row that was imported before. */
 export interface ExistingRecords {
   services: Array<{ date: IsoDate; description: string; price: number | null }>;
-  fuels: Array<{ date: IsoDate; gallons: number | null; urea: number | null; amount: number | null }>;
-  tires: Array<{ date: IsoDate; reference: string; quantity: number }>;
-  oilDates: IsoDate[];
   /** The vehicle's technical data now; absent means every field is empty. */
   technical?: VehicleTechnicalData;
 }
 
-export interface TabCounts {
+export interface ServiceCounts {
   create: number;
   duplicates: number;
   skipped: number;
@@ -662,13 +380,9 @@ export interface TabCounts {
 
 export interface ImportPlan {
   services: ImportedService[];
-  /** Oldest first, the order they are registered in. */
-  oils: ImportedOil[];
-  tires: ImportedTire[];
-  fuels: ImportedFuel[];
   /** Technical fields to fill: only those the vehicle has empty. */
   technical: Partial<VehicleTechnicalData>;
-  counts: Record<LogbookTab, TabCounts>;
+  counts: ServiceCounts;
   /** Every row left out for a reason other than being a duplicate, by tab and row. */
   skipped: ImportIssue[];
 }
@@ -677,15 +391,11 @@ const textKey = (text: string) => stripAccents(text).toUpperCase().replace(/\s+/
 
 const serviceKey = (r: { date: string; description: string; price: number | null }) =>
   `${r.date}|${textKey(r.description)}|${r.price ?? ""}`;
-const fuelKey = (r: { date: string; gallons: number | null; urea: number | null; amount: number | null }) =>
-  `${r.date}|${r.amount ?? ""}|${r.gallons?.toFixed(2) ?? ""}|${r.urea?.toFixed(2) ?? ""}`;
-const tireKey = (r: { date: string; reference: string; quantity: number }) =>
-  `${r.date}|${textKey(r.reference)}|${r.quantity}`;
 
 /**
  * Decides what to create: rows dated after `today` and rows that already exist, or
- * repeat inside the file, are left out. Oil changes come in as the Excel has them,
- * with or without km. Planning the same file twice therefore creates nothing the second time.
+ * repeat inside the file, are left out. Planning the same file twice therefore
+ * creates nothing the second time.
  */
 export function planLogbookImport(
   parsed: LogbookImport,
@@ -693,44 +403,22 @@ export function planLogbookImport(
   ctx: { today: IsoDate },
 ): ImportPlan {
   const skipped: ImportIssue[] = [...parsed.issues];
-  const counts = Object.fromEntries(
-    LOGBOOK_TABS.map((t) => [t.key, { create: 0, duplicates: 0, skipped: 0 }]),
-  ) as Record<LogbookTab, TabCounts>;
+  const counts: ServiceCounts = { create: 0, duplicates: 0, skipped: 0 };
 
-  /** Keeps the rows that are neither future nor already known. */
-  function select<T extends { row: number; date: IsoDate }>(
-    tab: LogbookTab,
-    rows: readonly T[],
-    known: Iterable<string>,
-    key: (row: T) => string,
-  ): T[] {
-    const seen = new Set(known);
-    const kept: T[] = [];
-    for (const row of rows) {
-      if (row.date > ctx.today) {
-        skipped.push({ tab, row: row.row, message: `Fecha futura (${formatDisplayDate(row.date)}).` });
-      } else if (seen.has(key(row))) {
-        counts[tab].duplicates += 1;
-      } else {
-        seen.add(key(row));
-        kept.push(row);
-      }
+  // Keeps the rows that are neither future nor already known.
+  const seen = new Set(existing.services.map(serviceKey));
+  const services: ImportedService[] = [];
+  for (const row of parsed.services) {
+    if (row.date > ctx.today) {
+      skipped.push({ tab: "servicios", row: row.row, message: `Fecha futura (${formatDisplayDate(row.date)}).` });
+    } else if (seen.has(serviceKey(row))) {
+      counts.duplicates += 1;
+    } else {
+      seen.add(serviceKey(row));
+      services.push(row);
     }
-    return kept;
   }
-
-  const services = select("servicios", parsed.services, existing.services.map(serviceKey), serviceKey);
-  const oils = select("aceite", parsed.oils, existing.oilDates, (o) => o.date).sort((a, b) =>
-    a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row,
-  );
-  const tires = select("llantas", parsed.tires, existing.tires.map(tireKey), tireKey);
-  const fuels = select("combustible", parsed.fuels, existing.fuels.map(fuelKey), fuelKey);
-
-  counts.servicios.create = services.length;
-  counts.aceite.create = oils.length;
-  counts.llantas.create = tires.length;
-  counts.combustible.create = fuels.length;
-
+  counts.create = services.length;
   // Fill only what the vehicle has empty: an existing value is never overwritten.
   const current = existing.technical ?? EMPTY_TECHNICAL_DATA;
   const technical: Partial<VehicleTechnicalData> = {};
@@ -739,13 +427,12 @@ export function planLogbookImport(
     if (value != null && current[key] == null) Object.assign(technical, { [key]: value });
   }
 
-  // General-data issues come last, after the four tabs.
-  const order = (tab: ImportIssue["tab"]) =>
-    tab === "datos" ? LOGBOOK_TABS.length : LOGBOOK_TABS.findIndex((t) => t.key === tab);
+  // General-data issues come last, after the services.
+  const order = (tab: ImportIssue["tab"]) => (tab === "datos" ? 1 : 0);
   skipped.sort((a, b) => order(a.tab) - order(b.tab) || a.row - b.row);
-  for (const { tab } of skipped) if (tab !== "datos") counts[tab].skipped += 1;
+  counts.skipped = skipped.filter((s) => s.tab === "servicios").length;
 
-  return { services, oils, tires, fuels, technical, counts, skipped };
+  return { services, technical, counts, skipped };
 }
 
 /* ---------------------------------- Preview ---------------------------------- */
@@ -756,7 +443,8 @@ export const PREVIEW_SKIPPED_LIMIT = 100;
 /** What the operator sees before confirming; plain data, safe to send to the browser. */
 export interface ImportPreview {
   plate: string;
-  tabs: Array<{ tab: LogbookTab; label: string } & TabCounts>;
+  /** "Mantenimiento": what would be created, what already exists and the rows left out. */
+  services: ServiceCounts;
   skipped: ImportIssue[];
   /** "Datos generales": the fields that would be filled, and the rows of that sheet left out. */
   technical: { count: number; labels: string[]; skipped: number };
@@ -764,13 +452,12 @@ export interface ImportPreview {
 }
 
 export function previewOf(plan: ImportPlan, plate: string): ImportPreview {
-  const tabs = LOGBOOK_TABS.map(({ key, label: name }) => ({ tab: key, label: name, ...plan.counts[key] }));
   const labels = TECHNICAL_FIELDS.filter(({ key }) => plan.technical[key] != null).map((f) => f.label);
   return {
     plate,
-    tabs,
+    services: plan.counts,
     skipped: plan.skipped.slice(0, PREVIEW_SKIPPED_LIMIT),
     technical: { count: labels.length, labels, skipped: plan.skipped.filter((s) => s.tab === "datos").length },
-    total: tabs.reduce((sum, t) => sum + t.create, 0) + labels.length,
+    total: plan.counts.create + labels.length,
   };
 }

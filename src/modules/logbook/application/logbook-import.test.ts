@@ -61,16 +61,9 @@ const generalSheet = (plate = "WOM-158"): RawSheet => ({
   ]),
 });
 
-const vehicle: ImportVehicle = {
-  id: 7,
-  status: "ACTIVE",
-  odometerWorking: true,
-  currentKm: 400000,
-  oilMode: "both",
-  oilInterval: { months: 6, km: 20000 },
-};
+const vehicle: ImportVehicle = { id: 7, status: "ACTIVE" };
 
-const noExisting: ExistingRecords = { services: [], fuels: [], tires: [], oilDates: [] };
+const noExisting: ExistingRecords = { services: [] };
 
 function setup(options: { vehicle?: ImportVehicle | null; existing?: ExistingRecords; sheets?: RawSheet[] | Error } = {}) {
   const writes: Array<{ vehicleId: number; write: ImportWrite }> = [];
@@ -98,13 +91,8 @@ describe("preview", () => {
   it("counts what would be created and what is skipped, and writes nothing", async () => {
     const { importer, writes } = setup();
     const preview = await importer.preview("WOM-158", data);
-    expect(preview.total).toBe(5);
-    expect(preview.tabs.map((t) => [t.tab, t.create, t.skipped])).toEqual([
-      ["servicios", 1, 1],
-      ["aceite", 2, 0], // the second change has no km in the Excel: it comes in all the same
-      ["llantas", 1, 0],
-      ["combustible", 1, 0],
-    ]);
+    expect(preview.total).toBe(1); // the ACEITE, LLANTAS and COMBUSTIBLE sheets are not read
+    expect(preview.services).toEqual({ create: 1, duplicates: 0, skipped: 1 });
     expect(preview.skipped.map((s) => [s.tab, s.row])).toEqual([["servicios", 9]]);
     expect(writes).toEqual([]);
   });
@@ -131,63 +119,25 @@ describe("preview", () => {
 });
 
 describe("confirm", () => {
-  it("writes every new record in one call, as PREVENTIVE services with the oil change planned like the oil form", async () => {
+  it("writes the new services in one call, as PREVENTIVE, and nothing from the ignored sheets", async () => {
     const { importer, writes } = setup();
     const result = await importer.confirm("WOM-158", data);
 
     expect(writes).toHaveLength(1);
     const { vehicleId, write } = writes[0];
     expect(vehicleId).toBe(7);
-    expect(write.services).toEqual([
-      { date: "2026-02-13", kind: "PREVENTIVE", description: "SERVICIO LAVADO GENERAL", provider: "91455007", km: null, price: 140000, notes: null },
-    ]);
-    expect(write.tires).toEqual([
-      { date: "2025-07-17", quantity: 2, reference: "LLANTA 295 80 22,5", provider: null, price: null, notes: "PENDIENTE" },
-    ]);
-    expect(write.fuels).toEqual([{ date: "2025-07-13", gallons: 100, urea: null, amount: 935000, provider: "EDS" }]);
-    expect(write.oils).toEqual([
-      {
-        date: "2025-06-13",
-        km: 407279,
-        intervalMonths: 6,
-        intervalKm: 20000,
-        nextDate: "2025-12-13",
-        nextKm: 427279,
-        price: null,
-        notes: null,
-        items: [{ quantity: 48, detail: "CUARTOS DELO 15W40" }],
-      },
-      {
-        // No km in the Excel: planned by date only, and the odometer is left alone.
-        date: "2025-09-11",
-        km: null,
-        intervalMonths: 6,
-        intervalKm: 20000,
-        nextDate: "2026-03-11",
-        nextKm: null,
-        price: null,
-        notes: null,
-        items: [{ quantity: 1, detail: "FILTRO" }],
-      },
-    ]);
-    expect(write.newCurrentKm).toEqual({ km: 407279, at: "2025-06-13" });
-    expect(result.message).toBe(
-      "Se importaron 1 mantenimiento, 2 cambios de aceite, 1 cambio de llantas, 1 tanqueo.",
-    );
-  });
-
-  it("does not lower the odometer: an older oil change leaves newCurrentKm empty", async () => {
-    const { importer, writes } = setup({ vehicle: { ...vehicle, currentKm: 500000 } });
-    await importer.confirm("WOM-158", data);
-    expect(writes[0].write.newCurrentKm).toBeNull();
+    expect(write).toEqual({
+      services: [
+        { date: "2026-02-13", kind: "PREVENTIVE", description: "SERVICIO LAVADO GENERAL", provider: "91455007", km: null, price: 140000, notes: null },
+      ],
+      technical: {},
+    });
+    expect(result.message).toBe("Se importaron 1 mantenimiento.");
   });
 
   it("writes nothing when everything already exists", async () => {
     const existing: ExistingRecords = {
       services: [{ date: "2026-02-13", description: "SERVICIO LAVADO GENERAL", price: 140000 }],
-      fuels: [{ date: "2025-07-13", gallons: 100, urea: null, amount: 935000 }],
-      tires: [{ date: "2025-07-17", reference: "LLANTA 295 80 22,5", quantity: 2 }],
-      oilDates: ["2025-06-13", "2025-09-11"],
     };
     const { importer, writes } = setup({ existing });
     const result = await importer.confirm("WOM-158", data);
@@ -227,7 +177,7 @@ describe("technical data from DATOS GENERALES", () => {
     const { importer } = setup({ sheets: [...workbook(), generalSheet()] });
     const result = await importer.confirm("WOM-158", data);
     expect(result.message).toBe(
-      "Se importaron 1 mantenimiento, 2 cambios de aceite, 1 cambio de llantas, 1 tanqueo, 3 datos técnicos.",
+      "Se importaron 1 mantenimiento, 3 datos técnicos.",
     );
   });
 

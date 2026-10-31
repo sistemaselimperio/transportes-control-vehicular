@@ -16,12 +16,12 @@ export const logbookImportRepository: LogbookImportRepository = {
   async findVehicle(plate) {
     const [vehicle] = await vehicleCommandRepository.findByPlates([plate]);
     if (!vehicle) return null;
-    const { id, status, odometerWorking, currentKm, oilMode, oilInterval } = vehicle;
-    return { id, status, odometerWorking, currentKm, oilMode, oilInterval };
+    const { id, status } = vehicle;
+    return { id, status };
   },
 
   async loadExisting(vehicleId) {
-    const [services, fuels, tires, oils, [technical]] = await Promise.all([
+    const [services, [technical]] = await Promise.all([
       db
         .select({
           date: schema.vehicleServices.date,
@@ -30,24 +30,6 @@ export const logbookImportRepository: LogbookImportRepository = {
         })
         .from(schema.vehicleServices)
         .where(eq(schema.vehicleServices.vehicleId, vehicleId)),
-      db
-        .select({
-          date: schema.fuelFills.date,
-          gallons: schema.fuelFills.gallons,
-          urea: schema.fuelFills.urea,
-          amount: schema.fuelFills.amount,
-        })
-        .from(schema.fuelFills)
-        .where(eq(schema.fuelFills.vehicleId, vehicleId)),
-      db
-        .select({
-          date: schema.tireChanges.date,
-          reference: schema.tireChanges.reference,
-          quantity: schema.tireChanges.quantity,
-        })
-        .from(schema.tireChanges)
-        .where(eq(schema.tireChanges.vehicleId, vehicleId)),
-      db.select({ date: schema.oilChanges.date }).from(schema.oilChanges).where(eq(schema.oilChanges.vehicleId, vehicleId)),
       db
         .select({
           registrationDate: schema.vehicles.registrationDate,
@@ -65,7 +47,7 @@ export const logbookImportRepository: LogbookImportRepository = {
         .from(schema.vehicles)
         .where(eq(schema.vehicles.id, vehicleId)),
     ]);
-    return { services, fuels, tires, oilDates: oils.map((o) => o.date), technical };
+    return { services, technical };
   },
 
   async apply(vehicleId, write) {
@@ -73,28 +55,6 @@ export const logbookImportRepository: LogbookImportRepository = {
     await db.transaction(async (tx) => {
       for (const rows of chunks(write.services)) {
         await tx.insert(schema.vehicleServices).values(rows.map((r) => ({ ...r, vehicleId })));
-      }
-      for (const rows of chunks(write.tires)) {
-        await tx.insert(schema.tireChanges).values(rows.map((r) => ({ ...r, vehicleId })));
-      }
-      for (const rows of chunks(write.fuels)) {
-        await tx.insert(schema.fuelFills).values(rows.map((r) => ({ ...r, vehicleId })));
-      }
-      // Same writes as `addOilChange` of the vehicle commands, inside this transaction.
-      for (const { items, ...oil } of write.oils) {
-        const [row] = await tx
-          .insert(schema.oilChanges)
-          .values({ ...oil, vehicleId })
-          .returning({ id: schema.oilChanges.id });
-        if (items.length > 0) {
-          await tx.insert(schema.oilChangeItems).values(items.map((item) => ({ oilChangeId: row.id, ...item })));
-        }
-      }
-      if (write.newCurrentKm) {
-        await tx
-          .update(schema.vehicles)
-          .set({ currentKm: write.newCurrentKm.km, currentKmAt: write.newCurrentKm.at })
-          .where(eq(schema.vehicles.id, vehicleId));
       }
       // COALESCE keeps a value saved by someone else since the plan was made: never overwritten.
       const fill = (Object.keys(write.technical) as Array<keyof typeof write.technical>).map(

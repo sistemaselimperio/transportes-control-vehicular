@@ -5,7 +5,6 @@
  * it parses and checks the file again. The workbook reader and the repository
  * are injected, which keeps the use cases unit-testable with fakes.
  */
-import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import type { RawSheet } from "@/modules/import-export/domain/types";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { assertEditable, RuleError } from "@/modules/vehicles/domain/vehicle-rules";
@@ -17,7 +16,7 @@ import {
   type ImportPlan,
   type ImportPreview,
 } from "../domain/logbook-import";
-import type { ImportWrite, LogbookImportRepository, PlannedOilChange } from "./logbook-import-ports";
+import type { ImportWrite, LogbookImportRepository } from "./logbook-import-ports";
 
 export interface LogbookImportDeps {
   repo: LogbookImportRepository;
@@ -36,9 +35,6 @@ function summaryMessage(plan: ImportPlan): string {
   const technicalCount = Object.keys(plan.technical).length;
   const parts = [
     plan.services.length > 0 && count(plan.services.length, "mantenimiento", "mantenimientos"),
-    plan.oils.length > 0 && count(plan.oils.length, "cambio de aceite", "cambios de aceite"),
-    plan.tires.length > 0 && count(plan.tires.length, "cambio de llantas", "cambios de llantas"),
-    plan.fuels.length > 0 && count(plan.fuels.length, "tanqueo", "tanqueos"),
     technicalCount > 0 && count(technicalCount, "dato técnico", "datos técnicos"),
   ].filter(Boolean);
   return parts.length === 0 ? "No hay registros nuevos para importar." : `Se importaron ${parts.join(", ")}.`;
@@ -65,37 +61,6 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
     const existing = await repo.loadExisting(vehicle.id);
     const plan = planLogbookImport(parsed, existing, { today: today() });
 
-    // Oil changes are planned like the "Cambio de aceite" button does, oldest first so the
-    // odometer only ever rises: next due date/km come from the vehicle's current interval.
-    // One the Excel has without km is planned by date only, so the history stays complete.
-    let currentKm = vehicle.currentKm;
-    let newCurrentKm: ImportWrite["newCurrentKm"] = null;
-    const oils: PlannedOilChange[] = [];
-    for (const oil of plan.oils) {
-      const planned = planOilChange({
-        date: oil.date,
-        km: oil.km,
-        today: today(),
-        vehicle: { odometerWorking: vehicle.odometerWorking && oil.km !== null, currentKm, oilMode: vehicle.oilMode },
-        interval: vehicle.oilInterval,
-      });
-      if (planned.newCurrentKm !== null) {
-        currentKm = planned.newCurrentKm;
-        newCurrentKm = { km: planned.newCurrentKm, at: oil.date };
-      }
-      oils.push({
-        date: oil.date,
-        km: oil.km,
-        intervalMonths: planned.intervalMonths,
-        intervalKm: planned.intervalKm,
-        nextDate: planned.nextDate,
-        nextKm: planned.nextKm,
-        price: null,
-        notes: oil.notes,
-        items: oil.items,
-      });
-    }
-
     return {
       plan,
       vehicleId: vehicle.id,
@@ -111,23 +76,6 @@ export function createLogbookImport({ repo, readSheets, today }: LogbookImportDe
           price: s.price,
           notes: s.notes,
         })),
-        tires: plan.tires.map((t) => ({
-          date: t.date,
-          quantity: t.quantity,
-          reference: t.reference,
-          provider: null,
-          price: t.price,
-          notes: t.notes,
-        })),
-        fuels: plan.fuels.map((f) => ({
-          date: f.date,
-          gallons: f.gallons,
-          urea: f.urea,
-          amount: f.amount,
-          provider: f.provider,
-        })),
-        oils,
-        newCurrentKm,
         technical: plan.technical,
       },
     };
