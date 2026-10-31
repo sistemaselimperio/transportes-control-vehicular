@@ -126,11 +126,14 @@
 /*
  * Sky theme (per-user, `data-theme="sky"` on the app shell): #87CEEB (sky) as the fill with dark
  * ink on top, #a9dcf1 and #cdeaf6 (tints), #1e6f8c (deep teal-blue ink for lines and marks on light
- * surfaces, like the olive of the yellow palette). Plates, status colors, destructive and the
- * other series colors keep their meaning and are not overridden.
+ * surfaces, like the olive of the yellow palette). Plates take the sky fill too, matching the active
+ * nav item. Status colors, destructive and the other series colors keep their meaning and are not
+ * overridden.
  */
 [data-theme="sky"] {
   --tint-hue: 230;
+  --plate: #87ceeb;
+  --plate-foreground: #0f1d24;
   --background: #f2f6f8;
   --foreground: #0f1d24;
   --card-foreground: #0f1d24;
