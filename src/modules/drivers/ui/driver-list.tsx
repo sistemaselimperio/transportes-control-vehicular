@@ -1,8 +1,8 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { ClipboardCheck, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { AlertStatus } from "@/modules/alerts/domain/alert-status";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import {
@@ -38,6 +38,20 @@ function Plates({ plates }: { plates: readonly string[] }) {
 const Status = ({ status }: { status: DriverStatus }) => (
   <StatusPill status={STATUS_TONE[status]}>{DRIVER_STATUS_LABELS[status]}</StatusPill>
 );
+
+/** Opens the pre-operational inspections list filtered to the inspections linked to this driver. */
+function InspectionsLink({ row }: { row: DriverRow }) {
+  return (
+    <Link
+      href={`/preoperacionales?conductor=${row.id}`}
+      aria-label={`Preoperacionales de ${row.name}`}
+      title="Preoperacionales"
+      className={buttonVariants({ variant: "ghost", size: "icon", className: "size-11 md:size-9" })}
+    >
+      <ClipboardCheck aria-hidden />
+    </Link>
+  );
+}
 
 function EditButton({ row, onEdit }: { row: DriverRow; onEdit: (row: DriverRow) => void }) {
   return (
@@ -91,6 +105,7 @@ export function DriverList({
               <span className="min-w-0 font-medium">{r.name}</span>
               <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                 <Status status={r.status} />
+                <InspectionsLink row={r} />
                 <EditButton row={r} onEdit={onEdit} />
                 <DeleteButton row={r} onDelete={onDelete} />
               </div>
@@ -125,7 +140,7 @@ export function DriverList({
                     {h}
                   </th>
                 ))}
-                <th scope="col" className="w-24">
+                <th scope="col" className="w-32">
                   <span className="sr-only">Acciones</span>
                 </th>
               </tr>
@@ -152,6 +167,7 @@ export function DriverList({
                     <Plates plates={r.plates} />
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                    <InspectionsLink row={r} />
                     <EditButton row={r} onEdit={onEdit} />
                     <DeleteButton row={r} onDelete={onDelete} />
                   </td>

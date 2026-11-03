@@ -57,6 +57,8 @@ const HEADER_ORDER = ["date", "time", "plate", "trailerPlate", "driverName", "dr
 
 const INPUT = "h-12 text-base";
 
+const PLATE_SUGGESTIONS_ID = "fleet-plates";
+
 type Done = Extract<SubmitInspectionResult, { ok: true }>;
 
 const subscribeNever = () => () => {};
@@ -76,7 +78,7 @@ function useColombiaNow(): { date: string; time: string } {
 }
 
 /** The public page: the form, then a green or red result screen, then back to a blank form. */
-export function PreoperationalFlow() {
+export function PreoperationalFlow({ plates }: { plates: readonly string[] }) {
   const [round, setRound] = useState(0);
   const [done, setDone] = useState<Done | null>(null);
 
@@ -91,10 +93,10 @@ export function PreoperationalFlow() {
       />
     );
   }
-  return <InspectionForm key={round} onDone={setDone} />;
+  return <InspectionForm key={round} plates={plates} onDone={setDone} />;
 }
 
-function InspectionForm({ onDone }: { onDone: (result: Done) => void }) {
+function InspectionForm({ plates, onDone }: { plates: readonly string[]; onDone: (result: Done) => void }) {
   // What the user typed; date and time stay null until edited and then follow the clock.
   const [edits, setHeader] = useState<HeaderEdits>(EMPTY_EDITS);
   const defaults = useColombiaNow();
@@ -198,6 +200,12 @@ function InspectionForm({ onDone }: { onDone: (result: Done) => void }) {
             <TextField label="Fecha" name="date" type="date" value={header.date} error={errors.date} onChange={setField} />
             <TextField label="Hora" name="time" type="time" value={header.time} error={errors.time} onChange={setField} />
           </div>
+          {/* Only the fleet's plates, as suggestions: the fields stay free text. */}
+          <datalist id={PLATE_SUGGESTIONS_ID}>
+            {plates.map((plate) => (
+              <option key={plate} value={plate} />
+            ))}
+          </datalist>
           <div className="grid grid-cols-2 gap-3">
             <TextField
               label="Placa"
@@ -208,6 +216,7 @@ function InspectionForm({ onDone }: { onDone: (result: Done) => void }) {
               required
               autoCapitalize="characters"
               autoComplete="off"
+              list={PLATE_SUGGESTIONS_ID}
               className="uppercase"
             />
             <TextField
@@ -219,6 +228,7 @@ function InspectionForm({ onDone }: { onDone: (result: Done) => void }) {
               hint="Opcional"
               autoCapitalize="characters"
               autoComplete="off"
+              list={PLATE_SUGGESTIONS_ID}
               className="uppercase"
             />
           </div>

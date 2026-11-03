@@ -4,8 +4,10 @@ import type { ReactNode } from "react";
 import { StatusMark } from "@/components/app/status-mark";
 import { VehicleLogbookSection } from "@/modules/logbook/ui/vehicle-logbook";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
+import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import type { VehicleInspectionRow } from "@/modules/inspections/infrastructure/inspection-repository";
 import type { VehicleDetail } from "../application/vehicle-queries";
 import { technicalGroups } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
@@ -161,8 +163,13 @@ export function VehicleDetailView({
   detail,
   readOnly = false,
   allowed,
+  inspections = [],
+  inspectionsLimit = 20,
 }: {
   detail: VehicleDetail;
+  /** Latest pre-operational inspections of this vehicle, newest first; read per request, not cached. */
+  inspections?: readonly VehicleInspectionRow[];
+  inspectionsLimit?: number;
   readOnly?: boolean;
   /** Actions a read-only user may still run (see `FileActions`). */
   allowed?: readonly ActionKey[];
@@ -225,6 +232,10 @@ export function VehicleDetailView({
         </div>
 
         <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} canManage={!readOnly} />
+
+        <Section id="preoperacionales" title="Preoperacionales" note={inspections.length > 0 ? `${inspections.length}${inspections.length >= inspectionsLimit ? "+" : ""}` : undefined}>
+          <VehicleInspectionsList vehicleId={r.id} rows={inspections} limit={inspectionsLimit} />
+        </Section>
 
         {(r.notes || detail.sale) && (
           <Section id="notas" title={detail.sale ? "Notas y venta" : "Notas"}>

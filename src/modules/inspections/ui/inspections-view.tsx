@@ -1,12 +1,12 @@
-import { ChevronLeft, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Search } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import type { InspectionFilters } from "../domain/inspection-filters";
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
+import { NotRegisteredBadge, StatusBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 function pageHref(filters: InspectionFilters, page: number) {
@@ -14,25 +14,29 @@ function pageHref(filters: InspectionFilters, page: number) {
   if (filters.plate) params.set("placa", filters.plate);
   if (filters.from) params.set("desde", filters.from);
   if (filters.to) params.set("hasta", filters.to);
+  if (filters.driverId) params.set("conductor", String(filters.driverId));
+  if (filters.vehicleId) params.set("vehiculo", String(filters.vehicleId));
   if (page > 1) params.set("pagina", String(page));
   const qs = params.toString();
   return qs ? `/preoperacionales?${qs}` : "/preoperacionales";
 }
 
-/** Own badge instead of `StatusPill`, whose hidden text says "Vencido" / "Vigente". Icon + text, not colour alone. */
-function StatusBadge({ critical }: { critical: boolean }) {
-  const Icon = critical ? CircleAlert : CircleCheck;
+/** The plate as a link to the vehicle's file when it is registered, else plain text plus a badge. */
+function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean }) {
+  if (row.vehiclePlate && linked) {
+    return (
+      <Link
+        href={`/flota/${encodeURIComponent(row.vehiclePlate)}`}
+        className="plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
+      >
+        {row.plate}
+      </Link>
+    );
+  }
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-xs leading-none font-medium whitespace-nowrap ring-1 ring-inset",
-        critical
-          ? "bg-danger-foreground/15 text-danger-foreground ring-danger-foreground/40"
-          : "bg-ok text-ok-foreground ring-ok-foreground/25",
-      )}
-    >
-      <Icon className="size-3.5 shrink-0" aria-hidden />
-      {critical ? "Crítico" : "OK"}
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className="plate">{row.plate}</span>
+      {!row.vehiclePlate && <NotRegisteredBadge>Placa no registrada</NotRegisteredBadge>}
     </span>
   );
 }
@@ -47,7 +51,7 @@ export function InspectionsView({
   filters: InspectionFilters;
   hasNext: boolean;
 }) {
-  const filtered = Boolean(filters.plate || filters.from || filters.to);
+  const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId);
   return (
     <section className="space-y-5">
       <PageHeader
@@ -56,6 +60,9 @@ export function InspectionsView({
       />
 
       <form method="get" action="/preoperacionales" className="flex flex-wrap items-end gap-3">
+        {/* The registered driver / vehicle filters come from links elsewhere; keep them when filtering. */}
+        {filters.driverId && <input type="hidden" name="conductor" value={filters.driverId} />}
+        {filters.vehicleId && <input type="hidden" name="vehiculo" value={filters.vehicleId} />}
         <div className="space-y-1.5">
           <Label htmlFor="insp-plate" className="text-sm text-foreground">
             Placa
@@ -113,10 +120,13 @@ export function InspectionsView({
                   className="block space-y-2 rounded-2xl border bg-card p-4 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/70"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="plate">{r.plate}</span>
+                    <PlateCell row={r} linked={false} />
                     <StatusBadge critical={r.hasCriticalFailure} />
                   </div>
-                  <p className="font-medium">{r.driverName}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+                    {r.driverName}
+                    {!r.driverId && <NotRegisteredBadge>Conductor no registrado</NotRegisteredBadge>}
+                  </p>
                   <p className="text-sm text-muted-foreground">{r.route}</p>
                   <p className="num text-xs text-muted-foreground">
                     {formatInspectionDate(r.inspectionDate)} · {r.inspectionTime}
@@ -155,9 +165,14 @@ export function InspectionsView({
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="plate">{r.plate}</span>
+                        <PlateCell row={r} linked />
                       </td>
-                      <td className="px-4 py-3 font-medium">{r.driverName}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {r.driverName}
+                          {!r.driverId && <NotRegisteredBadge>Conductor no registrado</NotRegisteredBadge>}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">{r.route}</td>
                       <td className="px-4 py-3">
                         <StatusBadge critical={r.hasCriticalFailure} />

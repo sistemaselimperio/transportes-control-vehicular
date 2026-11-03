@@ -31,6 +31,7 @@ const { fleet, owners, drivers, sales, logbook, dashboard, expiredCounts, files 
 
 export type ReadName =
   | "fleetRows"
+  | "fleetPlates"
   | "vehicleFormOptions"
   | "vehicleDetail"
   | "dashboard"
@@ -43,6 +44,7 @@ export type ReadName =
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   fleetRows: [fleet, owners, drivers, files],
+  fleetPlates: [fleet],
   vehicleFormOptions: [fleet, owners, drivers],
   vehicleDetail: [fleet, owners, drivers, sales, logbook],
   dashboard: [dashboard, fleet, owners],

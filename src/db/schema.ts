@@ -345,7 +345,8 @@ export const vehicleFiles = transportes.table(
 
 /**
  * Daily pre-operational inspections (form FO-PESV-016), submitted from the public form. The header
- * is free text on purpose: it is not linked to the vehicles or the drivers, whose data is incomplete.
+ * is free text on purpose (the fleet data is incomplete); the ids below are soft links, filled in when
+ * the typed plate / national id matches a registered record and null otherwise.
  */
 export const preoperationalInspections = transportes.table(
   "preoperational_inspections",
@@ -357,6 +358,9 @@ export const preoperationalInspections = transportes.table(
     inspectionTime: text("inspection_time").notNull(),
     plate: text().notNull(),
     trailerPlate: text("trailer_plate"),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    trailerVehicleId: integer("trailer_vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    driverId: integer("driver_id").references(() => drivers.id, { onDelete: "set null" }),
     driverName: text("driver_name").notNull(),
     driverNationalId: text("driver_national_id").notNull(),
     odometer: text().notNull(),
@@ -373,6 +377,9 @@ export const preoperationalInspections = transportes.table(
   (t) => [
     index("preoperational_inspections_date_idx").on(t.inspectionDate, t.createdAt),
     index("preoperational_inspections_plate_idx").on(t.plate),
+    index("preoperational_inspections_vehicle_idx").on(t.vehicleId),
+    index("preoperational_inspections_trailer_vehicle_idx").on(t.trailerVehicleId),
+    index("preoperational_inspections_driver_idx").on(t.driverId),
   ],
 );
 

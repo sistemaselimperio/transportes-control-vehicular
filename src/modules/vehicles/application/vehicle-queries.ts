@@ -12,6 +12,7 @@ import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
   loadVehicleEditValues,
   loadVehicleFormLists,
+  loadFleetPlates,
   loadLastOilItems,
   loadVehicleHistory,
   loadVehicleRowInputs,
@@ -25,6 +26,15 @@ export async function listVehicleRows(today: IsoDate): Promise<VehicleGridRow[]>
 
   const inputs = await loadVehicleRowInputs(today);
   return inputs.map(buildVehicleRow);
+}
+
+/** Plates of the fleet for the public inspection form's suggestions; company-wide, no session involved. */
+export async function listFleetPlates(): Promise<string[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(...readTags("fleetPlates"));
+
+  return loadFleetPlates();
 }
 
 export interface HistoryItem {

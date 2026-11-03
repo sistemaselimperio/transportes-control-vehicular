@@ -214,6 +214,16 @@ export async function loadVehicleFormLists() {
   return { classes, plates: plates.map((p) => p.plate) };
 }
 
+/** Plates of the vehicles still in the fleet (not sold), nothing else: the public form suggests them. */
+export async function loadFleetPlates(): Promise<string[]> {
+  const rows = await db
+    .select({ plate: schema.vehicles.plate })
+    .from(schema.vehicles)
+    .where(ne(schema.vehicles.status, "SOLD"))
+    .orderBy(asc(schema.vehicles.plate));
+  return rows.map((r) => r.plate);
+}
+
 /** Current editable data of one vehicle (prefills the edit form). */
 export async function loadVehicleEditValues(plate: string) {
   const towing = alias(schema.vehicles, "towing");

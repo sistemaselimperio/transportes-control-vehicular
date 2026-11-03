@@ -10,6 +10,7 @@ import {
   type ChecklistItem,
 } from "../domain/preoperational-checklist";
 import type { InspectionDetail } from "../infrastructure/inspection-repository";
+import { NotRegisteredBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 import { PrintButton } from "./print-button";
 
@@ -27,6 +28,48 @@ function Data({ label, children }: { label: string; children: React.ReactNode })
       <p className="micro-label print:text-black">{label}</p>
       <p className="mt-1 font-medium break-words">{children}</p>
     </div>
+  );
+}
+
+const LINK = "underline underline-offset-2 outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-ring/70";
+
+/** Where the typed header points in the fleet and the drivers. Screen only: the printed sheet is the form. */
+function RegisteredLinks({ inspection }: { inspection: InspectionDetail }) {
+  const fleetLink = (plate: string) => (
+    <Link href={`/flota/${encodeURIComponent(plate)}`} className={LINK}>
+      Ficha de {plate}
+    </Link>
+  );
+  return (
+    <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm print:hidden">
+      <li className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground">Vehículo</span>
+        {inspection.vehiclePlate ? fleetLink(inspection.vehiclePlate) : <NotRegisteredBadge>Placa no registrada</NotRegisteredBadge>}
+      </li>
+      {inspection.trailerPlate && (
+        <li className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground">Remolque</span>
+          {inspection.trailerRegisteredPlate ? (
+            fleetLink(inspection.trailerRegisteredPlate)
+          ) : (
+            <NotRegisteredBadge>Placa no registrada</NotRegisteredBadge>
+          )}
+        </li>
+      )}
+      <li className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground">Conductor</span>
+        {inspection.driverId ? (
+          <>
+            <span className="font-medium">{inspection.registeredDriverName}</span>
+            <Link href={`/preoperacionales?conductor=${inspection.driverId}`} className={LINK}>
+              Ver sus inspecciones
+            </Link>
+          </>
+        ) : (
+          <NotRegisteredBadge>Conductor no registrado</NotRegisteredBadge>
+        )}
+      </li>
+    </ul>
   );
 }
 
@@ -56,6 +99,8 @@ export function InspectionSheet({ inspection }: { inspection: InspectionDetail }
         </Link>
         <PrintButton />
       </div>
+
+      <RegisteredLinks inspection={inspection} />
 
       <div className="mx-auto w-full max-w-4xl bg-card text-sm text-card-foreground print:max-w-none print:bg-white print:text-[11px] print:text-black">
         <div className="grid grid-cols-[1fr_auto] border border-foreground/60 print:border-black sm:grid-cols-[1fr_2fr_auto]">

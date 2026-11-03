@@ -3,7 +3,7 @@ import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, parseInspectionFilters } from
 
 describe("parseInspectionFilters", () => {
   it("defaults to no filters on the first page", () => {
-    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, page: 1 });
+    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, driverId: null, vehicleId: null, page: 1 });
   });
 
   it("normalizes the plate like the form does", () => {
@@ -31,6 +31,17 @@ describe("parseInspectionFilters", () => {
     expect(parseInspectionFilters({ pagina: "3" }).page).toBe(3);
     for (const bad of ["0", "-2", "1.5", "abc", "", "99999999999"]) {
       expect(parseInspectionFilters({ pagina: bad }).page).toBe(1);
+    }
+  });
+});
+
+describe("parseInspectionFilters driver and vehicle", () => {
+  it("accepts only positive whole ids", () => {
+    expect(parseInspectionFilters({ conductor: "12" }).driverId).toBe(12);
+    expect(parseInspectionFilters({ vehiculo: "7" }).vehicleId).toBe(7);
+    for (const bad of ["0", "-2", "1.5", "abc", "", "99999999999"]) {
+      expect(parseInspectionFilters({ conductor: bad }).driverId).toBeNull();
+      expect(parseInspectionFilters({ vehiculo: bad }).vehicleId).toBeNull();
     }
   });
 });
