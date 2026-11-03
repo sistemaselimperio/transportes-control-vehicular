@@ -11,6 +11,7 @@ import { requireAdmin } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
   deleteAllOwners,
+  deleteOwner,
   findOwnerIdByDocument,
   insertOwner,
   updateOwner,
@@ -63,6 +64,15 @@ export async function updateOwnerAction(id: number, fd: FormData): Promise<Actio
     await ensureUniqueDocument(input, ownerId);
     if (!(await updateOwner(ownerId, input))) throw new OwnerError("El propietario ya no existe.");
     return `Propietario ${input.name} actualizado.`;
+  });
+}
+
+/** Removes one owner and their ownership links; the vehicles stay. */
+export async function deleteOwnerAction(id: number): Promise<ActionResult> {
+  return run(async () => {
+    const name = await deleteOwner(ownerIdSchema.parse(id));
+    if (name === null) throw new OwnerError("El propietario ya no existe.");
+    return `Propietario ${name} eliminado.`;
   });
 }
 

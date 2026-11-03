@@ -61,6 +61,15 @@ export async function updateOwner(id: number, values: OwnerValues) {
   return rows.length === 1;
 }
 
+/** Removes one owner and their ownership links (the vehicles stay); returns its name, or null when it no longer exists. */
+export async function deleteOwner(id: number): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    await tx.delete(schema.ownerships).where(eq(schema.ownerships.ownerId, id));
+    const [row] = await tx.delete(schema.owners).where(eq(schema.owners.id, id)).returning({ name: schema.owners.name });
+    return row?.name ?? null;
+  });
+}
+
 /** Removes every owner and their ownership links (the vehicles stay); returns how many owners went. */
 export async function deleteAllOwners() {
   return db.transaction(async (tx) => {

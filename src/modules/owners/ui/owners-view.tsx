@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Plus, Search } from "lucide-react";
+import { CheckCircle2, CircleAlert, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
@@ -9,6 +9,7 @@ import { TabBar } from "@/components/app/tab-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GROUP_LABELS, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
+import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { deleteAllOwnersAction } from "../application/owner-actions";
 import {
   countOwnerViews,
@@ -43,12 +44,30 @@ export function OwnersView({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<OwnerRow | undefined>();
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const counts = countOwnerViews(rows, query);
   const visible = filterOwnerRows(rows, { view, query });
 
+  const showMessage = (text: string) => {
+    setError(null);
+    setMessage(text);
+    setTimeout(() => setMessage(null), 6000);
+  };
+
+  const onDeleteResult = (result: ActionResult) => {
+    if (result.ok) {
+      showMessage(result.message);
+      return;
+    }
+    setMessage(null);
+    setError(result.error);
+    setTimeout(() => setError(null), 8000);
+  };
+
   const openForm = (owner?: OwnerRow) => {
     setMessage(null);
+    setError(null);
     setEditing(owner);
     setOpen(true);
   };
@@ -114,6 +133,7 @@ export function OwnersView({
               : "Ningún propietario coincide con la búsqueda."
           }
           onEdit={openForm}
+          onResult={onDeleteResult}
         />
       </div>
 
@@ -124,6 +144,15 @@ export function OwnersView({
         >
           <CheckCircle2 className="size-4 shrink-0" aria-hidden />
           {message}
+        </p>
+      )}
+      {error && (
+        <p
+          role="alert"
+          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-danger-foreground/30 bg-danger-foreground/10 px-4 py-3 text-sm text-danger-foreground shadow-soft"
+        >
+          <CircleAlert className="size-4 shrink-0" aria-hidden />
+          {error}
         </p>
       )}
 
@@ -137,8 +166,7 @@ export function OwnersView({
           owner={editing}
           onCancel={() => setOpen(false)}
           onDone={(msg) => {
-            setMessage(msg);
-            setTimeout(() => setMessage(null), 6000);
+            showMessage(msg);
             setOpen(false);
           }}
         />
