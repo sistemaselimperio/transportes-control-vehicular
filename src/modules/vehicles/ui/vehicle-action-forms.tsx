@@ -350,6 +350,9 @@ export function TechnicalFields({ values }: { values: VehicleTechnicalData }) {
               defaultValue={text("grossWeightKg")}
             />
           </Field>
+          <Field label="Color" htmlFor="tech-color">
+            <Input id="tech-color" name="color" className={FIELD} defaultValue={text("color")} placeholder="Blanco" />
+          </Field>
         </div>
     </>
   );
