@@ -12,6 +12,9 @@ export function proxy(request: NextRequest) {
   // A cookie may belong to a session that no longer exists, so /login is
   // never redirected here: the login page validates the real session itself.
   if (pathname === "/login") return NextResponse.next();
+  // The daily inspection form is public: drivers fill it in without an account. Its server action
+  // posts to this same path and validates everything itself.
+  if (pathname === "/preoperacional") return NextResponse.next();
   if (!hasSession) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

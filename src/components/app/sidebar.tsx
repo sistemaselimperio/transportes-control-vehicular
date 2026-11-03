@@ -3,6 +3,7 @@
 import {
   Bell,
   Building2,
+  ClipboardCheck,
   Loader2,
   LogOut,
   Menu,
@@ -38,6 +39,7 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
       { href: "/", label: "Alertas", icon: Bell, badge: "expired" },
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
+      { href: "/preoperacionales", label: "Preoperacionales", icon: ClipboardCheck },
       { href: "/bitacora", label: "Bitácora", icon: NotebookText },
     ],
   },
@@ -279,7 +281,7 @@ export function Sidebar({
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-2 md:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-2 md:hidden print:hidden!">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -302,7 +304,7 @@ export function Sidebar({
         <SidebarBody {...shared} onNavigate={() => setDrawerOpen(false)} />
       </SlideOver>
 
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r bg-sidebar md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r bg-sidebar md:flex print:hidden!">
         <BrandStacked />
         <SidebarBody {...shared} />
       </aside>

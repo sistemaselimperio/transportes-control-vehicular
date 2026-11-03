@@ -70,7 +70,7 @@ function Frame({ theme, children }: { theme?: Theme; children: React.ReactNode }
 
 function Main({ children }: { children: React.ReactNode }) {
   return (
-    <main id="contenido" className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8">
+    <main id="contenido" className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8 print:p-0!">
       <div className="mx-auto w-full max-w-[96rem]">{children}</div>
     </main>
   );

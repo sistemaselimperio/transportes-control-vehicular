@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, parseInspectionFilters } from "./inspection-filters";
+
+describe("parseInspectionFilters", () => {
+  it("defaults to no filters on the first page", () => {
+    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, page: 1 });
+  });
+
+  it("normalizes the plate like the form does", () => {
+    expect(parseInspectionFilters({ placa: " abc 12 " }).plate).toBe("ABC12");
+  });
+
+  it("keeps valid dates and drops invalid ones", () => {
+    const filters = parseInspectionFilters({ desde: "2026-03-01", hasta: "not-a-date" });
+    expect(filters.from).toBe("2026-03-01");
+    expect(filters.to).toBeNull();
+    expect(parseInspectionFilters({ desde: "2026-02-31" }).from).toBeNull();
+  });
+
+  it("swaps a reversed range", () => {
+    const filters = parseInspectionFilters({ desde: "2026-03-10", hasta: "2026-03-01" });
+    expect(filters.from).toBe("2026-03-01");
+    expect(filters.to).toBe("2026-03-10");
+  });
+
+  it("takes the first value of a repeated parameter", () => {
+    expect(parseInspectionFilters({ placa: ["abc", "xyz"] }).plate).toBe("ABC");
+  });
+
+  it("accepts only a positive whole page number", () => {
+    expect(parseInspectionFilters({ pagina: "3" }).page).toBe(3);
+    for (const bad of ["0", "-2", "1.5", "abc", "", "99999999999"]) {
+      expect(parseInspectionFilters({ pagina: bad }).page).toBe(1);
+    }
+  });
+});
+
+describe("escapeLikePattern", () => {
+  it("escapes the LIKE wildcards so the plate is matched literally", () => {
+    expect(escapeLikePattern("A%B_C\\")).toBe("A\\%B\\_C\\\\");
+  });
+});
+
+describe("INSPECTIONS_PAGE_SIZE", () => {
+  it("is a sensible page size", () => {
+    expect(INSPECTIONS_PAGE_SIZE).toBeGreaterThan(0);
+    expect(INSPECTIONS_PAGE_SIZE).toBeLessThanOrEqual(100);
+  });
+});

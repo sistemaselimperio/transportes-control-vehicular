@@ -18,14 +18,15 @@ describe("parseRole", () => {
 
 describe("canViewSection", () => {
   it("lets an admin see every section", () => {
-    for (const section of ["today", "fleet", "drivers", "logbook", "owners", "sales"] as const) {
+    for (const section of ["today", "fleet", "drivers", "inspections", "logbook", "owners", "sales"] as const) {
       expect(canViewSection("admin", section)).toBe(true);
     }
   });
 
-  it("lets staff see only the fleet and the drivers", () => {
+  it("lets staff see only the fleet, the drivers and the inspections", () => {
     expect(canViewSection("staff", "fleet")).toBe(true);
     expect(canViewSection("staff", "drivers")).toBe(true);
+    expect(canViewSection("staff", "inspections")).toBe(true);
     for (const section of ["today", "logbook", "owners", "sales"] as const) {
       expect(canViewSection("staff", section)).toBe(false);
     }
@@ -53,6 +54,8 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/flota/ABC123")).toBe("fleet");
     expect(sectionOfPath("/conductores")).toBe("drivers");
     expect(sectionOfPath("/bitacora")).toBe("logbook");
+    expect(sectionOfPath("/preoperacionales")).toBe("inspections");
+    expect(sectionOfPath("/preoperacionales/0b9d2c1e")).toBe("inspections");
     expect(sectionOfPath("/propietarios")).toBe("owners");
     expect(sectionOfPath("/ventas")).toBe("sales");
   });
@@ -60,6 +63,10 @@ describe("sectionOfPath", () => {
   it("does not match a path that merely starts with a section name", () => {
     expect(sectionOfPath("/flotante")).toBeNull();
     expect(sectionOfPath("/login")).toBeNull();
+  });
+
+  it("leaves the public inspection form outside every section", () => {
+    expect(sectionOfPath("/preoperacional")).toBeNull();
   });
 });
 

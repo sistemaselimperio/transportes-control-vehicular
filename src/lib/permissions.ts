@@ -1,18 +1,19 @@
 /**
  * Who may do what. Pure policy, shared by the server (pages, actions, routes) and the UI.
  * `admin` can do everything; `staff` can read the fleet (list, file, documents, logbook of a
- * vehicle), open vehicle files, and manage the drivers (create, edit, delete); nothing else is
- * writable for them.
+ * vehicle), open vehicle files, manage the drivers (create, edit, delete) and read the submitted
+ * pre-operational inspections; nothing else is writable for them.
  */
 export type Role = "admin" | "staff";
 
-export type Section = "today" | "fleet" | "drivers" | "logbook" | "owners" | "sales";
+export type Section = "today" | "fleet" | "drivers" | "inspections" | "logbook" | "owners" | "sales";
 
-const STAFF_SECTIONS: ReadonlySet<Section> = new Set(["fleet", "drivers"]);
+const STAFF_SECTIONS: ReadonlySet<Section> = new Set(["fleet", "drivers", "inspections"]);
 
 const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
   ["fleet", "/flota"],
   ["drivers", "/conductores"],
+  ["inspections", "/preoperacionales"],
   ["logbook", "/bitacora"],
   ["owners", "/propietarios"],
   ["sales", "/ventas"],

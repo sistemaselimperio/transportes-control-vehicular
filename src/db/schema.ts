@@ -11,6 +11,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgSchema,
   text,
@@ -339,6 +340,39 @@ export const vehicleFiles = transportes.table(
       .defaultNow(),
   },
   (t) => [index("vehicle_files_vehicle_category_idx").on(t.vehicleId, t.category)],
+);
+
+/**
+ * Daily pre-operational inspections (form FO-PESV-016), submitted from the public form. The header
+ * is free text on purpose: it is not linked to the vehicles or the drivers, whose data is incomplete.
+ */
+export const preoperationalInspections = transportes.table(
+  "preoperational_inspections",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Colombia calendar date and local time as typed on the form. */
+    inspectionDate: date("inspection_date", { mode: "string" }).notNull(),
+    inspectionTime: text("inspection_time").notNull(),
+    plate: text().notNull(),
+    trailerPlate: text("trailer_plate"),
+    driverName: text("driver_name").notNull(),
+    driverNationalId: text("driver_national_id").notNull(),
+    odometer: text().notNull(),
+    route: text().notNull(),
+    /** The vehicle is not a mule: the mule-only items were not asked. */
+    muleNotApplicable: boolean("mule_not_applicable").notNull().default(false),
+    /** Checklist item id to `{ status: "BIEN" | "MAL", note? }`; ids live in the domain checklist. */
+    answers: jsonb().$type<Record<string, { status: "BIEN" | "MAL"; note?: string }>>().notNull(),
+    /** Computed server-side: some critical point (★) is MAL. */
+    hasCriticalFailure: boolean("has_critical_failure").notNull().default(false),
+    /** PNG data URL of the drawn signature. */
+    signature: text().notNull(),
+  },
+  (t) => [
+    index("preoperational_inspections_date_idx").on(t.inspectionDate, t.createdAt),
+    index("preoperational_inspections_plate_idx").on(t.plate),
+  ],
 );
 
 /* ------------------- Better Auth (username plugin) ------------------- */

@@ -273,3 +273,10 @@
     }
   }
 }
+
+/* Printed pages (e.g. a saved inspection): modest margins; the app chrome hides itself with `print:`. */
+@media print {
+  @page {
+    margin: 10mm;
+  }
+}
