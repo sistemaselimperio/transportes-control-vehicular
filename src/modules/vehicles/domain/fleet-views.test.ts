@@ -52,7 +52,7 @@ describe("filtersForView", () => {
     expect(filtersForView("taller")).toMatchObject({ status: "IN_WORKSHOP", onlyAlerts: false });
     expect(filtersForView("quietas")).toMatchObject({ status: "IDLE", onlyAlerts: false });
     expect(filtersForView("vendidos")).toMatchObject({ status: "SOLD", onlyAlerts: false });
-    expect(filtersForView("todos")).toMatchObject({ status: "ALL", onlyAlerts: false });
+    expect(filtersForView("todos")).toMatchObject({ status: "NOT_SOLD", onlyAlerts: false });
   });
 
   it("leaves the other filters at their defaults", () => {
@@ -70,7 +70,7 @@ describe("viewFromFilters", () => {
   });
 
   it("returns null for combinations no tab represents", () => {
-    expect(viewFromFilters({ ...DEFAULT_FILTERS })).toBeNull();
+    expect(viewFromFilters({ ...DEFAULT_FILTERS, status: "ALL" })).toBeNull();
     expect(viewFromFilters({ ...DEFAULT_FILTERS, status: "ACTIVE", onlyAlerts: true })).toBeNull();
   });
 });
@@ -84,7 +84,7 @@ describe("countByView", () => {
       taller: 1,
       quietas: 1,
       vendidos: 1,
-      todos: 6,
+      todos: 5,
     });
     for (const { key } of FLEET_VIEWS) {
       expect(counts[key]).toBe(filterVehicleRows(rows, filtersForView(key)).length);

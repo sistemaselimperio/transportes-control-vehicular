@@ -29,7 +29,8 @@ const VIEW_FILTERS: Record<FleetView, Pick<VehicleFilters, "status" | "onlyAlert
   taller: { status: "IN_WORKSHOP", onlyAlerts: false },
   quietas: { status: "IDLE", onlyAlerts: false },
   vendidos: { status: "SOLD", onlyAlerts: false },
-  todos: { status: "ALL", onlyAlerts: false },
+  // Sold vehicles live only under "vendidos".
+  todos: { status: "NOT_SOLD", onlyAlerts: false },
 };
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
