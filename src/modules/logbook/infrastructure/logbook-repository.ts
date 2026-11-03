@@ -1,12 +1,16 @@
-import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
+import { escapeLikePattern } from "@/modules/shared/domain/like-pattern";
 import type { LogbookRepository } from "../application/logbook-ports";
 import {
   driverAtDate,
+  LOGBOOK_PAGE_SIZE,
+  type CostSummary,
   type DriverPeriod,
   type FuelRow,
+  type FuelSummary,
   type LogbookQuery,
   type OilRow,
   type ServiceRow,
@@ -17,8 +21,19 @@ import {
 /** What a list is narrowed to: a whole vehicle, or the filters of the fleet-wide page. */
 export type LogbookScope = Partial<LogbookQuery> & { vehicleId?: number };
 
+/** The columns a tab's text search looks at, and the service kind column when it has one. */
+interface TabFilters {
+  search: PgColumn[];
+  kind?: PgColumn;
+}
+
 /** Every logbook table has `vehicle_id` and `date`; the vehicle is joined for the plate filter. */
-function scopeFilter(table: { vehicleId: PgColumn; date: PgColumn }, scope: LogbookScope): SQL | undefined {
+function scopeFilter(
+  table: { vehicleId: PgColumn; date: PgColumn },
+  scope: LogbookScope,
+  tab: TabFilters = { search: [] },
+): SQL | undefined {
+  const pattern = scope.search ? `%${escapeLikePattern(scope.search)}%` : null;
   return and(
     scope.vehicleId !== undefined ? eq(table.vehicleId, scope.vehicleId) : undefined,
     // The plate is already reduced to letters and digits, so it holds no LIKE wildcards.
@@ -35,7 +50,40 @@ function scopeFilter(table: { vehicleId: PgColumn; date: PgColumn }, scope: Logb
             .where(and(isNull(schema.ownerships.toDate), eq(schema.owners.group, scope.group))),
         )
       : undefined,
+    pattern ? or(...tab.search.map((column) => ilike(column, pattern))) : undefined,
+    scope.kind && tab.kind ? eq(tab.kind, scope.kind) : undefined,
+    scope.driverId != null
+      ? sql`exists (
+          select 1 from ${schema.driverAssignments}
+          where ${schema.driverAssignments.vehicleId} = ${table.vehicleId}
+            and ${schema.driverAssignments.driverId} = ${scope.driverId}
+            and ${schema.driverAssignments.fromDate} <= ${table.date}
+            and (${schema.driverAssignments.toDate} is null or ${schema.driverAssignments.toDate} >= ${table.date})
+        )`
+      : undefined,
   );
+}
+
+const SERVICE_FILTERS: TabFilters = {
+  search: [schema.vehicleServices.description, schema.vehicleServices.provider, schema.vehicleServices.notes],
+  kind: schema.vehicleServices.kind,
+};
+const OIL_FILTERS: TabFilters = { search: [schema.oilChanges.notes] };
+const TIRE_FILTERS: TabFilters = {
+  search: [schema.tireChanges.reference, schema.tireChanges.provider, schema.tireChanges.notes],
+};
+const FUEL_FILTERS: TabFilters = { search: [schema.fuelFills.provider] };
+
+/** One page of a list: `limit + 1` rows tell whether a next page exists. */
+export interface RowsPage<T> {
+  rows: T[];
+  hasNext: boolean;
+}
+
+const pageOffset = (page: number) => (page - 1) * LOGBOOK_PAGE_SIZE;
+
+function toPage<T>(rows: T[]): RowsPage<T> {
+  return { rows: rows.slice(0, LOGBOOK_PAGE_SIZE), hasNext: rows.length > LOGBOOK_PAGE_SIZE };
 }
 
 /** Adds the driver the vehicle had on each row's date (drivers are never stored on the records). */
@@ -67,9 +115,9 @@ async function withDrivers<T extends { vehicleId: number; date: string }>(
   }));
 }
 
-export async function loadServiceRows(scope: LogbookScope): Promise<ServiceRow[]> {
+async function selectServices(scope: LogbookScope, page?: number) {
   const t = schema.vehicleServices;
-  const rows = await db
+  const query = db
     .select({
       id: t.id,
       vehicleId: t.vehicleId,
@@ -84,14 +132,25 @@ export async function loadServiceRows(scope: LogbookScope): Promise<ServiceRow[]
     })
     .from(t)
     .innerJoin(schema.vehicles, eq(t.vehicleId, schema.vehicles.id))
-    .where(scopeFilter(t, scope))
-    .orderBy(desc(t.date), desc(t.id));
-  return withDrivers(rows);
+    .where(scopeFilter(t, scope, SERVICE_FILTERS))
+    .orderBy(desc(t.date), desc(t.id))
+    .$dynamic();
+  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
 }
 
-export async function loadOilRows(scope: LogbookScope): Promise<OilRow[]> {
+export async function loadServiceRows(scope: LogbookScope): Promise<ServiceRow[]> {
+  return withDrivers(await selectServices(scope));
+}
+
+/** One page of services; drivers are resolved for those rows only. */
+export async function loadServicePage(scope: LogbookScope, page: number): Promise<RowsPage<ServiceRow>> {
+  const found = toPage(await selectServices(scope, page));
+  return { rows: await withDrivers(found.rows), hasNext: found.hasNext };
+}
+
+async function selectOil(scope: LogbookScope, page?: number) {
   const t = schema.oilChanges;
-  const rows = await db
+  const query = db
     .select({
       id: t.id,
       vehicleId: t.vehicleId,
@@ -110,8 +169,14 @@ export async function loadOilRows(scope: LogbookScope): Promise<OilRow[]> {
     })
     .from(t)
     .innerJoin(schema.vehicles, eq(t.vehicleId, schema.vehicles.id))
-    .where(scopeFilter(t, scope))
-    .orderBy(desc(t.date), desc(t.id));
+    .where(scopeFilter(t, scope, OIL_FILTERS))
+    .orderBy(desc(t.date), desc(t.id))
+    .$dynamic();
+  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+}
+
+/** Adds each change's supplies, then its driver. */
+async function completeOil(rows: Awaited<ReturnType<typeof selectOil>>): Promise<OilRow[]> {
   if (rows.length === 0) return [];
 
   const items = await db
@@ -129,9 +194,18 @@ export async function loadOilRows(scope: LogbookScope): Promise<OilRow[]> {
   return withDrivers(withItems);
 }
 
-export async function loadTireRows(scope: LogbookScope): Promise<TireRow[]> {
+export async function loadOilRows(scope: LogbookScope): Promise<OilRow[]> {
+  return completeOil(await selectOil(scope));
+}
+
+export async function loadOilPage(scope: LogbookScope, page: number): Promise<RowsPage<OilRow>> {
+  const found = toPage(await selectOil(scope, page));
+  return { rows: await completeOil(found.rows), hasNext: found.hasNext };
+}
+
+async function selectTires(scope: LogbookScope, page?: number) {
   const t = schema.tireChanges;
-  const rows = await db
+  const query = db
     .select({
       id: t.id,
       vehicleId: t.vehicleId,
@@ -145,14 +219,24 @@ export async function loadTireRows(scope: LogbookScope): Promise<TireRow[]> {
     })
     .from(t)
     .innerJoin(schema.vehicles, eq(t.vehicleId, schema.vehicles.id))
-    .where(scopeFilter(t, scope))
-    .orderBy(desc(t.date), desc(t.id));
-  return withDrivers(rows);
+    .where(scopeFilter(t, scope, TIRE_FILTERS))
+    .orderBy(desc(t.date), desc(t.id))
+    .$dynamic();
+  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
 }
 
-export async function loadFuelRows(scope: LogbookScope): Promise<FuelRow[]> {
+export async function loadTireRows(scope: LogbookScope): Promise<TireRow[]> {
+  return withDrivers(await selectTires(scope));
+}
+
+export async function loadTirePage(scope: LogbookScope, page: number): Promise<RowsPage<TireRow>> {
+  const found = toPage(await selectTires(scope, page));
+  return { rows: await withDrivers(found.rows), hasNext: found.hasNext };
+}
+
+async function selectFuel(scope: LogbookScope, page?: number) {
   const t = schema.fuelFills;
-  const rows = await db
+  const query = db
     .select({
       id: t.id,
       vehicleId: t.vehicleId,
@@ -165,9 +249,74 @@ export async function loadFuelRows(scope: LogbookScope): Promise<FuelRow[]> {
     })
     .from(t)
     .innerJoin(schema.vehicles, eq(t.vehicleId, schema.vehicles.id))
-    .where(scopeFilter(t, scope))
-    .orderBy(desc(t.date), desc(t.id));
-  return withDrivers(rows);
+    .where(scopeFilter(t, scope, FUEL_FILTERS))
+    .orderBy(desc(t.date), desc(t.id))
+    .$dynamic();
+  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+}
+
+export async function loadFuelRows(scope: LogbookScope): Promise<FuelRow[]> {
+  return withDrivers(await selectFuel(scope));
+}
+
+export async function loadFuelPage(scope: LogbookScope, page: number): Promise<RowsPage<FuelRow>> {
+  const found = toPage(await selectFuel(scope, page));
+  return { rows: await withDrivers(found.rows), hasNext: found.hasNext };
+}
+
+/* ------------------------------ Summaries ------------------------------ */
+
+type CostTable = typeof schema.vehicleServices | typeof schema.oilChanges | typeof schema.tireChanges;
+
+/** Totals computed by the database, so thousands of records are never loaded just to be added up. */
+async function costSummary(t: CostTable, filters: TabFilters, scope: LogbookScope): Promise<CostSummary> {
+  const [row] = await db
+    .select({
+      count: count(),
+      total: sql<number>`coalesce(sum(${t.price}), 0)`.mapWith(Number),
+      withoutPrice: sql<number>`count(*) filter (where ${t.price} is null)`.mapWith(Number),
+    })
+    .from(t)
+    .where(scopeFilter(t, scope, filters));
+  return row;
+}
+
+export const summarizeServices = (scope: LogbookScope) =>
+  costSummary(schema.vehicleServices, SERVICE_FILTERS, scope);
+export const summarizeOil = (scope: LogbookScope) => costSummary(schema.oilChanges, OIL_FILTERS, scope);
+export const summarizeTires = (scope: LogbookScope) => costSummary(schema.tireChanges, TIRE_FILTERS, scope);
+
+export async function summarizeFuelFills(scope: LogbookScope): Promise<FuelSummary> {
+  const t = schema.fuelFills;
+  const [row] = await db
+    .select({
+      count: count(),
+      gallons: sql<number>`coalesce(sum(${t.gallons}), 0)`.mapWith(Number),
+      urea: sql<number>`coalesce(sum(${t.urea}), 0)`.mapWith(Number),
+      amount: sql<number>`coalesce(sum(${t.amount}), 0)`.mapWith(Number),
+    })
+    .from(t)
+    .where(scopeFilter(t, scope, FUEL_FILTERS));
+  return row;
+}
+
+/** The id of the vehicle stored with exactly this plate, or null. */
+export async function findVehicleIdByPlate(plate: string): Promise<number | null> {
+  const [vehicle] = await db
+    .select({ id: schema.vehicles.id })
+    .from(schema.vehicles)
+    .where(eq(schema.vehicles.plate, plate));
+  return vehicle?.id ?? null;
+}
+
+/** Every driver who ever had this vehicle, A to Z (for the driver filter). */
+export async function loadDriversOfVehicle(vehicleId: number): Promise<Array<{ id: number; name: string }>> {
+  return db
+    .selectDistinct({ id: schema.drivers.id, name: schema.drivers.name })
+    .from(schema.driverAssignments)
+    .innerJoin(schema.drivers, eq(schema.driverAssignments.driverId, schema.drivers.id))
+    .where(eq(schema.driverAssignments.vehicleId, vehicleId))
+    .orderBy(asc(schema.drivers.name), asc(schema.drivers.id));
 }
 
 /** The four lists of one vehicle. */

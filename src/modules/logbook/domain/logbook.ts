@@ -105,6 +105,14 @@ export function monthBounds(month: string): { from: IsoDate; to: IsoDate } {
 /** Plates are compared without case, spaces or dashes ("abc-12" finds "ABC123"). */
 export const normalizePlateQuery = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
+/** Rows per page of a vehicle's list. */
+export const LOGBOOK_PAGE_SIZE = 50;
+
+/** Longest search text kept. */
+export const LOGBOOK_SEARCH_MAX = 80;
+
+const SERVICE_KINDS: readonly ServiceKind[] = ["PREVENTIVE", "CORRECTIVE"];
+
 /** The filters of the fleet-wide logbook; `plate` is already normalized. */
 export interface LogbookQuery {
   plate: string;
@@ -112,22 +120,42 @@ export interface LogbookQuery {
   from: IsoDate | null;
   to: IsoDate | null;
   group: OwnerGroup | null;
+  /** Free text matched against descriptions, providers and notes; empty for no filter. */
+  search: string;
+  /** Service kind (only the servicios tab uses it). */
+  kind: ServiceKind | null;
+  /** Driver who had the vehicle on the record's date. */
+  driverId: number | null;
+  /** 1-based page of the vehicle's list. */
+  page: number;
 }
+
+const positiveInt = (value: string | undefined): number | null =>
+  value !== undefined && /^\d{1,9}$/.test(value.trim()) && Number(value) >= 1 ? Number(value) : null;
 
 export function parseLogbookQuery(params: {
   placa?: string | string[];
   desde?: string | string[];
   hasta?: string | string[];
   grupo?: string | string[];
+  q?: string | string[];
+  tipo?: string | string[];
+  conductor?: string | string[];
+  pagina?: string | string[];
 }): LogbookQuery {
   const from = parseDateParam(params.desde);
   const to = parseDateParam(params.hasta);
   const inverted = from !== null && to !== null && from > to;
+  const kind = first(params.tipo);
   return {
     plate: normalizePlateQuery(first(params.placa) ?? ""),
     from: inverted ? to : from,
     to: inverted ? from : to,
     group: parseGroupParam(params.grupo),
+    search: (first(params.q) ?? "").trim().slice(0, LOGBOOK_SEARCH_MAX).trim(),
+    kind: SERVICE_KINDS.find((k) => k === kind) ?? null,
+    driverId: positiveInt(first(params.conductor)),
+    page: positiveInt(first(params.pagina)) ?? 1,
   };
 }
 
@@ -153,11 +181,20 @@ export function driverAtDate(date: IsoDate, periods: readonly DriverPeriod[]): s
 
 /* ------------------------------- Totals ------------------------------- */
 
-export function summarizeCost(rows: readonly { price: number | null }[]): {
+export interface CostSummary {
   count: number;
   total: number;
   withoutPrice: number;
-} {
+}
+
+export interface FuelSummary {
+  count: number;
+  gallons: number;
+  urea: number;
+  amount: number;
+}
+
+export function summarizeCost(rows: readonly { price: number | null }[]): CostSummary {
   let total = 0;
   let withoutPrice = 0;
   for (const r of rows) {
@@ -169,12 +206,7 @@ export function summarizeCost(rows: readonly { price: number | null }[]): {
 
 export function summarizeFuel(
   rows: readonly { gallons: number | null; urea: number | null; amount: number | null }[],
-): {
-  count: number;
-  gallons: number;
-  urea: number;
-  amount: number;
-} {
+): FuelSummary {
   // Gallons have two decimals: add in hundredths to avoid float drift. Missing values count as zero.
   const hundredths = (pick: (r: (typeof rows)[number]) => number | null) =>
     rows.reduce((sum, r) => sum + Math.round((pick(r) ?? 0) * 100), 0) / 100;

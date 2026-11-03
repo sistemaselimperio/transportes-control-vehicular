@@ -216,6 +216,8 @@ export function RowActions({
 
 interface ListProps<T> {
   rows: readonly T[];
+  /** Records the filters match in all, across pages (the table header counts these, not `rows`). */
+  total: number;
   /** Text shown when nothing matches the current filters. */
   empty: string;
   onEdit: (row: T) => void;
@@ -232,7 +234,7 @@ const cellClass = <T extends Row>(c: Column<T>) =>
 const headerClass = <T extends Row>(c: Column<T>) => `micro-label px-4 py-3 font-medium ${c.right ? "text-right" : ""}`;
 
 /** A fleet-wide list: a table from `md`, cards on phones. */
-function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListProps<T> & { spec: Spec<T> }) {
+function LogList<T extends Row>({ spec, rows, total, empty, onEdit, onResult }: ListProps<T> & { spec: Spec<T> }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   const actions = (r: T) => (
     <RowActions noun={spec.noun} plate={r.plate} date={r.date} onEdit={() => onEdit(r)} remove={() => spec.remove(r.id)} onResult={onResult} />
@@ -265,7 +267,7 @@ function LogList<T extends Row>({ spec, rows, empty, onEdit, onResult }: ListPro
       <div className="panel hidden md:block">
         <div className="plate-head">
           <span className="micro-label">
-            {rows.length} {rows.length === 1 ? "registro" : "registros"}
+            {total} {total === 1 ? "registro" : "registros"}
           </span>
         </div>
         <div className="overflow-x-auto">

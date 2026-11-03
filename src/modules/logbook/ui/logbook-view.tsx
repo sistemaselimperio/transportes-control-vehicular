@@ -1,27 +1,31 @@
 "use client";
 
-import { CalendarRange, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarRange, ChevronLeft, ChevronRight, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { TabBar } from "@/components/app/tab-bar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { GROUP_LABELS } from "@/modules/dashboard/domain/dashboard-metrics";
 import { formatPrice } from "@/modules/sales/domain/sale-row";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
-import type { LogbookData, LogbookPage } from "../application/logbook-queries";
+import type { LogbookPage, TabSummary } from "../application/logbook-queries";
 import {
+  LOGBOOK_SEARCH_MAX,
   LOGBOOK_TABS,
   monthBounds,
   normalizePlateQuery,
+  SERVICE_KIND_LABELS,
   type FuelRow,
   type LogbookQuery,
   type LogbookTab,
   type OilRow,
+  type ServiceKind,
   type ServiceRow,
   type TireRow,
 } from "../domain/logbook";
@@ -64,7 +68,7 @@ type Editing =
   | { tab: "llantas"; row: TireRow }
   | { tab: "combustible"; row: FuelRow };
 
-function summaryText(data: LogbookData): string {
+function summaryText(data: TabSummary): string {
   if (data.tab === "combustible") {
     const { count, gallons, urea, amount } = data.summary;
     const text = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 2 });
@@ -76,41 +80,90 @@ function summaryText(data: LogbookData): string {
 }
 
 /**
- * Bitácora page: one tab per logbook (servicios, aceite, llantas, combustible), each a fleet-wide
- * table. The tab, the plate and the date range live in the URL and are filtered on the server, so the
- * list and its total always match what the link says.
+ * Bitácora page: one tab per logbook (servicios, aceite, llantas, combustible). The fleet-wide totals
+ * are always shown; the records are listed per vehicle, 50 at a time. The tab, plate, date range,
+ * search, filters and page live in the URL and are applied on the server, so the list and its totals
+ * always match what the link says.
  */
 export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: LogbookTab; query: LogbookQuery }) {
-  const { data, providers, plates, today } = page;
+  const { fleet, vehicle: listing, providers, plates, today } = page;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [plate, setPlate] = useState(query.plate);
   const [from, setFrom] = useState(query.from ?? "");
   const [to, setTo] = useState(query.to ?? "");
+  const [search, setSearch] = useState(query.search);
+  const [kind, setKind] = useState<ServiceKind | "">(query.kind ?? "");
+  const [driverId, setDriverId] = useState(query.driverId === null ? "" : String(query.driverId));
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [notice, notify] = useNotice();
 
-  function go(next: { tab?: LogbookTab; plate?: string; from?: string; to?: string }) {
+  /** Any change resets the page: only an explicit `page` keeps it. */
+  function hrefFor(next: {
+    tab?: LogbookTab;
+    plate?: string;
+    from?: string;
+    to?: string;
+    q?: string;
+    kind?: ServiceKind | "";
+    driverId?: string;
+    page?: number;
+  }) {
     const params = new URLSearchParams();
     const nextTab = next.tab ?? tab;
     const nextPlate = normalizePlateQuery(next.plate ?? plate);
     const nextFrom = next.from ?? from;
     const nextTo = next.to ?? to;
+    const nextSearch = (next.q ?? search).trim();
+    // The kind exists on the servicios tab only; search and filters are per vehicle.
+    const nextKind = nextTab === "servicios" ? (next.kind ?? kind) : "";
+    const nextDriver = next.driverId ?? driverId;
     if (nextTab !== "servicios") params.set("tab", nextTab);
     if (nextPlate) params.set("placa", nextPlate);
     if (nextFrom) params.set("desde", nextFrom);
     if (nextTo) params.set("hasta", nextTo);
     if (query.group) params.set("grupo", query.group);
+    if (nextPlate && nextSearch) params.set("q", nextSearch);
+    if (nextPlate && nextKind) params.set("tipo", nextKind);
+    if (nextPlate && nextDriver) params.set("conductor", nextDriver);
+    if (next.page && next.page > 1) params.set("pagina", String(next.page));
     const qs = params.toString();
-    startTransition(() => router.replace(qs ? `/bitacora?${qs}` : "/bitacora", { scroll: false }));
+    return qs ? `/bitacora?${qs}` : "/bitacora";
   }
+
+  function go(next: Parameters<typeof hrefFor>[0]) {
+    clearTimeout(searchTimer.current);
+    startTransition(() => router.replace(hrefFor(next), { scroll: false }));
+  }
+
+  useEffect(() => () => clearTimeout(searchTimer.current), []);
 
   function changePlate(value: string) {
     setPlate(value);
-    go({ plate: value });
+    // The driver list belongs to the vehicle, so the old choice no longer applies.
+    setDriverId("");
+    go({ plate: value, driverId: "" });
+  }
+
+  /** Waits for a pause in typing before asking the server. */
+  function changeSearch(value: string) {
+    setSearch(value);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => go({ q: value }), 300);
+  }
+
+  function changeKind(value: ServiceKind | "") {
+    setKind(value);
+    go({ kind: value });
+  }
+
+  function changeDriver(value: string) {
+    setDriverId(value);
+    go({ driverId: value });
   }
 
   const presets = rangePresets(today);
@@ -145,16 +198,21 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
     setFrom("");
     setTo("");
     setCustomRange(false);
-    go({ plate: "", from: "", to: "" });
+    setSearch("");
+    setKind("");
+    setDriverId("");
+    go({ plate: "", from: "", to: "", q: "", kind: "", driverId: "" });
   }
 
-  const filtered = Boolean(query.plate || query.from || query.to);
+  const narrowed = Boolean(query.search || query.kind || query.driverId !== null);
+  const filtered = Boolean(query.plate || query.from || query.to || narrowed);
   const labels = NEW_LABELS[tab];
   const vehicle = { plates };
   // The Excel import is per vehicle: it needs one plate chosen (sold vehicles are not in `plates`).
   const importPlate = query.plate ? (plates.find((p) => normalizePlateQuery(p) === query.plate) ?? null) : null;
-  // Clearing a list is per vehicle too, and only offered when there is something listed to clear.
-  const bulkCount = data.rows.length;
+  // Clearing a list is per vehicle too, over its plate and period: offered only when no search, kind or
+  // driver filter narrows the list, so the count shown is exactly what would be deleted.
+  const bulkCount = listing?.data.summary.count ?? 0;
   const bulkScope = `${plural(bulkCount, "registro", "registros")} de ${LOGBOOK_TABS.find((t) => t.key === tab)?.label ?? ""} de ${importPlate ?? ""} · ${rangeText}`;
   const closeForm = () => {
     setCreating(false);
@@ -170,7 +228,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
     notify(result.ok ? { tone: "ok", text: result.message } : { tone: "error", text: result.error });
   const empty =
     filtered || query.group ? "Ningún registro coincide con los filtros." : "Aún no hay registros en esta bitácora.";
-  const list = { empty, onResult };
+  const list = { empty, onResult, total: bulkCount };
 
   const formProps = { today, providers, vehicle, onDone: done, onCancel: closeForm };
 
@@ -187,7 +245,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
                 Importar Excel
               </Button>
             )}
-            {importPlate && bulkCount > 0 && (
+            {importPlate && !narrowed && bulkCount > 0 && (
               <Button
                 type="button"
                 variant="outline"
@@ -286,7 +344,66 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
               </div>
             </div>
           )}
-          {(plate || period !== "all") && (
+          {listing && (
+            <>
+              <div className="flex flex-col gap-1.5 sm:w-64">
+                <label htmlFor="logbook-search" className="block text-sm font-medium">
+                  Buscar
+                </label>
+                <div className="relative">
+                  <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="logbook-search"
+                    type="search"
+                    value={search}
+                    maxLength={LOGBOOK_SEARCH_MAX}
+                    placeholder="Descripción, proveedor, notas…"
+                    onChange={(e) => changeSearch(e.target.value)}
+                    className="h-11 pl-9 md:h-9"
+                  />
+                </div>
+              </div>
+              {tab === "servicios" && (
+                <div className="flex flex-col gap-1.5 sm:w-40">
+                  <label htmlFor="logbook-kind" className="block text-sm font-medium">
+                    Tipo
+                  </label>
+                  <NativeSelect
+                    id="logbook-kind"
+                    value={kind}
+                    onChange={(e) => changeKind(e.target.value as ServiceKind | "")}
+                    className="h-11 md:h-9"
+                  >
+                    <option value="">Todos</option>
+                    {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5 sm:w-48">
+                <label htmlFor="logbook-driver" className="block text-sm font-medium">
+                  Conductor
+                </label>
+                <NativeSelect
+                  id="logbook-driver"
+                  value={listing.drivers.some((d) => String(d.id) === driverId) ? driverId : ""}
+                  onChange={(e) => changeDriver(e.target.value)}
+                  className="h-11 md:h-9"
+                >
+                  <option value="">Todos</option>
+                  {listing.drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+            </>
+          )}
+          {(plate || period !== "all" || search || kind || driverId) && (
             <Button
               type="button"
               variant="ghost"
@@ -306,7 +423,15 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
             <CalendarRange aria-hidden className="size-4" />
             <span className="num">{rangeText}</span>
           </span>
-          <span className="num font-semibold text-foreground">{summaryText(data)}</span>
+          <span className="flex flex-col gap-0.5 sm:items-end">
+            <span className="num font-semibold text-foreground">Flota: {summaryText(fleet)}</span>
+            {listing && (
+              <span className="num font-semibold text-foreground">
+                {listing.plate}: {summaryText(listing.data)}
+                {narrowed ? " (filtrado)" : ""}
+              </span>
+            )}
+          </span>
         </div>
       </div>
 
@@ -317,19 +442,48 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
         aria-busy={pending}
         className={pending ? "opacity-60 transition-opacity" : "transition-opacity"}
       >
-        {data.tab === "servicios" && (
-          <ServiceList rows={data.rows} {...list} onEdit={(row) => setEditing({ tab: "servicios", row })} />
+        {!listing && <p className="text-sm text-muted-foreground">Selecciona un vehículo para ver sus registros.</p>}
+        {listing?.data.tab === "servicios" && (
+          <ServiceList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "servicios", row })} />
         )}
-        {data.tab === "aceite" && (
-          <OilList rows={data.rows} {...list} onEdit={(row) => setEditing({ tab: "aceite", row })} />
+        {listing?.data.tab === "aceite" && (
+          <OilList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "aceite", row })} />
         )}
-        {data.tab === "llantas" && (
-          <TireList rows={data.rows} {...list} onEdit={(row) => setEditing({ tab: "llantas", row })} />
+        {listing?.data.tab === "llantas" && (
+          <TireList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "llantas", row })} />
         )}
-        {data.tab === "combustible" && (
-          <FuelList rows={data.rows} {...list} onEdit={(row) => setEditing({ tab: "combustible", row })} />
+        {listing?.data.tab === "combustible" && (
+          <FuelList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "combustible", row })} />
         )}
       </div>
+
+      {listing && (listing.page > 1 || listing.hasNext) && (
+        <nav aria-label="Paginación" className="flex items-center justify-between gap-3">
+          {listing.page > 1 ? (
+            <Link
+              href={hrefFor({ page: listing.page - 1 })}
+              className={buttonVariants({ variant: "outline", className: "h-11 px-4 md:h-9" })}
+            >
+              <ChevronLeft aria-hidden />
+              Anterior
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="num text-sm text-muted-foreground">Página {listing.page}</span>
+          {listing.hasNext ? (
+            <Link
+              href={hrefFor({ page: listing.page + 1 })}
+              className={buttonVariants({ variant: "outline", className: "h-11 px-4 md:h-9" })}
+            >
+              Siguiente
+              <ChevronRight aria-hidden />
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
 
       <NoticeToast notice={notice} />
 
