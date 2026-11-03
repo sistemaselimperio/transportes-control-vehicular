@@ -3,6 +3,7 @@
  * physical specs. Every field is optional.
  */
 import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
+import { progressOf, type Progress } from "@/modules/shared/domain/progress";
 import { formatKm } from "./vehicle-row";
 import { RuleError } from "./vehicle-rules";
 
@@ -89,4 +90,10 @@ export function technicalGroups(data: VehicleTechnicalData): TechnicalGroup[] {
     group("Identificación", rows.filter((r) => IDENTIFICATION.has(r.label))),
     group("Características", rows.filter((r) => !IDENTIFICATION.has(r.label))),
   ];
+}
+
+/** How much of the vehicle file's technical data is on record (the fleet list's indicator). */
+export function technicalProgress(data: VehicleTechnicalData): Progress {
+  const rows = technicalRows(data);
+  return progressOf(rows.filter((r) => r.value !== "—").length, rows.length);
 }

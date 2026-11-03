@@ -15,6 +15,8 @@ import {
   type OilMode,
 } from "@/modules/maintenance/domain/oil-change";
 import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
+import type { FileCategory } from "@/modules/documents/domain/vehicle-file-rules";
+import { progressOf, type Progress } from "@/modules/shared/domain/progress";
 import type { VehicleTechnicalData } from "./technical-data";
 
 export type OwnerGroup = "IMPERIO" | "PAEZ" | "THIRD_PARTY";
@@ -59,6 +61,8 @@ export interface VehicleRowInput {
     intervalMonths: number | null;
   } | null;
   technical: VehicleTechnicalData;
+  /** Categories with at least one uploaded file. */
+  fileCategories: readonly FileCategory[];
   today: IsoDate;
 }
 
@@ -94,6 +98,8 @@ export interface VehicleGridRow {
   overall: AlertStatus;
   notes: string | null;
   technical: VehicleTechnicalData;
+  /** Uploaded files of the documents that apply (the fleet list's indicator). */
+  files: Progress;
 }
 
 export const STATUS_LABELS: Record<VehicleStatus, string> = {
@@ -199,6 +205,21 @@ function oilCell(input: VehicleRowInput): Cell {
   return { text: parts.join(" · ") || "Sin dato", status };
 }
 
+/**
+ * Which of the vehicle file's documents have a scanned copy. A document marked as not applying
+ * (or a tax the vehicle does not pay) needs no file; the ownership card is always expected.
+ */
+function filesProgress(
+  uploaded: readonly FileCategory[],
+  cells: Record<"POLICY" | "SOAT" | "TECNO" | "TAX", Cell>,
+): Progress {
+  const expected: FileCategory[] = [
+    ...(Object.keys(cells) as Array<keyof typeof cells>).filter((c) => cells[c].status !== "not_applicable"),
+    "OWNERSHIP_CARD",
+  ];
+  return progressOf(expected.filter((c) => uploaded.includes(c)).length, expected.length);
+}
+
 export function buildVehicleRow(input: VehicleRowInput): VehicleGridRow {
   const { vehicle, classInfo, owner, driver, today } = input;
   const sold = vehicle.status === "SOLD";
@@ -237,5 +258,6 @@ export function buildVehicleRow(input: VehicleRowInput): VehicleGridRow {
     }),
     notes: vehicle.notes,
     technical: input.technical,
+    files: filesProgress(input.fileCategories, { POLICY: policy, SOAT: soat, TECNO: tecno, TAX: tax }),
   };
 }

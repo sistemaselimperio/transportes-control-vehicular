@@ -18,6 +18,8 @@ export const CACHE_TAGS = {
   dashboard: "dashboard",
   /** Expired-vehicle counts of the nav; derived from the fleet and its owners. */
   expiredCounts: "expired-counts",
+  /** Which file categories each vehicle has (the fleet list's documents indicator). */
+  files: "fleet-files",
 } as const;
 
 type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.logbook;
@@ -25,7 +27,7 @@ type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CAC
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
 
-const { fleet, owners, drivers, sales, logbook, dashboard, expiredCounts } = CACHE_TAGS;
+const { fleet, owners, drivers, sales, logbook, dashboard, expiredCounts, files } = CACHE_TAGS;
 
 export type ReadName =
   | "fleetRows"
@@ -40,7 +42,7 @@ export type ReadName =
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
-  fleetRows: [fleet, owners, drivers],
+  fleetRows: [fleet, owners, drivers, files],
   vehicleFormOptions: [fleet, owners, drivers],
   vehicleDetail: [fleet, owners, drivers, sales, logbook],
   dashboard: [dashboard, fleet, owners],
@@ -81,7 +83,7 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
 
 /** The tags a write must expire so every read that shows what it changed is recomputed. */
 export function changeTags(change: Change): string[] {
-  if (change.kind === "vehicle-file") return [vehicleFilesTag(change.plate)];
+  if (change.kind === "vehicle-file") return [vehicleFilesTag(change.plate), files];
 
   const tags: string[] = [...WRITTEN_ENTITIES[change.kind]];
   // The dashboard and the nav counts are computed from the fleet and its owners.

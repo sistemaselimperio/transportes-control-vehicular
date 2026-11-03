@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertModelYear, EMPTY_TECHNICAL_DATA, technicalGroups, technicalRows } from "./technical-data";
+import { assertModelYear, EMPTY_TECHNICAL_DATA, technicalGroups, technicalProgress, technicalRows } from "./technical-data";
 import { RuleError } from "./vehicle-rules";
 
 describe("assertModelYear", () => {
@@ -60,5 +60,42 @@ describe("technicalGroups", () => {
   it("reports how many fields are on record", () => {
     const groups = technicalGroups({ ...EMPTY_TECHNICAL_DATA, modelYear: 2021, color: "BLANCO" });
     expect(groups.reduce((n, g) => n + g.known, 0)).toBe(2);
+  });
+});
+
+describe("technicalProgress", () => {
+  const full = {
+    registrationDate: "2020-01-15",
+    modelYear: 2020,
+    engineNumber: "E1",
+    chassisNumber: "C1",
+    serialNumber: "S1",
+    bodyType: "Furgón",
+    fuelType: "Diésel",
+    capacity: "34 t",
+    engineDisplacement: 12000,
+    grossWeightKg: 34000,
+    color: "BLANCO",
+  } as const;
+
+  it("is missing when nothing is on record", () => {
+    expect(technicalProgress(EMPTY_TECHNICAL_DATA)).toEqual({ known: 0, total: 10, state: "missing" });
+  });
+
+  it("is partial when some fields are on record", () => {
+    expect(technicalProgress({ ...EMPTY_TECHNICAL_DATA, modelYear: 2021, color: "BLANCO" })).toEqual({
+      known: 2,
+      total: 10,
+      state: "partial",
+    });
+  });
+
+  it("is complete when every shown field is on record, whatever the fuel type", () => {
+    expect(technicalProgress({ ...full, fuelType: null }).state).toBe("complete");
+  });
+
+  it("counts the same fields the vehicle file shows", () => {
+    const data = { ...EMPTY_TECHNICAL_DATA, chassisNumber: "C1", capacity: "34 t" };
+    expect(technicalProgress(data).known).toBe(technicalGroups(data).reduce((n, g) => n + g.known, 0));
   });
 });

@@ -39,6 +39,7 @@ function input(overrides: Partial<VehicleRowInput> = {}): VehicleRowInput {
       intervalMonths: null,
     },
     technical: EMPTY_TECHNICAL_DATA,
+    fileCategories: [],
     today: TODAY,
     ...overrides,
   };
@@ -184,5 +185,32 @@ describe("ownerShortName", () => {
     expect(ownerShortName("Fabián Páez", "PAEZ")).toBe("Fabián Páez");
     expect(ownerShortName("Sandra Marcela Páez Porras", "THIRD_PARTY")).toBe("Sandra Marcela Páez Porras");
     expect(ownerShortName("Bancolombia S.A.", "THIRD_PARTY")).toBe("Bancolombia S.A.");
+  });
+});
+
+describe("buildVehicleRow: uploaded files", () => {
+  it("counts the file categories with at least one file", () => {
+    expect(buildVehicleRow(input()).files).toEqual({ known: 0, total: 4, state: "missing" });
+    expect(buildVehicleRow(input({ fileCategories: ["SOAT", "OWNERSHIP_CARD"] })).files).toEqual({
+      known: 2,
+      total: 4,
+      state: "partial",
+    });
+  });
+
+  it("does not ask for files of documents that do not apply", () => {
+    // The fixture's tax is "No paga", so its file is not expected; here SOAT does not apply either.
+    const row = buildVehicleRow(
+      input({
+        soat: { kind: null, expiresOn: null, notApplicable: true },
+        fileCategories: ["POLICY", "TECNO", "OWNERSHIP_CARD"],
+      }),
+    );
+    expect(row.files).toEqual({ known: 3, total: 3, state: "complete" });
+  });
+
+  it("ignores logbook files and files of documents that do not apply", () => {
+    const row = buildVehicleRow(input({ fileCategories: ["LOGBOOK", "TAX"] }));
+    expect(row.files).toEqual({ known: 0, total: 4, state: "missing" });
   });
 });

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
+import { technicalProgress } from "../domain/technical-data";
+import { ProgressBadge } from "./progress-badge";
 import type { VehicleGridRow } from "../domain/vehicle-row";
 
 /** Mobile list: one tappable card per vehicle (no horizontal scrolling). */
@@ -34,6 +36,8 @@ export function VehicleCards({ rows }: { rows: readonly VehicleGridRow[] }) {
               <StatusPill status={r.nextChange.status}>
                 Aceite {r.nextChange.text || "—"}
               </StatusPill>
+              <ProgressBadge subject="Datos técnicos" prefix="Téc." progress={technicalProgress(r.technical)} />
+              <ProgressBadge subject="Documentos subidos" prefix="Docs" progress={r.files} />
             </div>
           </Link>
         </li>

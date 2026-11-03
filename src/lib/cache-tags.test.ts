@@ -84,8 +84,8 @@ describe("changeTags", () => {
     );
   });
 
-  it("a file change only expires that plate's files", () => {
-    expect(changeTags({ kind: "vehicle-file", plate: "ABC-123" })).toEqual([vehicleFilesTag("ABC-123")]);
+  it("a file change expires that plate's files and the fleet's file indicator", () => {
+    expect(changeTags({ kind: "vehicle-file", plate: "ABC-123" })).toEqual([vehicleFilesTag("ABC-123"), CACHE_TAGS.files]);
   });
 
   it("has no duplicates", () => {
@@ -106,7 +106,7 @@ describe("read / change consistency", () => {
     sale: [CACHE_TAGS.sales],
     logbook: [CACHE_TAGS.logbook],
     "logbook-with-oil": [CACHE_TAGS.logbook, CACHE_TAGS.fleet],
-    "vehicle-file": [],
+    "vehicle-file": [CACHE_TAGS.files],
   };
 
   it("every change expires every read that depends on what it writes", () => {
@@ -125,10 +125,11 @@ describe("read / change consistency", () => {
     }
   });
 
-  it("a file change expires the detail of its plate and nothing else", () => {
+  it("a file change expires the detail of its plate and the fleet list only", () => {
     const expired = new Set(changeTags({ kind: "vehicle-file", plate: "ABC-123" }));
     expect(readTags("vehicleDetail", "ABC-123").some((t) => expired.has(t))).toBe(true);
     expect(readTags("vehicleDetail", "XYZ-987").some((t) => expired.has(t))).toBe(false);
-    expect(readTags("fleetRows").some((t) => expired.has(t))).toBe(false);
+    expect(readTags("fleetRows").some((t) => expired.has(t))).toBe(true);
+    expect(readTags("dashboard").some((t) => expired.has(t))).toBe(false);
   });
 });

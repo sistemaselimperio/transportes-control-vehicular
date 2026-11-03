@@ -9,10 +9,15 @@ import {
 } from "./column-groups";
 
 describe("COLUMN_GROUPS", () => {
-  it("keeps all 14 grid columns, each in exactly one group", () => {
+  it("keeps all 16 grid columns, each in exactly one group", () => {
     const ids = COLUMN_GROUPS.flatMap((g) => g.columns);
-    expect(ids).toHaveLength(14);
-    expect(new Set(ids).size).toBe(14);
+    expect(ids).toHaveLength(16);
+    expect(new Set(ids).size).toBe(16);
+  });
+
+  it("shows the technical data indicator with the vehicle identity", () => {
+    expect(COLUMN_GROUPS.find((g) => g.key === "vehicle")?.columns).toContain("technical");
+    expect(COLUMN_GROUPS.find((g) => g.key === "vehicle")?.columns).toContain("files");
   });
 
   it("has no status column: the fleet views already split vehicles by status", () => {

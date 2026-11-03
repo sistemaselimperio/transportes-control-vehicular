@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { alias, type PgColumn } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
+import type { FileCategory } from "@/modules/documents/domain/vehicle-file-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import type { DocumentData, VehicleRowInput } from "../domain/vehicle-row";
 
@@ -33,7 +34,7 @@ export async function loadVehicleRowInputs(
   const ids = vehicleRows.map((r) => r.vehicle.id);
   const scope = (col: PgColumn) => (plate ? inArray(col, ids) : undefined);
 
-  const [ownerships, assignments, documents, taxes, oilChanges] = await Promise.all([
+  const [ownerships, assignments, documents, taxes, oilChanges, files] = await Promise.all([
     db
       .select({ vehicleId: schema.ownerships.vehicleId, id: schema.ownerships.id, owner: schema.owners })
       .from(schema.ownerships)
@@ -63,7 +64,16 @@ export async function loadVehicleRowInputs(
       .from(schema.oilChanges)
       .where(scope(schema.oilChanges.vehicleId))
       .orderBy(asc(schema.oilChanges.date), asc(schema.oilChanges.id)),
+    db
+      .selectDistinct({ vehicleId: schema.vehicleFiles.vehicleId, category: schema.vehicleFiles.category })
+      .from(schema.vehicleFiles)
+      .where(scope(schema.vehicleFiles.vehicleId)),
   ]);
+
+  const fileCategories = new Map<number, FileCategory[]>();
+  for (const { vehicleId, category } of files) {
+    fileCategories.set(vehicleId, [...(fileCategories.get(vehicleId) ?? []), category]);
+  }
 
   const currentOwner = latestBy(ownerships, (o) => o.vehicleId);
   const currentDriver = latestBy(assignments, (a) => a.vehicleId);
@@ -131,6 +141,7 @@ export async function loadVehicleRowInputs(
         grossWeightKg: vehicle.grossWeightKg,
         color: vehicle.color,
       },
+      fileCategories: fileCategories.get(vehicle.id) ?? [],
       today,
     };
   });

@@ -1,5 +1,5 @@
 /**
- * The 14 grid columns, grouped the way people read a vehicle:
+ * The 16 grid columns, grouped the way people read a vehicle:
  * who/what it is, who is behind it, its papers, and its upkeep.
  */
 export type ColumnGroupKey = "vehicle" | "people" | "documents" | "maintenance";
@@ -17,7 +17,7 @@ export const COLUMN_GROUPS: readonly ColumnGroupDef[] = [
   {
     key: "vehicle",
     label: "Vehículo",
-    columns: ["className", "plate", "municipality", "service"],
+    columns: ["className", "plate", "municipality", "service", "technical", "files"],
     pinned: true,
   },
   { key: "people", label: "Personas", columns: ["owner", "driver", "phone"] },

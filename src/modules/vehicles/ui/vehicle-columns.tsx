@@ -5,6 +5,8 @@ import Link from "next/link";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { COLUMN_GROUPS, type ColumnGroupKey } from "../domain/column-groups";
+import { technicalProgress } from "../domain/technical-data";
+import { ProgressBadge } from "./progress-badge";
 import { formatKm, ownerShortName, type DocCell, type VehicleGridRow } from "../domain/vehicle-row";
 
 declare module "@tanstack/react-table" {
@@ -61,6 +63,20 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
   },
   municipality: { id: "municipality", header: "Municipio", accessorFn: (r) => r.municipality ?? "" },
   service: { id: "service", header: "Servicio", accessorFn: (r) => r.serviceLabel },
+  technical: {
+    id: "technical",
+    header: "D. téc.",
+    meta: { className: "w-16 text-center" },
+    accessorFn: (r) => technicalProgress(r.technical).known,
+    cell: ({ row }) => <ProgressBadge subject="Datos técnicos" progress={technicalProgress(row.original.technical)} />,
+  },
+  files: {
+    id: "files",
+    header: "Docs",
+    meta: { className: "w-14 text-center" },
+    accessorFn: (r) => (r.files.total === 0 ? 1 : r.files.known / r.files.total),
+    cell: ({ row }) => <ProgressBadge subject="Documentos subidos" progress={row.original.files} />,
+  },
   owner: {
     id: "owner",
     header: "Propietario",
@@ -165,7 +181,7 @@ const statusSort: ColumnDef<VehicleGridRow> = {
   sortDescFirst: true,
 };
 
-/** Same 14 columns, nested under their four group headers, plus the hidden urgency sort. */
+/** Same 15 columns, nested under their four group headers, plus the hidden urgency sort. */
 export const vehicleColumns: ColumnDef<VehicleGridRow>[] = [
   ...COLUMN_GROUPS.map((group) => ({
     id: `group-${group.key}`,
