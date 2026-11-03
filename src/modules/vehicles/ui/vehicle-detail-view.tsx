@@ -19,6 +19,7 @@ import {
   SellButton,
   SoldNotice,
   StatusSwitch,
+  type ActionKey,
 } from "./vehicle-file-actions";
 
 /** One labelled value of the technical sheet; a missing value reads as a muted dash. */
@@ -156,7 +157,16 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
  * how far it has gone; then its papers; then the logbook; and last the
  * notes. The only overlays are the action forms, which `readOnly` removes along with every write control.
  */
-export function VehicleDetailView({ detail, readOnly = false }: { detail: VehicleDetail; readOnly?: boolean }) {
+export function VehicleDetailView({
+  detail,
+  readOnly = false,
+  allowed,
+}: {
+  detail: VehicleDetail;
+  readOnly?: boolean;
+  /** Actions a read-only user may still run (see `FileActions`). */
+  allowed?: readonly ActionKey[];
+}) {
   const r = detail.row;
   const sold = r.vehicleStatus === "SOLD";
 
@@ -169,6 +179,7 @@ export function VehicleDetailView({ detail, readOnly = false }: { detail: Vehicl
       technical={r.technical}
       current={{ owner: r.ownerName, driver: r.driverName }}
       readOnly={readOnly}
+      allowed={allowed}
     >
       <TabParamScroll />
       <div className="space-y-10">

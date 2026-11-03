@@ -9,7 +9,7 @@ import type { ZodType } from "zod";
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireAdmin, requireDriverAssigner } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { RuleError } from "../domain/vehicle-rules";
 import { vehicleCommandRepository } from "../infrastructure/vehicle-command-repository";
@@ -40,9 +40,10 @@ function parse<T>(schema: ZodType<T>, data: unknown): T {
 
 const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
 
-async function run(fn: () => Promise<CommandResult>): Promise<ActionResult> {
+/** `guard` decides who may run the command; every vehicle write is admin-only except the driver change. */
+async function run(fn: () => Promise<CommandResult>, guard: () => Promise<unknown> = requireAdmin): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await guard();
     const result = await fn();
     expireAfterAction({ kind: "vehicle" });
     return { ok: true, message: result.message };
@@ -158,7 +159,7 @@ export async function assignDriverAction(plate: string, fd: FormData): Promise<A
           ? { kind: "existing", id: v.driverId! }
           : { kind: "new", name: v.name!, nationalId: v.nationalId, phone: v.phone },
     });
-  });
+  }, requireDriverAssigner);
 }
 
 function ownerTarget(v: ReturnType<typeof transferOwnerSchema.parse>): OwnerTarget {

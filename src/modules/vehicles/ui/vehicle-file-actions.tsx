@@ -72,6 +72,8 @@ interface FileActionsContext {
   status: VehicleStatus;
   /** No action control shows: the vehicle is sold or the user may only read. */
   locked: boolean;
+  /** Whether one action's control shows: unlocked, or one of the few a read-only user may still run. */
+  canOpen: (key: ActionKey) => boolean;
   open: (key: ActionKey) => void;
   notify: (notice: Notice) => void;
 }
@@ -97,6 +99,7 @@ export function FileActions({
   technical,
   current,
   readOnly = false,
+  allowed = [],
   children,
 }: {
   plate: string;
@@ -109,6 +112,8 @@ export function FileActions({
   current: { owner: string | null; driver: string | null };
   /** The user cannot change anything: every action control is hidden. */
   readOnly?: boolean;
+  /** Actions still open to a read-only user (staff may change the driver). */
+  allowed?: readonly ActionKey[];
   children: ReactNode;
 }) {
   const [active, setActive] = useState<ActionKey | null>(null);
@@ -136,6 +141,7 @@ export function FileActions({
         plate,
         status,
         locked: readOnly || status === "SOLD",
+        canOpen: (key) => status !== "SOLD" && (!readOnly || allowed.includes(key)),
         open: (key) => {
           setMessage(null);
           setActive(key);
@@ -199,11 +205,12 @@ export function FileActions({
  * one key drawn filled; the rest are outlined. Hidden once the vehicle is sold.
  */
 export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; primary?: ActionKey }) {
-  const { locked, open } = useFileActions();
-  if (locked) return null;
+  const { canOpen, open } = useFileActions();
+  const shown = keys.filter(canOpen);
+  if (shown.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
-      {keys.map((key) => {
+      {shown.map((key) => {
         const { label, icon: Icon } = ACTIONS[key];
         return (
           <Button
@@ -326,8 +333,8 @@ export function InlineAction({
   label?: string;
   children: ReactNode;
 }) {
-  const { locked, open } = useFileActions();
-  if (locked) return null;
+  const { canOpen, open } = useFileActions();
+  if (!canOpen(action)) return null;
   return (
     <button
       type="button"

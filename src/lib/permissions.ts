@@ -1,8 +1,8 @@
 /**
  * Who may do what. Pure policy, shared by the server (pages, actions, routes) and the UI.
  * `admin` can do everything; `staff` can read the fleet (list, file, documents, logbook of a
- * vehicle), open vehicle files, manage the drivers (create, edit, delete) and read the submitted
- * pre-operational inspections; nothing else is writable for them.
+ * vehicle), open vehicle files, manage the drivers (create, edit, delete), change the driver of a
+ * vehicle and read the submitted pre-operational inspections; nothing else is writable for them.
  */
 export type Role = "admin" | "staff";
 
@@ -35,6 +35,11 @@ export function canWrite(role: Role): boolean {
 
 /** Create, edit and delete drivers: the one write staff also has. */
 export function canManageDrivers(role: Role): boolean {
+  return role === "admin" || role === "staff";
+}
+
+/** Change which driver a vehicle has: the one vehicle write staff also has. */
+export function canAssignDrivers(role: Role): boolean {
   return role === "admin" || role === "staff";
 }
 

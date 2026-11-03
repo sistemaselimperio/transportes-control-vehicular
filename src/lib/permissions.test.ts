@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, sectionOfPath } from "./permissions";
+import { canAssignDrivers, canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, sectionOfPath } from "./permissions";
 
 describe("parseRole", () => {
   it("keeps the known roles", () => {
@@ -37,6 +37,13 @@ describe("canWrite", () => {
   it("allows writes only for admins", () => {
     expect(canWrite("admin")).toBe(true);
     expect(canWrite("staff")).toBe(false);
+  });
+});
+
+describe("canAssignDrivers", () => {
+  it("lets admins and staff change a vehicle's driver", () => {
+    expect(canAssignDrivers("admin")).toBe(true);
+    expect(canAssignDrivers("staff")).toBe(true);
   });
 });
 
