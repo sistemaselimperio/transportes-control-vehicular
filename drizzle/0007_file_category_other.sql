@@ -1,0 +1,1 @@
+ALTER TYPE "transportes"."file_category" ADD VALUE 'OTHER';

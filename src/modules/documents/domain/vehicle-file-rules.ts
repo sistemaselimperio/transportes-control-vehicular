@@ -4,7 +4,7 @@
  */
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 
-export type FileCategory = "POLICY" | "SOAT" | "TECNO" | "TAX" | "LOGBOOK" | "OWNERSHIP_CARD";
+export type FileCategory = "POLICY" | "SOAT" | "TECNO" | "TAX" | "LOGBOOK" | "OWNERSHIP_CARD" | "OTHER";
 
 export const FILE_CATEGORIES: Record<FileCategory, { label: string }> = {
   POLICY: { label: "Póliza" },
@@ -12,7 +12,10 @@ export const FILE_CATEGORIES: Record<FileCategory, { label: string }> = {
   TECNO: { label: "Tecnomecánica" },
   TAX: { label: "Impuestos" },
   LOGBOOK: { label: "Bitácoras" },
-  OWNERSHIP_CARD: { label: "Tarjeta de propiedad" },
+  /** Short on purpose: it shares a row of three narrow cards on the vehicle file. */
+  OWNERSHIP_CARD: { label: "T. Propiedad" },
+  /** Any paper that fits no other category. */
+  OTHER: { label: "Otros" },
 };
 
 export const FILE_CATEGORY_KEYS = Object.keys(FILE_CATEGORIES) as FileCategory[];

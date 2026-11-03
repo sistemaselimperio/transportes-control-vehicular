@@ -7,6 +7,7 @@ import type { FileCategory } from "./vehicle-file-rules";
 export const FILE_GROUPS: ReadonlyArray<{ key: string; title: string; categories: readonly FileCategory[] }> = [
   { key: "expiring", title: "Vigentes con vencimiento", categories: ["SOAT", "TECNO", "POLICY", "TAX"] },
   { key: "registry", title: "Registro del vehículo", categories: ["OWNERSHIP_CARD"] },
+  { key: "other", title: "Otros", categories: ["OTHER"] },
 ];
 
 /** Short type label shown next to a file, taken from its extension. */

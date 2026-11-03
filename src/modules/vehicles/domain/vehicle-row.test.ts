@@ -209,8 +209,8 @@ describe("buildVehicleRow: uploaded files", () => {
     expect(row.files).toEqual({ known: 3, total: 3, state: "complete" });
   });
 
-  it("ignores logbook files and files of documents that do not apply", () => {
-    const row = buildVehicleRow(input({ fileCategories: ["LOGBOOK", "TAX"] }));
+  it("ignores logbook, other and not-applying documents' files", () => {
+    const row = buildVehicleRow(input({ fileCategories: ["LOGBOOK", "TAX", "OTHER"] }));
     expect(row.files).toEqual({ known: 0, total: 4, state: "missing" });
   });
 });

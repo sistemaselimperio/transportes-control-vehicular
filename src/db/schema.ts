@@ -68,6 +68,7 @@ export const fileCategoryEnum = transportes.enum("file_category", [
   "TAX",
   "LOGBOOK",
   "OWNERSHIP_CARD",
+  "OTHER",
 ]);
 
 /* ---------------------------- Fleet domain ---------------------------- */

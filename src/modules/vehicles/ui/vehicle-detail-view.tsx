@@ -192,7 +192,8 @@ export function VehicleDetailView({
           <TechnicalSheet r={r} />
         </Section>
 
-        <div className="grid gap-x-10 gap-y-10 lg:grid-cols-2">
+        {/* Documents get one share more than maintenance: their cards sit three to a row. */}
+        <div className="grid gap-x-10 gap-y-10 lg:grid-cols-[5fr_7fr]">
           <div className="min-w-0">
             <Section id="mantenimiento" title="Mantenimiento" actions={<ActionButtons keys={["oil", "km"]} />}>
               <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">

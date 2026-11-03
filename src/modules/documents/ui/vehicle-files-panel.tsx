@@ -26,14 +26,15 @@ type Stage = { category: FileCategory; step: "optimizing" | "uploading" };
 const CATEGORIES = FILE_GROUPS.flatMap((g) => g.categories);
 
 /**
- * Card order and width on a six-column grid: SOAT, póliza and impuestos share the top row; the
- * other categories split the row below. Any category not listed here falls in after them.
+ * Card order on a three-column grid, so the six documents fill two rows: tarjeta de propiedad,
+ * impuestos and otros on top; SOAT, póliza and tecnomecánica below. Any category not listed here
+ * falls in after them.
  */
-const TOP_ROW: readonly FileCategory[] = ["SOAT", "POLICY", "TAX"];
+const ORDER: readonly FileCategory[] = ["OWNERSHIP_CARD", "TAX", "OTHER", "SOAT", "POLICY", "TECNO"];
 const LAYOUT: Array<{ category: FileCategory; span: string }> = [
-  ...TOP_ROW.map((category) => ({ category, span: "col-span-2" })),
-  ...CATEGORIES.filter((c) => !TOP_ROW.includes(c)).map((category) => ({ category, span: "col-span-3" })),
-];
+  ...ORDER,
+  ...CATEGORIES.filter((c) => !ORDER.includes(c)),
+].map((category) => ({ category, span: "col-span-1" }));
 
 const uploadedOn = (at: Date) =>
   formatDisplayDate(new Date(at).toISOString().slice(0, 10));
@@ -282,7 +283,7 @@ export function VehicleFilesPanel({
 
   return (
     <div className="@container mt-3 min-w-0">
-      <ul className="grid grid-cols-6 gap-2">
+      <ul className="grid grid-cols-3 gap-2">
         {LAYOUT.map(renderDoc)}
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">

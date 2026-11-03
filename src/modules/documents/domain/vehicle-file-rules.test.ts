@@ -18,8 +18,9 @@ describe("FILE_CATEGORIES", () => {
 
   it("has a Spanish label for every category", () => {
     expect(FILE_CATEGORIES.TECNO.label).toBe("Tecnomecánica");
-    expect(FILE_CATEGORIES.OWNERSHIP_CARD.label).toBe("Tarjeta de propiedad");
-    expect(FILE_CATEGORY_KEYS).toHaveLength(6);
+    expect(FILE_CATEGORIES.OWNERSHIP_CARD.label).toBe("T. Propiedad");
+    expect(FILE_CATEGORIES.OTHER.label).toBe("Otros");
+    expect(FILE_CATEGORY_KEYS).toHaveLength(7);
   });
 });
 
