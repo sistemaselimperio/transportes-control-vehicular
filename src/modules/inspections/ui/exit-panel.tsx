@@ -210,6 +210,34 @@ function DecisionPanel({
   );
 }
 
+type SavedClosure = NonNullable<ExitPanelProps["closure"]>;
+
+/** A recorded closure, read-only: once saved it is final for everyone, admin included. */
+function ClosureDetails({ closure }: { closure: SavedClosure }) {
+  return (
+    <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+      <dt className="text-muted-foreground">Fecha de cierre</dt>
+      <dd className="num">{formatInspectionDate(closure.date)}</dd>
+      {closure.workOrder && (
+        <>
+          <dt className="text-muted-foreground">Orden de trabajo</dt>
+          <dd>{closure.workOrder}</dd>
+        </>
+      )}
+      <dt className="text-muted-foreground">Qué se hizo</dt>
+      <dd>{closure.action}</dd>
+      {closure.responsible && (
+        <>
+          <dt className="text-muted-foreground">Responsable</dt>
+          <dd>{closure.responsible}</dd>
+        </>
+      )}
+      <dt className="text-muted-foreground">Registrado por</dt>
+      <dd>{closure.signoff}</dd>
+    </dl>
+  );
+}
+
 function ClosurePanel({
   inspectionId,
   inspectionDate,
@@ -217,9 +245,28 @@ function ClosurePanel({
   defaults,
 }: Pick<ExitPanelProps, "inspectionId" | "inspectionDate" | "closure" | "defaults">) {
   const { pending, errors, saved, run } = useSave();
+  // Saving is final, so the first submit only asks to confirm; the second one saves.
+  const [confirming, setConfirming] = useState(false);
+
+  if (closure) {
+    return (
+      <section aria-labelledby="closure-title" className={cn(PANEL, "space-y-2")}>
+        <h2 id="closure-title" className="text-lg font-semibold">
+          Cierre de la novedad
+        </h2>
+        <ClosureDetails closure={closure} />
+        <p className="text-xs text-muted-foreground">El cierre ya fue registrado y no se puede modificar.</p>
+      </section>
+    );
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     const fd = new FormData(event.currentTarget);
     run(() =>
       recordClosureAction(inspectionId, {
@@ -242,10 +289,15 @@ function ClosurePanel({
         <h2 id="closure-title" className="text-lg font-semibold">
           Cierre de la novedad
         </h2>
-        {closure && <p className="text-sm text-muted-foreground">Registrado por {closure.signoff}</p>}
+        <p className="text-sm text-muted-foreground">Una vez guardado, el cierre no se puede modificar.</p>
       </div>
 
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
+      <form
+        onSubmit={onSubmit}
+        onChange={() => setConfirming(false)}
+        className="grid gap-4 sm:grid-cols-2"
+        noValidate
+      >
         <div className="space-y-1.5">
           <Label htmlFor="closure-date" className="text-sm text-foreground">
             Fecha de cierre
@@ -255,7 +307,7 @@ function ClosurePanel({
             name="date"
             type="date"
             min={inspectionDate}
-            defaultValue={closure?.date ?? defaults.date}
+            defaultValue={defaults.date}
             className="h-11 md:h-9"
             {...fieldProps("date")}
           />
@@ -268,7 +320,7 @@ function ClosurePanel({
           <Input
             id="closure-work-order"
             name="workOrder"
-            defaultValue={closure?.workOrder ?? ""}
+            defaultValue=""
             maxLength={MAX_CLOSURE_WORK_ORDER_LENGTH}
             autoComplete="off"
             className="h-11 md:h-9"
@@ -284,7 +336,7 @@ function ClosurePanel({
             id="closure-action"
             name="action"
             rows={3}
-            defaultValue={closure?.action ?? ""}
+            defaultValue=""
             maxLength={MAX_CLOSURE_ACTION_LENGTH}
             {...fieldProps("action")}
           />
@@ -297,7 +349,7 @@ function ClosurePanel({
           <Input
             id="closure-responsible"
             name="responsible"
-            defaultValue={closure?.responsible ?? ""}
+            defaultValue=""
             maxLength={MAX_CLOSURE_RESPONSIBLE_LENGTH}
             autoComplete="off"
             className="h-11 md:h-9"
@@ -306,11 +358,21 @@ function ClosurePanel({
           <FieldError id="closure-responsible-error" message={errors.responsible} />
         </div>
 
+        {confirming && (
+          <p role="alert" className="rounded-lg bg-warn/60 p-3 text-sm font-medium sm:col-span-2">
+            Revise los datos: después de confirmar, el cierre no se puede modificar.
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
           <Button type="submit" className="h-11 px-4 md:h-10" disabled={pending}>
             {pending && <Loader2 className="animate-spin" aria-hidden />}
-            {closure ? "Guardar cambios" : "Guardar cierre"}
+            {confirming ? "Confirmar cierre" : "Guardar cierre"}
           </Button>
+          {confirming && (
+            <Button type="button" variant="ghost" className="h-11 px-4 md:h-10" onClick={() => setConfirming(false)}>
+              Volver a revisar
+            </Button>
+          )}
           <FieldError id="closure-form-error" message={errors.form} />
           {saved && !pending && !errors.form && (
             <p role="status" className="text-sm text-ok-foreground">
@@ -361,26 +423,7 @@ export function ExitSummary({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">Cierre de la novedad</h2>
           {closure ? (
-            <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-              <dt className="text-muted-foreground">Fecha de cierre</dt>
-              <dd className="num">{formatInspectionDate(closure.date)}</dd>
-              {closure.workOrder && (
-                <>
-                  <dt className="text-muted-foreground">Orden de trabajo</dt>
-                  <dd>{closure.workOrder}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Qué se hizo</dt>
-              <dd>{closure.action}</dd>
-              {closure.responsible && (
-                <>
-                  <dt className="text-muted-foreground">Responsable</dt>
-                  <dd>{closure.responsible}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Registrado por</dt>
-              <dd>{closure.signoff}</dd>
-            </dl>
+            <ClosureDetails closure={closure} />
           ) : (
             <p className="text-sm text-muted-foreground">Sin cierre registrado.</p>
           )}

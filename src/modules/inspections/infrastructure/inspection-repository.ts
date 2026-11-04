@@ -254,13 +254,15 @@ export async function findInspection(id: string): Promise<InspectionDetail | nul
 /** What the admin actions need to validate: the date and the answers. */
 export async function findInspectionForDecision(
   id: string,
-): Promise<{ inspectionDate: string; answers: InspectionAnswers } | null> {
+): Promise<{ inspectionDate: string; answers: InspectionAnswers; closed: boolean } | null> {
   const [row] = await db
-    .select({ inspectionDate: t.inspectionDate, answers: t.answers })
+    .select({ inspectionDate: t.inspectionDate, answers: t.answers, closureDate: t.closureDate })
     .from(t)
     .where(eq(t.id, id))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  const { closureDate, ...rest } = row;
+  return { ...rest, closed: closureDate !== null };
 }
 
 /** Records (or overwrites) the exit decision; false when the inspection does not exist. */
@@ -278,7 +280,11 @@ export async function saveExitDecision(id: string, input: ExitDecisionInput, use
   return updated.length > 0;
 }
 
-/** Records (or overwrites) the novelty closure; false when the inspection does not exist. */
+/**
+ * Records the novelty closure once: it is final, so a closure already on file is never overwritten
+ * (the condition is in the UPDATE itself, so two concurrent saves cannot both win). False when the
+ * inspection does not exist or is already closed.
+ */
 export async function saveClosure(id: string, input: ClosureInput, userId: string): Promise<boolean> {
   const updated = await db
     .update(t)
@@ -290,7 +296,7 @@ export async function saveClosure(id: string, input: ClosureInput, userId: strin
       closureRecordedAt: new Date(),
       closureRecordedBy: userId,
     })
-    .where(eq(t.id, id))
+    .where(and(eq(t.id, id), isNull(t.closureDate)))
     .returning({ id: t.id });
   return updated.length > 0;
 }

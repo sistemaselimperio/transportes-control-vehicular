@@ -57,19 +57,26 @@ export async function decideExitAction(id: string, input: unknown): Promise<Exit
   }
 }
 
-/** Records or edits the closure of the novelties of an inspection that has some item MAL. */
+const ALREADY_CLOSED: ExitActionResult = {
+  ok: false,
+  errors: { form: "El cierre ya fue registrado y no se puede modificar." },
+};
+
+/** Records the closure of the novelties of an inspection that has some item MAL. Final: no edits. */
 export async function recordClosureAction(id: string, input: unknown): Promise<ExitActionResult> {
   try {
     const session = await requireAdmin();
     if (!UUID.test(id)) return NOT_FOUND;
     const inspection = await findInspectionForDecision(id);
     if (!inspection) return NOT_FOUND;
+    if (inspection.closed) return ALREADY_CLOSED;
     const validation = validateClosure(input, {
       inspectionDate: inspection.inspectionDate,
       hasFailedItems: hasFailedItems(inspection.answers),
     });
     if (!validation.ok) return validation;
-    if (!(await saveClosure(id, validation.value, session.user.id))) return NOT_FOUND;
+    // Nothing updated after the checks above: someone closed it in the meantime.
+    if (!(await saveClosure(id, validation.value, session.user.id))) return ALREADY_CLOSED;
     revalidate(id);
     return { ok: true };
   } catch (e) {
