@@ -12,6 +12,7 @@ export const CACHE_TAGS = {
   owners: "owners",
   drivers: "drivers",
   sales: "sales",
+  trips: "trips",
   /** Service, tire and fuel records. */
   logbook: "logbook",
   /** Dashboard figures; derived from the fleet and its owners. */
@@ -22,12 +23,12 @@ export const CACHE_TAGS = {
   files: "fleet-files",
 } as const;
 
-type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.logbook;
+type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.trips | typeof CACHE_TAGS.logbook;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
 
-const { fleet, owners, drivers, sales, logbook, dashboard, expiredCounts, files } = CACHE_TAGS;
+const { fleet, owners, drivers, sales, trips, logbook, dashboard, expiredCounts, files } = CACHE_TAGS;
 
 export type ReadName =
   | "fleetRows"
@@ -40,7 +41,9 @@ export type ReadName =
   | "driverRows"
   | "driverOptions"
   | "ownerRows"
-  | "saleRows";
+  | "saleRows"
+  | "tripRows"
+  | "vehicleTrips";
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
@@ -55,6 +58,10 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   driverOptions: [drivers],
   ownerRows: [owners, fleet],
   saleRows: [sales, fleet, owners],
+  /** The fleet is a dependency because deleting a vehicle unlinks its trips. */
+  tripRows: [trips, fleet],
+  /** Latest trips of one vehicle; same dependencies as `tripRows`. */
+  vehicleTrips: [trips, fleet],
 };
 
 /** The tags to hand to `cacheTag` for a read. The vehicle detail also needs its plate. */
@@ -71,6 +78,7 @@ export type Change =
   | { kind: "owner" }
   | { kind: "driver" }
   | { kind: "sale" }
+  | { kind: "trip" }
   | { kind: "logbook" }
   /** Logbook writes that also change oil changes or the odometer (bulk delete, Excel import). */
   | { kind: "logbook-with-oil" }
@@ -81,6 +89,7 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   owner: [owners],
   driver: [drivers],
   sale: [sales],
+  trip: [trips],
   logbook: [logbook],
   "logbook-with-oil": [logbook, fleet],
 };

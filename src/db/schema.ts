@@ -71,6 +71,17 @@ export const fileCategoryEnum = transportes.enum("file_category", [
   "OWNERSHIP_CARD",
   "OTHER",
 ]);
+export const tripStatusEnum = transportes.enum("trip_status", ["programado", "en_ruta", "entregado"]);
+export const tripAreaEnum = transportes.enum("trip_area", [
+  "Traslados",
+  "Cemento",
+  "Ganadería",
+  "Ruta Ricaurte",
+  "Abono",
+  "Concentrado",
+  "Combustible",
+  "Trasolicar",
+]);
 
 /* ---------------------------- Fleet domain ---------------------------- */
 
@@ -398,6 +409,31 @@ export const preoperationalInspections = transportes.table(
   ],
 );
 
+/**
+ * Trips of the fleet. `plate` is a snapshot of the vehicle's plate; `vehicleId` is a soft link
+ * that goes null when the vehicle is deleted, so trips never depend on the fleet.
+ */
+export const trips = transportes.table(
+  "trips",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** Start instant; the date and hour are typed in Colombia local time. */
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    destination: text().notNull(),
+    plate: text().notNull(),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    area: tripAreaEnum().notNull(),
+    status: tripStatusEnum().notNull().default("programado"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("trips_start_at_idx").on(t.startAt),
+    index("trips_vehicle_idx").on(t.vehicleId),
+    index("trips_status_idx").on(t.status),
+  ],
+);
+
 /* ------------------- Better Auth (username plugin) ------------------- */
 
 export const user = transportes.table("user", {
@@ -414,7 +450,7 @@ export const user = transportes.table("user", {
     .defaultNow(),
   username: text().unique(),
   displayUsername: text("display_username"),
-  /** "admin" does everything; "staff" only reads the fleet and the drivers (see `src/lib/permissions.ts`). */
+  /** Access per section depends on the role (see `src/lib/permissions.ts`). */
   role: text().notNull().default("staff"),
   /** "yellow" (brand default) or "sky": the palette the app shell renders in (see `src/lib/theme.ts`). */
   theme: text().notNull().default("yellow"),
