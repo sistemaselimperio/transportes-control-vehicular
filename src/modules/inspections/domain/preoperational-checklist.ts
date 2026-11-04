@@ -148,7 +148,12 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
       regular("ppe.gloves", "Guantes"),
     ],
   },
-  // Retired: "prohibited" / "prohibited.illegal-items" (Elementos no permitidos). Never reuse the ids.
+  {
+    id: "prohibited",
+    title: "Elementos no permitidos",
+    // Optional on purpose: nothing illegal is carried, so the driver may leave it blank.
+    items: [regular("prohibited.illegal-items", "Sin elementos ilegales a bordo")],
+  },
 ];
 
 /** Every item of every section, in form order. */

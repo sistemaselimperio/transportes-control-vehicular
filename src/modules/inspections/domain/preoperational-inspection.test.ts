@@ -31,15 +31,14 @@ const draft = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("PREOPERATIONAL_CHECKLIST", () => {
-  it("has 12 sections with unique, stable item ids", () => {
-    expect(PREOPERATIONAL_CHECKLIST).toHaveLength(12);
+  it("has 13 sections with unique, stable item ids", () => {
+    expect(PREOPERATIONAL_CHECKLIST).toHaveLength(13);
     const ids = ALL_CHECKLIST_ITEMS.map((i) => i.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("no longer asks about illegal items on board", () => {
-    expect(PREOPERATIONAL_CHECKLIST.map((s) => s.id)).not.toContain("prohibited");
-    expect(ALL_CHECKLIST_ITEMS.map((i) => i.id)).not.toContain("prohibited.illegal-items");
+  it("keeps the illegal-items point optional, not critical", () => {
+    expect(ALL_CHECKLIST_ITEMS.find((i) => i.id === "prohibited.illegal-items")?.critical).toBe(false);
   });
 
   it("marks only the mule section as mule-only", () => {
