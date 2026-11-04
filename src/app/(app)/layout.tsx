@@ -80,7 +80,7 @@ async function SessionSidebar() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
   const role = parseRole(session.user.role);
-  // The counts only feed the alerts entry, which staff do not see.
+  // The counts only feed the alerts entry, which only some roles can open.
   const expiredCounts = canViewSection(role, "today") ? await getExpiredVehicleCounts() : null;
   return <Sidebar userName={session.user.name} role={role} expiredCounts={expiredCounts} />;
 }

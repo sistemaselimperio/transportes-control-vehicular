@@ -1,7 +1,7 @@
 import type { ZodError } from "zod";
 import { auth } from "@/lib/auth";
 import { expireAfterRoute } from "@/lib/cache-invalidation";
-import { canWrite, ForbiddenError, parseRole } from "@/lib/permissions";
+import { canManageSection, ForbiddenError, parseRole } from "@/lib/permissions";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { createVehicleCommands } from "@/modules/vehicles/application/vehicle-commands";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
@@ -12,11 +12,11 @@ export const vehicleCommands = createVehicleCommands(vehicleCommandRepository, t
 const unauthorized = () => Response.json({ error: "No autorizado" }, { status: 401 });
 const forbidden = () => Response.json({ error: new ForbiddenError().message }, { status: 403 });
 
-/** Gate of every write route: the rejection to send (401 signed out, 403 staff), or `null` to go on. */
-export async function rejectUnlessAdmin(request: Request): Promise<Response | null> {
+/** Gate of every write route: the rejection to send (401 signed out, 403 read-only role), or `null` to go on. */
+export async function rejectUnlessFleetManager(request: Request): Promise<Response | null> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return unauthorized();
-  return canWrite(parseRole(session.user.role)) ? null : forbidden();
+  return canManageSection(parseRole(session.user.role), "fleet") ? null : forbidden();
 }
 
 export function invalidBody(error: ZodError) {

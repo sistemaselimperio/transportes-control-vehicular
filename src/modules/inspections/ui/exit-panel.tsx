@@ -472,12 +472,12 @@ function ExitModal({ canDecide, ...props }: ExitPanelProps & { canDecide: boolea
   );
 }
 
-/** Admin only: records the exit decision and, when something is MAL, the novelty closure. */
+/** Inspections managers only: records the exit decision and, when something is MAL, the novelty closure. */
 export function ExitPanel(props: ExitPanelProps) {
   return <ExitModal {...props} canDecide />;
 }
 
-/** Read-only view of the decision and the closure, for staff. */
+/** Read-only view of the decision and the closure, for roles that only read inspections. */
 export function ExitSummary(props: ExitPanelProps) {
   return <ExitModal {...props} canDecide={false} />;
 }

@@ -102,14 +102,16 @@ function DeleteButton({ row, onResult }: { row: OwnerRow; onResult: (result: Act
   );
 }
 
-/** Owners as a table from `md`, as cards on phones. */
+/** Owners as a table from `md`, as cards on phones. Without `canManage` the rows carry no edit / delete. */
 export function OwnerList({
   rows,
+  canManage,
   empty,
   onEdit,
   onResult,
 }: {
   rows: readonly OwnerRow[];
+  canManage: boolean;
   /** Text shown when nothing matches the current filters. */
   empty: string;
   onEdit: (row: OwnerRow) => void;
@@ -129,7 +131,7 @@ export function OwnerList({
           <li key={r.id} className="space-y-2 rounded-2xl border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
               <span className="min-w-0 font-medium">{r.name}</span>
-              <div className="-mt-2 -mr-2 shrink-0">{actions(r)}</div>
+              {canManage && <div className="-mt-2 -mr-2 shrink-0">{actions(r)}</div>}
             </div>
             <div className="text-sm text-muted-foreground">
               {[GROUP_LABELS[r.group], r.documentNumber && `NIT/C.C. ${r.documentNumber}`].filter(Boolean).join(" · ")}
@@ -154,9 +156,11 @@ export function OwnerList({
                     {h}
                   </th>
                 ))}
-                <th scope="col" className="w-px">
-                  <span className="sr-only">Acciones</span>
-                </th>
+                {canManage && (
+                  <th scope="col" className="w-px">
+                    <span className="sr-only">Acciones</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -168,7 +172,7 @@ export function OwnerList({
                   <td className="px-4 py-3">
                     <Plates plates={r.plates} />
                   </td>
-                  <td className="px-2 py-1.5 text-right">{actions(r)}</td>
+                  {canManage && <td className="px-2 py-1.5 text-right">{actions(r)}</td>}
                 </tr>
               ))}
             </tbody>

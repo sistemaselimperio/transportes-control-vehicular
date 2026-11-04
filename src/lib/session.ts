@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canManageSection, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 import { parseTheme } from "@/lib/theme";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
@@ -15,21 +15,23 @@ export async function requireSession() {
   return session;
 }
 
-/** Every write goes through this: staff can read but never change data. Throws `ForbiddenError` for them. */
-export async function requireAdmin() {
+/**
+ * Every write goes through a guard like this one: the role must manage the section it writes to
+ * (see `ACCESS` in permissions). Throws `ForbiddenError` otherwise.
+ */
+export async function requireSectionManager(section: Section) {
   const session = await requireSession();
-  if (!canWrite(parseRole(session.user.role))) throw new ForbiddenError();
+  if (!canManageSection(parseRole(session.user.role), section)) throw new ForbiddenError();
   return session;
 }
 
-/** Driver writes: open to admin and staff, still needs a signed-in user. Throws `ForbiddenError` otherwise. */
-export async function requireDriverManager() {
-  const session = await requireSession();
-  if (!canManageDrivers(parseRole(session.user.role))) throw new ForbiddenError();
-  return session;
-}
+/** Driver writes. */
+export const requireDriverManager = () => requireSectionManager("drivers");
 
-/** Changing a vehicle's driver: open to admin and staff. Throws `ForbiddenError` otherwise. */
+/** Trip writes. */
+export const requireTripManager = () => requireSectionManager("trips");
+
+/** Changing a vehicle's driver: open to anyone who sees the fleet and manages drivers. Throws `ForbiddenError` otherwise. */
 export async function requireDriverAssigner() {
   const session = await requireSession();
   if (!canAssignDrivers(parseRole(session.user.role))) throw new ForbiddenError();

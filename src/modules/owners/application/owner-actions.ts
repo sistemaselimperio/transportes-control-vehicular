@@ -7,7 +7,7 @@
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import {
   deleteAllOwners,
@@ -30,7 +30,7 @@ async function ensureUniqueDocument(input: OwnerInput, exceptId?: number) {
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("owners");
     const message = await fn();
     expireAfterAction({ kind: "owner" });
     return { ok: true, message };

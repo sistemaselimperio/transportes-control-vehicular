@@ -1,7 +1,7 @@
 import { createVehicleSchema } from "@/modules/vehicles/application/create-vehicle-schema";
 import {
   commandErrorResponse,
-  rejectUnlessAdmin,
+  rejectUnlessFleetManager,
   invalidBody,
   expireVehicleReads,
   vehicleCommands,
@@ -9,7 +9,7 @@ import {
 
 /** Creates a vehicle with its owner, driver, documents, tax and first oil change. */
 export async function POST(request: Request) {
-  const rejection = await rejectUnlessAdmin(request);
+  const rejection = await rejectUnlessFleetManager(request);
   if (rejection) return rejection;
 
   const parsed = createVehicleSchema.safeParse(await request.json().catch(() => null));

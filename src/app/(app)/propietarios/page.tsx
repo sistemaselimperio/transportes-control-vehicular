@@ -1,3 +1,4 @@
+import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { parseGroupParam } from "@/modules/dashboard/domain/dashboard-metrics";
 import { listOwnerRows } from "@/modules/owners/application/owner-queries";
@@ -9,10 +10,10 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireSectionAccess("owners");
+  const role = await requireSectionAccess("owners");
   // Await the request first: the cached read must run per request, never while prerendering.
   const { grupo, vista } = await searchParams;
   const rows = await listOwnerRows();
   const group = parseGroupParam(grupo);
-  return <OwnersView rows={filterOwnersByGroup(rows, group)} group={group} initialView={parseViewParam(vista)} />;
+  return <OwnersView rows={filterOwnersByGroup(rows, group)} group={group} initialView={parseViewParam(vista)} canManage={canManageSection(role, "owners")} />;
 }

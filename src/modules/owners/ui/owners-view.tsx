@@ -29,12 +29,15 @@ function syncUrl(view: OwnerView) {
   window.history.replaceState(null, "", url);
 }
 
-/** Owners page: tabs, search, the list and the create / edit side sheet. */
+/** Owners page: tabs, search, the list and the create / edit side sheet (only with `canManage`). */
 export function OwnersView({
   rows,
   group,
   initialView,
+  canManage,
 }: {
+  /** False for a read-only role: no create, edit or delete controls. */
+  canManage: boolean;
   rows: readonly OwnerRow[];
   group: OwnerGroup | null;
   initialView: OwnerView;
@@ -83,18 +86,20 @@ export function OwnersView({
         title="Propietarios"
         description={`Dueños de los vehículos y los vehículos que tienen hoy${group ? ` · ${GROUP_LABELS[group]}` : ""}.`}
         actions={
-          <>
-            <DeleteAllButton count={rows.length} title="Eliminar todos los propietarios" action={deleteAllOwnersAction}>
-              <p className="font-medium">Se eliminarán TODOS los propietarios, no solo los que ves en pantalla.</p>
-              <p className="text-muted-foreground">
-                Se quitan también los vínculos de propiedad con los vehículos. Los vehículos no se eliminan.
-              </p>
-            </DeleteAllButton>
-            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-              <Plus aria-hidden />
-              Nuevo propietario
-            </Button>
-          </>
+          canManage && (
+            <>
+              <DeleteAllButton count={rows.length} title="Eliminar todos los propietarios" action={deleteAllOwnersAction}>
+                <p className="font-medium">Se eliminarán TODOS los propietarios, no solo los que ves en pantalla.</p>
+                <p className="text-muted-foreground">
+                  Se quitan también los vínculos de propiedad con los vehículos. Los vehículos no se eliminan.
+                </p>
+              </DeleteAllButton>
+              <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+                <Plus aria-hidden />
+                Nuevo propietario
+              </Button>
+            </>
+          )
         }
       />
 
@@ -127,6 +132,7 @@ export function OwnersView({
       <div id="owner-panel" role="tabpanel" aria-labelledby={`owner-tab-${view}`}>
         <OwnerList
           rows={visible}
+          canManage={canManage}
           empty={
             query === "" && view === "WITH_VEHICLES"
               ? "Ningún propietario tiene vehículos para este filtro."

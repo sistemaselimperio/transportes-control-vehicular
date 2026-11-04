@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { deleteInspectionAction } from "../application/delete-inspection-action";
 
 /**
- * Admin only: deletes one inspection after an in-app confirmation. `afterDelete` is where to go
+ * Inspections managers only: deletes one inspection after an in-app confirmation. `afterDelete` is where to go
  * once it is gone (the list, from the detail page); without it the current page just refreshes.
  */
 export function DeleteInspectionButton({

@@ -155,7 +155,7 @@ export function InspectionSheet({
   defaults,
 }: {
   inspection: InspectionDetail;
-  /** Admin only: shows the decision / closure controls instead of the read-only summary. */
+  /** Inspections managers only: shows the decision / closure controls instead of the read-only summary. */
   canDecide: boolean;
   defaults: { date: string; time: string };
 }) {

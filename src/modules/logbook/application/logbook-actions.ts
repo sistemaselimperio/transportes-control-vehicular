@@ -11,7 +11,7 @@ import { z, ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import type { Change } from "@/lib/cache-tags";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
@@ -42,7 +42,7 @@ async function run(
   change: Change = { kind: "logbook" },
 ): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("logbook");
     const result = await fn();
     expireAfterAction(change);
     return { ok: true, message: result.message };

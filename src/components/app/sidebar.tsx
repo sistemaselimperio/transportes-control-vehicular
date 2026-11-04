@@ -5,10 +5,12 @@ import {
   Building2,
   ClipboardCheck,
   Loader2,
+  Lock,
   LogOut,
   Menu,
   NotebookText,
   Receipt,
+  Route,
   Truck,
   Users,
   type LucideIcon,
@@ -40,6 +42,7 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
       { href: "/flota", label: "Flota", icon: Truck },
       { href: "/conductores", label: "Conductores", icon: Users },
       { href: "/preoperacionales", label: "Preoperacionales", icon: ClipboardCheck },
+      { href: "/viajes", label: "Viajes", icon: Route },
       { href: "/bitacora", label: "Bitácora", icon: NotebookText },
     ],
   },
@@ -109,23 +112,34 @@ function SidebarBody({ pathname, role, grupo, currentQuery, userName, expiredVeh
   const focus =
     "outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
 
-  const sections = SECTIONS.map((section) => ({
-    ...section,
-    items: section.items.filter((item) => {
-      const target = sectionOfPath(item.href);
-      return target != null && canViewSection(role, target);
-    }),
-  })).filter((section) => section.items.length > 0);
-
   return (
     <>
       <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
-        {sections.map((section) => (
+        {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
             {section.items.map((item) => {
-              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const target = sectionOfPath(item.href);
               const Icon = item.icon;
+              // Every role sees every entry; the ones it cannot open stay in place, disabled.
+              if (target == null || !canViewSection(role, target)) {
+                return (
+                  <div
+                    key={item.href}
+                    aria-disabled="true"
+                    title="Sin acceso"
+                    className="flex h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground/50 select-none md:h-9"
+                  >
+                    <Icon className="size-[1.125rem] shrink-0" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.label}
+                      <span className="sr-only"> (sin acceso)</span>
+                    </span>
+                    <Lock className="size-3.5 shrink-0" aria-hidden />
+                  </div>
+                );
+              }
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
@@ -261,7 +275,7 @@ export function Sidebar({
 }: {
   userName: string;
   role: Role;
-  /** Only the roles that see the alerts page get the counts. */
+  /** Only the roles that can open the alerts page get the counts. */
   expiredCounts: ExpiredVehicleCounts | null;
 }) {
   const pathname = usePathname();

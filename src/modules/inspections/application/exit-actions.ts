@@ -2,13 +2,13 @@
 
 /**
  * Server actions of the exit decision and the novelty closure. Unlike the public form action these
- * need an admin session (the maintenance chief): staff can read the result but never write it.
+ * need a session that manages the inspections section (staff): an admin can read the result but never write it.
  * The inspection reads are not cached, so there are no cache tags to expire; the paths that show
  * the status are revalidated instead.
  */
 import { revalidatePath } from "next/cache";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import {
   hasFailedItems,
   validateClosure,
@@ -45,7 +45,7 @@ function revalidate(id: string) {
 /** Records or changes the exit decision of an inspection; the latest one wins. */
 export async function decideExitAction(id: string, input: unknown): Promise<ExitActionResult> {
   try {
-    const session = await requireAdmin();
+    const session = await requireSectionManager("inspections");
     if (!UUID.test(id)) return NOT_FOUND;
     const validation = validateExitDecision(input);
     if (!validation.ok) return validation;
@@ -65,7 +65,7 @@ const ALREADY_CLOSED: ExitActionResult = {
 /** Records the closure of the novelties of an inspection that has some item MAL. Final: no edits. */
 export async function recordClosureAction(id: string, input: unknown): Promise<ExitActionResult> {
   try {
-    const session = await requireAdmin();
+    const session = await requireSectionManager("inspections");
     if (!UUID.test(id)) return NOT_FOUND;
     const inspection = await findInspectionForDecision(id);
     if (!inspection) return NOT_FOUND;

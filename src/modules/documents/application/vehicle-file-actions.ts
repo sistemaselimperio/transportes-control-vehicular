@@ -7,7 +7,7 @@
 import { z, ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
@@ -20,7 +20,7 @@ const commands = createVehicleFileCommands(vehicleFileRepository, supabaseFileSt
 
 async function run(plate: string, fn: () => Promise<{ message: string }>): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("fleet");
     const result = await fn();
     // The command only succeeds for a plate stored exactly as given, the same one the detail page tags.
     expireAfterAction({ kind: "vehicle-file", plate });

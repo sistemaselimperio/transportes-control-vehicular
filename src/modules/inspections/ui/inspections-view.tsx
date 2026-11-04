@@ -50,7 +50,7 @@ function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean })
 
 /**
  * List of submitted inspections: a GET filter form, the rows and simple prev / next paging. Only the
- * admin (`canDelete`) gets a delete action per row.
+ * role that manages inspections (`canDelete`) gets a delete action per row.
  */
 export function InspectionsView({
   rows,

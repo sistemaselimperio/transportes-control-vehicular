@@ -1,7 +1,7 @@
 import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { currentDay } from "@/lib/current-day";
-import { canWrite } from "@/lib/permissions";
+import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { deleteAllVehiclesAction } from "@/modules/vehicles/application/vehicle-actions";
 import { getVehicleFormOptions, listVehicleRows } from "@/modules/vehicles/application/vehicle-queries";
@@ -15,7 +15,7 @@ export default async function Page({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const role = await requireSectionAccess("fleet");
-  const editable = canWrite(role);
+  const editable = canManageSection(role, "fleet");
   const [today, params] = await Promise.all([currentDay(), searchParams]);
   const [rows, options] = await Promise.all([
     listVehicleRows(today),

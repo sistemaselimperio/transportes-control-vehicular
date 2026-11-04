@@ -2,7 +2,7 @@ import { updateVehicleSchema } from "@/modules/vehicles/application/update-vehic
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import {
   commandErrorResponse,
-  rejectUnlessAdmin,
+  rejectUnlessFleetManager,
   invalidBody,
   expireVehicleReads,
   vehicleCommands,
@@ -10,7 +10,7 @@ import {
 
 /** Edits the vehicle's own data (plate, class, brand, notes, municipality, service, oil mode, towing). */
 export async function PATCH(request: Request, { params }: { params: Promise<{ placa: string }> }) {
-  const rejection = await rejectUnlessAdmin(request);
+  const rejection = await rejectUnlessFleetManager(request);
   if (rejection) return rejection;
 
   const parsed = updateVehicleSchema.safeParse(await request.json().catch(() => null));

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { canWrite } from "@/lib/permissions";
+import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { bogotaDateTime } from "@/modules/inspections/domain/preoperational-inspection";
 import { findInspection } from "@/modules/inspections/infrastructure/inspection-repository";
@@ -13,5 +13,5 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // Anything that is not a UUID cannot exist; skip the query (Postgres would reject the cast).
   const inspection = UUID.test(id) ? await findInspection(id) : null;
   if (!inspection) notFound();
-  return <InspectionSheet inspection={inspection} canDecide={canWrite(role)} defaults={bogotaDateTime(new Date())} />;
+  return <InspectionSheet inspection={inspection} canDecide={canManageSection(role, "inspections")} defaults={bogotaDateTime(new Date())} />;
 }

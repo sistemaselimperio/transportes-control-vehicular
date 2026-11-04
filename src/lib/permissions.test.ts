@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { canAssignDrivers, canManageDrivers, canViewSection, canWrite, ForbiddenError, homePath, parseRole, sectionOfPath } from "./permissions";
+import {
+  canAssignDrivers,
+  canManageDrivers,
+  canManageSection,
+  canManageTrips,
+  canViewSection,
+  ForbiddenError,
+  homePath,
+  parseRole,
+  sectionOfPath,
+  type Role,
+  type Section,
+} from "./permissions";
 
 describe("parseRole", () => {
   it("keeps the known roles", () => {
@@ -16,34 +28,57 @@ describe("parseRole", () => {
   });
 });
 
-describe("canViewSection", () => {
-  it("lets an admin see every section", () => {
-    for (const section of ["today", "fleet", "drivers", "inspections", "logbook", "owners", "sales"] as const) {
-      expect(canViewSection("admin", section)).toBe(true);
-    }
-  });
+const SECTIONS: ReadonlyArray<Section> = ["today", "fleet", "drivers", "inspections", "trips", "logbook", "owners", "sales"];
 
-  it("lets staff see only the fleet, the drivers and the inspections", () => {
-    expect(canViewSection("staff", "fleet")).toBe(true);
-    expect(canViewSection("staff", "drivers")).toBe(true);
-    expect(canViewSection("staff", "inspections")).toBe(true);
-    for (const section of ["today", "logbook", "owners", "sales"] as const) {
-      expect(canViewSection("staff", section)).toBe(false);
-    }
-  });
-});
+/** The agreed matrix: "manage" = every write, "read" = view only, "locked" = not even the page. */
+const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
+  admin: {
+    today: "read",
+    fleet: "manage",
+    drivers: "manage",
+    inspections: "read",
+    trips: "read",
+    logbook: "manage",
+    owners: "manage",
+    sales: "manage",
+  },
+  staff: {
+    today: "locked",
+    fleet: "read",
+    drivers: "manage",
+    inspections: "manage",
+    trips: "manage",
+    logbook: "locked",
+    owners: "read",
+    sales: "locked",
+  },
+};
 
-describe("canWrite", () => {
-  it("allows writes only for admins", () => {
-    expect(canWrite("admin")).toBe(true);
-    expect(canWrite("staff")).toBe(false);
+describe("access matrix", () => {
+  for (const role of ["admin", "staff"] as const) {
+    for (const section of SECTIONS) {
+      const level = MATRIX[role][section];
+      it(`${role} on ${section} is ${level}`, () => {
+        expect(canViewSection(role, section)).toBe(level !== "locked");
+        expect(canManageSection(role, section)).toBe(level === "manage");
+      });
+    }
+  }
+
+  it("never lets a role manage what it cannot view", () => {
+    for (const role of ["admin", "staff"] as const) {
+      for (const section of SECTIONS) {
+        if (canManageSection(role, section)) expect(canViewSection(role, section)).toBe(true);
+      }
+    }
   });
 });
 
 describe("canAssignDrivers", () => {
-  it("lets admins and staff change a vehicle's driver", () => {
+  it("lets admins and staff change a vehicle's driver, even though staff only reads the fleet", () => {
     expect(canAssignDrivers("admin")).toBe(true);
     expect(canAssignDrivers("staff")).toBe(true);
+    expect(canManageSection("staff", "fleet")).toBe(false);
   });
 });
 
@@ -63,6 +98,7 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/bitacora")).toBe("logbook");
     expect(sectionOfPath("/preoperacionales")).toBe("inspections");
     expect(sectionOfPath("/preoperacionales/0b9d2c1e")).toBe("inspections");
+    expect(sectionOfPath("/viajes")).toBe("trips");
     expect(sectionOfPath("/propietarios")).toBe("owners");
     expect(sectionOfPath("/ventas")).toBe("sales");
   });
@@ -91,7 +127,16 @@ describe("canManageDrivers", () => {
     expect(canManageDrivers("staff")).toBe(true);
   });
 
-  it("does not widen canWrite for staff", () => {
-    expect(canWrite("staff")).toBe(false);
+  it("follows the drivers row of the matrix", () => {
+    for (const role of ["admin", "staff"] as const) {
+      expect(canManageDrivers(role)).toBe(canManageSection(role, "drivers"));
+    }
+  });
+});
+
+describe("canManageTrips", () => {
+  it("allows only staff to create, edit and delete trips; an admin just reads them", () => {
+    expect(canManageTrips("staff")).toBe(true);
+    expect(canManageTrips("admin")).toBe(false);
   });
 });

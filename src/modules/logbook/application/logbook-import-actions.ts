@@ -9,7 +9,7 @@
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import { readWorkbook } from "@/modules/import-export/infrastructure/xlsx-reader";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { plateSchema } from "@/modules/vehicles/application/vehicle-action-schemas";
@@ -50,7 +50,7 @@ function failure(e: unknown): { ok: false; error: string } {
 
 export async function previewLogbookImportAction(fd: FormData): Promise<ImportPreviewResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("logbook");
     const { plate, data } = await readForm(fd);
     return { ok: true, preview: await importer.preview(plate, data) };
   } catch (e) {
@@ -60,7 +60,7 @@ export async function previewLogbookImportAction(fd: FormData): Promise<ImportPr
 
 export async function confirmLogbookImportAction(fd: FormData): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("logbook");
     const { plate, data } = await readForm(fd);
     const result = await importer.confirm(plate, data);
     // The import can add oil changes and move the odometer, so the fleet changes too.

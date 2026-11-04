@@ -7,7 +7,7 @@
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireAdmin } from "@/lib/session";
+import { requireSectionManager } from "@/lib/session";
 import { assertNotFuture, RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { todayInBogota } from "@/modules/shared/domain/dates";
@@ -18,7 +18,7 @@ const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await requireSectionManager("sales");
     const message = await fn();
     expireAfterAction({ kind: "sale" });
     return { ok: true, message };
