@@ -10,7 +10,7 @@
  *   today/Alertas  read            locked
  *   fleet          manage          read (+ changing a vehicle's driver)
  *   drivers        manage          manage
- *   inspections    read            manage
+ *   inspections    manage          read
  *   trips          read            manage
  *   logbook        manage          locked
  *   owners         manage          read
@@ -29,7 +29,7 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     today: "read",
     fleet: "manage",
     drivers: "manage",
-    inspections: "read",
+    inspections: "manage",
     trips: "read",
     logbook: "manage",
     owners: "manage",
@@ -38,7 +38,7 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
   staff: {
     fleet: "read",
     drivers: "manage",
-    inspections: "manage",
+    inspections: "read",
     trips: "manage",
     owners: "read",
   },
