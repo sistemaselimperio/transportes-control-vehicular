@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { TRIP_AREAS, isTripArea } from "../domain/trip-areas";
-import { filterTrips, suggestDestinations, type TripFilters, type TripRow } from "../domain/trip-row";
+import { filterTrips, type TripFilters, type TripRow } from "../domain/trip-row";
 import { isTripStatus, TRIP_STATUS_LABELS, TRIP_STATUSES } from "../domain/trip-status";
 import { DeleteTripDialog } from "./delete-trip-dialog";
 import { TripForm } from "./trip-form";
@@ -41,7 +41,6 @@ export function TripsView({
   const [message, setMessage] = useState<string | null>(null);
   const [filters, setFilters] = useState<TripFilters>({ status: "ALL", area: "ALL", query: initialQuery });
   const shown = useMemo(() => filterTrips(rows, filters), [rows, filters]);
-  const destinations = useMemo(() => suggestDestinations(rows), [rows]);
 
   const openForm = (trip?: TripRow) => {
     setMessage(null);
@@ -158,7 +157,6 @@ export function TripsView({
         <TripForm
           trip={editing}
           plates={plates}
-          destinations={destinations}
           onCancel={() => setOpen(false)}
           onDone={(msg) => {
             done(msg);

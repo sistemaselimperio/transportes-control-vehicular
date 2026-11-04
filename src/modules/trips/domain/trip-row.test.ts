@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { filterTrips, parsePlateParam, sortTrips, suggestDestinations, type TripRow } from "./trip-row";
+import { filterTrips, parsePlateParam, sortTrips, type TripRow } from "./trip-row";
 
 const row = (over: Partial<TripRow>): TripRow => ({
   id: 1,
   startAt: "2026-03-10T13:00:00.000Z",
+  origin: null,
   destination: "Bogotá",
   plate: "ABC-123",
   vehicleId: 1,
@@ -48,6 +49,11 @@ describe("filterTrips", () => {
     expect(filterTrips(rows, { status: "ALL", area: "Abono", query: "" }).map((r) => r.id)).toEqual([2, 3]);
   });
 
+  it("also matches the origin", () => {
+    const withOrigin = [row({ id: 1, origin: "Tunja (Boyacá)" }), row({ id: 2, origin: null, destination: "Medellín" })];
+    expect(filterTrips(withOrigin, { status: "ALL", area: "ALL", query: "tunja" }).map((r) => r.id)).toEqual([1]);
+  });
+
   it("searches plate and destination ignoring case, accents and dashes", () => {
     expect(filterTrips(rows, { status: "ALL", area: "ALL", query: "cucuta" }).map((r) => r.id)).toEqual([1, 3]);
     expect(filterTrips(rows, { status: "ALL", area: "ALL", query: "xyz987" }).map((r) => r.id)).toEqual([2]);
@@ -56,13 +62,6 @@ describe("filterTrips", () => {
 
   it("combines the filters", () => {
     expect(filterTrips(rows, { status: "entregado", area: "Abono", query: "cucuta" }).map((r) => r.id)).toEqual([3]);
-  });
-});
-
-describe("suggestDestinations", () => {
-  it("returns the distinct destinations, A to Z", () => {
-    const rows = [row({ destination: "Medellín" }), row({ destination: "Cúcuta" }), row({ destination: "Medellín" })];
-    expect(suggestDestinations(rows)).toEqual(["Cúcuta", "Medellín"]);
   });
 });
 

@@ -1,0 +1,1 @@
+ALTER TABLE "transportes"."trips" ADD COLUMN "origin" text;

@@ -4,7 +4,8 @@ import type { TripInput } from "./trip-schemas";
 
 const input = (over: Partial<TripInput> = {}): TripInput => ({
   startAt: new Date("2026-03-10T13:30:00.000Z"),
-  destination: "Cúcuta",
+  origin: "Tunja (Boyacá)",
+  destination: "Medellín (Antioquia)",
   plate: "ABC-123",
   area: "Cemento",
   status: "programado",

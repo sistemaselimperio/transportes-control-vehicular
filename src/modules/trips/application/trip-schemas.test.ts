@@ -3,7 +3,8 @@ import { tripIdSchema, tripSchema } from "./trip-schemas";
 
 const valid = {
   startAt: "2026-03-10T08:30",
-  destination: "  Cúcuta ",
+  origin: "Tunja (Boyacá)",
+  destination: "Medellín (Antioquia)",
   plate: "abc 123",
   area: "Cemento",
   status: "en_ruta",
@@ -13,7 +14,8 @@ describe("tripSchema", () => {
   it("parses a valid form", () => {
     const parsed = tripSchema.parse(valid);
     expect(parsed.startAt.toISOString()).toBe("2026-03-10T13:30:00.000Z");
-    expect(parsed.destination).toBe("Cúcuta");
+    expect(parsed.origin).toBe("Tunja (Boyacá)");
+    expect(parsed.destination).toBe("Medellín (Antioquia)");
     expect(parsed.plate).toBe("ABC-123");
     expect(parsed.area).toBe("Cemento");
     expect(parsed.status).toBe("en_ruta");
@@ -29,8 +31,18 @@ describe("tripSchema", () => {
     expect(tripSchema.safeParse({ ...valid, startAt: "mañana" }).success).toBe(false);
   });
 
-  it("requires the destination", () => {
-    expect(tripSchema.safeParse({ ...valid, destination: "   " }).success).toBe(false);
+  it("requires the destination to be a municipality label", () => {
+    expect(tripSchema.safeParse({ ...valid, destination: "" }).success).toBe(false);
+    expect(tripSchema.safeParse({ ...valid, destination: "Cúcuta" }).success).toBe(false);
+    const r = tripSchema.safeParse({ ...valid, destination: "" });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Elige el municipio de destino.");
+  });
+
+  it("requires the origin to be a municipality label", () => {
+    expect(tripSchema.safeParse({ ...valid, origin: undefined }).success).toBe(false);
+    expect(tripSchema.safeParse({ ...valid, origin: "Tunja" }).success).toBe(false);
+    const r = tripSchema.safeParse({ ...valid, origin: "" });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Elige el municipio de salida.");
   });
 
   it("requires the plate", () => {

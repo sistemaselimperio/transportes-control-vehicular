@@ -419,6 +419,8 @@ export const trips = transportes.table(
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     /** Start instant; the date and hour are typed in Colombia local time. */
     startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    /** Municipality label; null on trips saved before the origin existed. */
+    origin: text(),
     destination: text().notNull(),
     plate: text().notNull(),
     vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),

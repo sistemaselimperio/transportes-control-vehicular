@@ -1,7 +1,9 @@
 "use client";
 
+import { MapPin } from "lucide-react";
 import { useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
+import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createTripAction, updateTripAction } from "../application/trip-actions";
@@ -16,15 +18,12 @@ const FIELD = "h-10 md:h-9";
 export function TripForm({
   trip,
   plates,
-  destinations,
   onDone,
   onCancel,
 }: {
   trip?: TripRow;
   /** Plates of the registered fleet: the only ones that can be picked. */
   plates: readonly string[];
-  /** Destinations already used, offered as suggestions. */
-  destinations: readonly string[];
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
@@ -51,23 +50,46 @@ export function TripForm({
           required
         />
       </Field>
-      <Field label="Destino" htmlFor="trip-destination" required>
-        <Input
-          id="trip-destination"
-          name="destination"
-          className={FIELD}
-          defaultValue={trip?.destination}
-          list="trip-destinations"
-          autoComplete="off"
-          maxLength={120}
-          required
-        />
-        <datalist id="trip-destinations">
-          {destinations.map((d) => (
-            <option key={d} value={d} />
-          ))}
-        </datalist>
-      </Field>
+      {/* The route as a timeline: a rail runs from the departure point down to the arrival pin. */}
+      <div className="flex flex-col">
+        <fieldset className="relative grid grid-cols-[1.5rem_1fr] gap-x-3 pb-4">
+          <legend className="sr-only">Salida</legend>
+          <span aria-hidden className="relative flex justify-center pt-0.5">
+            <span className="z-10 size-3.5 rounded-full border-[3px] border-foreground bg-background" />
+            <span className="absolute top-5 -bottom-4 w-0.5 border-l-2 border-dashed border-muted-foreground/50" />
+          </span>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p aria-hidden className="micro-label">Salida</p>
+            <div className="grid grid-cols-2 gap-3">
+              <MunicipalityPicker
+                idPrefix="trip-origin"
+                name="origin"
+                defaultValue={trip?.origin}
+                selectClassName={FIELD}
+                required
+              />
+            </div>
+          </div>
+        </fieldset>
+        <fieldset className="grid grid-cols-[1.5rem_1fr] gap-x-3">
+          <legend className="sr-only">Destino</legend>
+          <span aria-hidden className="flex justify-center">
+            <MapPin className="z-10 size-5 fill-primary/20 text-primary" strokeWidth={2.25} />
+          </span>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p aria-hidden className="micro-label">Destino</p>
+            <div className="grid grid-cols-2 gap-3">
+              <MunicipalityPicker
+                idPrefix="trip-destination"
+                name="destination"
+                defaultValue={trip?.destination}
+                selectClassName={FIELD}
+                required
+              />
+            </div>
+          </div>
+        </fieldset>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Placa" htmlFor="trip-plate" required>
           <NativeSelect id="trip-plate" name="plate" defaultValue={trip?.plate ?? ""} required>

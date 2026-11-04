@@ -71,7 +71,9 @@ export function TripList({
         {rows.map((r) => (
           <li key={r.id} className="space-y-2 rounded-2xl border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
-              <span className="min-w-0 font-medium">{r.destination}</span>
+              <span className="min-w-0 font-medium">
+                {r.origin ?? "—"} → {r.destination}
+              </span>
               {canManage && (
                 <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                   <EditButton row={r} onEdit={onEdit} />
@@ -99,7 +101,7 @@ export function TripList({
           <table className="w-full text-sm">
             <thead className="text-left">
               <tr className="border-b">
-                {["Fecha inicio", "Destino", "Placa", "Área", "Estado"].map((h) => (
+                {["Fecha inicio", "Salida", "Destino", "Placa", "Área", "Estado"].map((h) => (
                   <th key={h} scope="col" className="micro-label px-4 py-3 font-medium">
                     {h}
                   </th>
@@ -115,6 +117,7 @@ export function TripList({
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-muted/50">
                   <td className="num px-4 py-3 whitespace-nowrap">{formatTripDateTime(r.startAt)}</td>
+                  <td className="px-4 py-3">{r.origin ?? "—"}</td>
                   <td className="px-4 py-3 font-medium">{r.destination}</td>
                   <td className="px-4 py-3">
                     <Plate row={r} />

@@ -21,6 +21,7 @@ export function VehicleTripsList({ rows }: { rows: readonly TripRow[] }) {
           <thead className="text-left">
             <tr className="border-b">
               <th scope="col" className={TH}>Fecha inicio</th>
+              <th scope="col" className={TH}>Salida</th>
               <th scope="col" className={TH}>Destino</th>
               <th scope="col" className={TH}>Área</th>
               <th scope="col" className={TH}>Estado</th>
@@ -30,6 +31,7 @@ export function VehicleTripsList({ rows }: { rows: readonly TripRow[] }) {
             {rows.map((r) => (
               <tr key={r.id} className="hover:bg-muted/50">
                 <td className={`${TD} num whitespace-nowrap`}>{formatTripDateTime(r.startAt)}</td>
+                <td className={TD}>{r.origin ?? "—"}</td>
                 <td className={`${TD} font-medium`}>{r.destination}</td>
                 <td className={`${TD} text-muted-foreground`}>{r.area}</td>
                 <td className={TD}>
@@ -44,7 +46,9 @@ export function VehicleTripsList({ rows }: { rows: readonly TripRow[] }) {
         {rows.map((r) => (
           <li key={r.id} className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 border-b py-2 text-sm">
             <span className="num whitespace-nowrap">{formatTripDateTime(r.startAt)}</span>
-            <span className="min-w-0 flex-1 basis-40 truncate font-medium">{r.destination}</span>
+            <span className="min-w-0 flex-1 basis-40 truncate font-medium">
+              {r.origin ?? "—"} → {r.destination}
+            </span>
             <span className="text-muted-foreground">{r.area}</span>
             <TripStatusBadge status={r.status} />
           </li>

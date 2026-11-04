@@ -6,6 +6,8 @@ export interface TripRow {
   id: number;
   /** ISO instant. */
   startAt: string;
+  /** Municipality label; null on trips saved before the origin existed. */
+  origin: string | null;
   destination: string;
   /** Plate as it was when the trip was saved; stays even if the vehicle is deleted. */
   plate: string;
@@ -37,8 +39,8 @@ const searchKey = (text: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9ñ]/g, "");
 
-/** Rows matching the status and area filters and every word of the query in the plate or destination. */
-export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" | "destination">>(
+/** Rows matching the status and area filters and every word of the query in the plate, origin or destination. */
+export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" | "origin" | "destination">>(
   rows: readonly T[],
   filters: TripFilters,
 ): T[] {
@@ -46,16 +48,9 @@ export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" 
   return rows.filter((r) => {
     if (filters.status !== "ALL" && r.status !== filters.status) return false;
     if (filters.area !== "ALL" && r.area !== filters.area) return false;
-    const fields = [r.plate, r.destination].map(searchKey);
+    const fields = [r.plate, r.origin ?? "", r.destination].map(searchKey);
     return words.every((w) => fields.some((f) => f.includes(w)));
   });
-}
-
-const collator = new Intl.Collator("es", { sensitivity: "base" });
-
-/** Distinct destinations already used, A to Z: the suggestions of the form. */
-export function suggestDestinations(rows: readonly Pick<TripRow, "destination">[]): string[] {
-  return [...new Set(rows.map((r) => r.destination))].sort(collator.compare);
 }
 
 /** The canonical plate in a `placa` search param, or "" when it is missing or blank. */

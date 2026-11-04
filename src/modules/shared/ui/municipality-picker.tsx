@@ -10,16 +10,25 @@ const DEFAULT_DEPARTMENT = "15";
 
 /**
  * Department + municipality selects. The municipality list follows the chosen
- * department; the form submits the municipality label as `municipality`.
+ * department; the form submits the municipality label under `name`.
  */
 export function MunicipalityPicker({
   idPrefix,
   defaultValue,
   selectClassName,
+  name = "municipality",
+  departmentLabel = "Departamento",
+  municipalityLabelText = "Municipio",
+  required,
 }: {
   idPrefix: string;
   defaultValue?: string | null;
   selectClassName?: string;
+  /** Name of the hidden input that carries the municipality label. */
+  name?: string;
+  departmentLabel?: string;
+  municipalityLabelText?: string;
+  required?: boolean;
 }) {
   const initial = findMunicipality(defaultValue ?? null);
   const [department, setDepartment] = useState(initial?.departmentCode ?? (defaultValue ? "" : DEFAULT_DEPARTMENT));
@@ -29,7 +38,7 @@ export function MunicipalityPicker({
 
   return (
     <>
-      <Field label="Departamento" htmlFor={`${idPrefix}-dept`}>
+      <Field label={departmentLabel} htmlFor={`${idPrefix}-dept`}>
         <NativeSelect
           id={`${idPrefix}-dept`}
           className={selectClassName}
@@ -48,7 +57,8 @@ export function MunicipalityPicker({
         </NativeSelect>
       </Field>
       <Field
-        label="Municipio"
+        label={municipalityLabelText}
+        required={required}
         htmlFor={`${idPrefix}-muni`}
         hint={legacy ? `Valor anterior: ${legacy}. Elige el municipio para corregirlo.` : undefined}
       >
@@ -67,7 +77,7 @@ export function MunicipalityPicker({
           ))}
         </NativeSelect>
       </Field>
-      <input type="hidden" name="municipality" value={(code && municipalityLabel(code)) || ""} />
+      <input type="hidden" name={name} value={(code && municipalityLabel(code)) || ""} />
     </>
   );
 }

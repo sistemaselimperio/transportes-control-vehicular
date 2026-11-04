@@ -1,9 +1,18 @@
 /** Zod schemas that parse the raw form values (strings) of the trip form. */
 import { z } from "zod";
+import { isMunicipalityLabel } from "@/modules/shared/domain/municipalities";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import { TRIP_AREAS } from "../domain/trip-areas";
 import { parseLocalInput } from "../domain/trip-datetime";
 import { TRIP_STATUSES } from "../domain/trip-status";
+
+/** A required municipality label ("Tunja (Boyacá)") picked from the list. */
+const municipalityField = (message: string) =>
+  z
+    .string()
+    .default("")
+    .transform((v) => v.trim())
+    .refine(isMunicipalityLabel, message);
 
 export const tripSchema = z.object({
   startAt: z
@@ -11,12 +20,8 @@ export const tripSchema = z.object({
     .transform((v) => parseLocalInput(v))
     .refine((v): v is Date => v !== null, "Ingresa una fecha de inicio válida.")
     .transform((v) => v as Date),
-  destination: z
-    .string()
-    .default("")
-    .transform((v) => v.trim().replace(/\s+/g, " "))
-    .refine((v) => v !== "", "Ingresa el destino.")
-    .refine((v) => v.length <= 120, "El destino es demasiado largo."),
+  origin: municipalityField("Elige el municipio de salida."),
+  destination: municipalityField("Elige el municipio de destino."),
   plate: z
     .string()
     .default("")

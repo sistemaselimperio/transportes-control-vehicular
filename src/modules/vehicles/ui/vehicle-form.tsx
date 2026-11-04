@@ -14,7 +14,7 @@ import { expireVehicleViewsAction, updateTechnicalDataAction, type ActionResult 
 import { createBodyFromForm, editBodyFromForm } from "../application/vehicle-form-body";
 import type { VehicleEditValues, VehicleFormOptions } from "../application/vehicle-queries";
 import type { VehicleTechnicalData } from "../domain/technical-data";
-import { MunicipalityPicker } from "./municipality-picker";
+import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { TechnicalFields } from "./vehicle-action-forms";
 
 const FIELD = "h-10 md:h-9";

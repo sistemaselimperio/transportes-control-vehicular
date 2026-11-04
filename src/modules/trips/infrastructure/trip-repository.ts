@@ -24,6 +24,7 @@ function toTripRow(r: typeof schema.trips.$inferSelect): TripRow {
   return {
     id: r.id,
     startAt: r.startAt.toISOString(),
+    origin: r.origin,
     destination: r.destination,
     plate: r.plate,
     vehicleId: r.vehicleId,
@@ -34,6 +35,7 @@ function toTripRow(r: typeof schema.trips.$inferSelect): TripRow {
 
 const toColumns = (v: TripValues) => ({
   startAt: v.startAt,
+  origin: v.origin,
   destination: v.destination,
   plate: v.plate,
   vehicleId: v.vehicleId,
