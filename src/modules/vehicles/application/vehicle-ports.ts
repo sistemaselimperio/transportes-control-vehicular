@@ -159,6 +159,8 @@ export interface VehicleCommandRepository {
     date: IsoDate;
     close: PeriodClose | null;
   }): Promise<void>;
+  /** Closes the current assignment without opening another: the vehicle is left without a driver. */
+  endDriverAssignment(close: PeriodClose): Promise<void>;
   /** Closes the current ownership and opens the new one. */
   transferOwnership(input: {
     vehicleId: number;

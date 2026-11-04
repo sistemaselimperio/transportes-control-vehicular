@@ -164,6 +164,7 @@ export async function changeStatusAction(plate: string, fd: FormData): Promise<A
 export async function assignDriverAction(plate: string, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const v = parse(assignDriverSchema, formValues(fd));
+    if (v.mode === "none") return commands.removeDriver(parse(plateSchema, plate), v.date);
     return commands.assignDriver(parse(plateSchema, plate), {
       date: v.date,
       driver:

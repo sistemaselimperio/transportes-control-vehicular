@@ -59,6 +59,10 @@ describe("form schemas", () => {
     expect(assignDriverSchema.parse({ mode: "existing", driverId: "4", date }).driverId).toBe(4);
   });
 
+  it("accepts removing the driver with only a date", () => {
+    expect(assignDriverSchema.parse({ mode: "none", driverId: "", date: "2026-10-17" }).mode).toBe("none");
+  });
+
   it("validates the owner choice", () => {
     const date = "2026-10-17";
     expect(() => transferOwnerSchema.parse({ owner: "", date })).toThrow();

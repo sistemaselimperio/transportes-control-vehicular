@@ -83,6 +83,20 @@ export function assertCanAssignDriver(input: {
   }
 }
 
+/** Leaving a vehicle without a driver: there must be one to remove, on a date that already happened. */
+export function assertCanRemoveDriver(input: {
+  status: VehicleStatus;
+  currentDriverId: number | null;
+  date: IsoDate;
+  today: IsoDate;
+}): void {
+  assertEditable(input.status);
+  assertNotFuture(input.date, input.today);
+  if (input.currentDriverId == null) {
+    throw new RuleError("El vehículo no tiene conductor asignado.");
+  }
+}
+
 /**
  * Dates for closing an open ownership/assignment. Imported rows start on the
  * import day (a placeholder), so a back-dated close pulls the start back too,

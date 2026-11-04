@@ -279,6 +279,10 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
     });
   },
 
+  async endDriverAssignment(close) {
+    await db.transaction((tx) => closeAssignment(tx, close));
+  },
+
   async transferOwnership({ vehicleId, owner, date, close }) {
     await db.transaction(async (tx) => {
       const ownerId = (await resolveOwnerId(tx, owner, true))!;

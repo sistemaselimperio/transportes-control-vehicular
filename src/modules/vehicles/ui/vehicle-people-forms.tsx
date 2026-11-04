@@ -16,23 +16,44 @@ import type { FormProps } from "./vehicle-action-forms";
 
 const FIELD = "h-10 md:h-9";
 
-export function AssignDriverForm({ plate, ctx, onDone, onCancel }: FormProps) {
+/** Select value that removes the current driver instead of naming a new one. */
+const NO_DRIVER = "NONE";
+
+export function AssignDriverForm({
+  plate,
+  ctx,
+  current,
+  onDone,
+  onCancel,
+}: FormProps & { current: { driver: string | null } }) {
+  const [choice, setChoice] = useState("");
+  const removing = choice === NO_DRIVER;
   return (
     <ActionForm
       action={(fd) => assignDriverAction(plate, fd)}
-      submitLabel="Asignar conductor"
+      submitLabel={removing ? "Quitar conductor" : "Asignar conductor"}
       onDone={onDone}
       onCancel={onCancel}
     >
       <p className="text-sm text-muted-foreground">
-        El conductor actual queda cerrado en el historial con la fecha elegida.
+        {removing
+          ? `${current.driver} queda cerrado en el historial con la fecha elegida y el vehículo queda sin conductor.`
+          : "El conductor actual queda cerrado en el historial con la fecha elegida."}
       </p>
-      <input type="hidden" name="mode" value="existing" />
+      <input type="hidden" name="mode" value={removing ? "none" : "existing"} />
       <Field label="Conductor" htmlFor="drv-id">
-        <NativeSelect id="drv-id" name="driverId" defaultValue="" required>
+        <NativeSelect
+          id="drv-id"
+          // Removing sends no driver id: "NONE" is not a number.
+          name={removing ? undefined : "driverId"}
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          required
+        >
           <option value="" disabled>
             Buscar en la lista un conductor…
           </option>
+          {current.driver && <option value={NO_DRIVER}>Ninguno: quitar el conductor actual</option>}
           {ctx.drivers.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}
@@ -41,7 +62,7 @@ export function AssignDriverForm({ plate, ctx, onDone, onCancel }: FormProps) {
           ))}
         </NativeSelect>
       </Field>
-      <Field label="Desde" htmlFor="drv-date">
+      <Field label={removing ? "Sin conductor desde" : "Desde"} htmlFor="drv-date">
         <Input id="drv-date" name="date" type="date" className={FIELD} defaultValue={ctx.today} max={ctx.today} required />
       </Field>
     </ActionForm>

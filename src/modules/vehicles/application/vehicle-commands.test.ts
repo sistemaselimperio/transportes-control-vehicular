@@ -45,6 +45,7 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99, oi
     updateOdometer: async (id, o) => void calls.push({ op: "updateOdometer", args: { id, o } }),
     setStatus: async (id, s) => void calls.push({ op: "setStatus", args: { id, s } }),
     assignDriver: record("assignDriver"),
+    endDriverAssignment: record("endDriverAssignment"),
     transferOwnership: record("transferOwnership"),
     registerSale: record("registerSale"),
     deleteAllVehicles: async () => {
@@ -328,6 +329,28 @@ describe("assignDriver", () => {
     await expect(
       c.assignDriver("AAA-111", { driver: { kind: "existing", id: 3 }, date: TODAY }),
     ).rejects.toThrow(RuleError);
+  });
+});
+
+describe("removeDriver", () => {
+  it("closes the current assignment and opens none", async () => {
+    const c = commands([snapshot({ assignment: { id: 20, driverId: 3, fromDate: "2026-01-01" } })]);
+    const result = await c.removeDriver("AAA-111", "2026-10-01");
+    expect(c.calls).toEqual([
+      { op: "endDriverAssignment", args: { id: 20, fromDate: "2026-01-01", toDate: "2026-10-01" } },
+    ]);
+    expect(result.message).toBe("El vehículo quedó sin conductor.");
+  });
+
+  it("rejects a vehicle that has no driver", async () => {
+    const c = commands([snapshot({ assignment: null })]);
+    await expect(c.removeDriver("AAA-111", TODAY)).rejects.toThrow(/no tiene conductor/);
+    expect(c.calls).toEqual([]);
+  });
+
+  it("rejects a future date and a sold vehicle", async () => {
+    await expect(commands([snapshot()]).removeDriver("AAA-111", "2026-12-31")).rejects.toThrow(RuleError);
+    await expect(commands([snapshot({ status: "SOLD" })]).removeDriver("AAA-111", TODAY)).rejects.toThrow(RuleError);
   });
 });
 

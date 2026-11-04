@@ -12,6 +12,7 @@ import { normalizePlate } from "../domain/plate";
 import { assertModelYear, type VehicleTechnicalData } from "../domain/technical-data";
 import {
   assertCanAssignDriver,
+  assertCanRemoveDriver,
   assertCanChangeStatus,
   assertCanSell,
   assertCanTransfer,
@@ -394,6 +395,18 @@ export function createVehicleCommands(
         close: closeOf(vehicle.assignment, input.date),
       });
       return { message: "Conductor asignado." };
+    },
+
+    async removeDriver(plate: string, date: IsoDate): Promise<CommandResult> {
+      const vehicle = await loadOne(plate);
+      assertCanRemoveDriver({
+        status: vehicle.status,
+        currentDriverId: vehicle.assignment?.driverId ?? null,
+        date,
+        today: today(),
+      });
+      await repo.endDriverAssignment(closeOf(vehicle.assignment, date)!);
+      return { message: "El vehículo quedó sin conductor." };
     },
 
     async transferOwner(plate: string, owner: OwnerTarget, date: IsoDate): Promise<CommandResult> {

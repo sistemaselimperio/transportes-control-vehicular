@@ -192,7 +192,7 @@ export function FileActions({
         {active === "tax" && <UpdateTaxForm {...common} />}
         {active === "oil" && <OilChangeForm {...common} />}
         {active === "km" && <UpdateKmForm {...common} />}
-        {active === "driver" && <AssignDriverForm {...common} />}
+        {active === "driver" && <AssignDriverForm {...common} current={current} />}
         {active === "owner" && <TransferOwnerForm {...common} />}
         {active === "sell" && <SellForm {...common} current={current} />}
       </SlideOver>

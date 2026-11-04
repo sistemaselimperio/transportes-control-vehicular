@@ -99,7 +99,8 @@ export const statusSchema = z.object({
 
 export const assignDriverSchema = z
   .object({
-    mode: z.enum(["existing", "new"]),
+    /** `none` removes the current driver and leaves the vehicle without one. */
+    mode: z.enum(["existing", "new", "none"]),
     driverId: intField("El conductor"),
     name: textField,
     nationalId: textField,
