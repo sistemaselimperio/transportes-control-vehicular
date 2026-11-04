@@ -1,6 +1,7 @@
 /**
  * Validation of a submitted pre-operational inspection (form FO-PESV-016). The public form runs it
- * before sending and the server action runs it again: the server never trusts the client. Header
+ * before sending and the server action runs it again: the server never trusts the client. Only critical
+ * checklist points must be answered. Header
  * values are free text on purpose, they are not checked against the fleet or the drivers.
  */
 import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, type ChecklistItem } from "./preoperational-checklist";
@@ -21,6 +22,8 @@ export type ValidInspection = {
   trailerPlate: string | null;
   driverName: string;
   driverNationalId: string;
+  /** Registered driver picked from the public list; null when the name was typed. */
+  selectedDriverId: number | null;
   odometer: string;
   route: string;
   muleNotApplicable: boolean;
@@ -69,6 +72,11 @@ export function applicableItems(muleNotApplicable: boolean): readonly ChecklistI
   );
 }
 
+/** Applicable items without a BIEN/MAL answer. Only critical ones are required, so this can be above zero. */
+export function uncheckedCount(answers: InspectionAnswers, muleNotApplicable: boolean): number {
+  return applicableItems(muleNotApplicable).filter((item) => !answers[item.id]).length;
+}
+
 /** The critical points marked MAL, in form order: when any exists the vehicle does not leave. */
 export function failedCriticalItems(answers: InspectionAnswers): ChecklistItem[] {
   return ALL_CHECKLIST_ITEMS.filter((item) => item.critical && answers[item.id]?.status === "MAL");
@@ -101,8 +109,20 @@ export function validateInspection(input: unknown): InspectionValidation {
   const trailerPlateText = normalizeInspectionPlate(asText(raw.trailerPlate));
   if (trailerPlateText.length > MAX_PLATE_LENGTH) errors.trailerPlate = `Máximo ${MAX_PLATE_LENGTH} caracteres.`;
   const driverName = required("driverName", collapseSpaces(asText(raw.driverName)), MAX_NAME_LENGTH, "Escribe el nombre del conductor.");
-  const driverNationalId = required("driverId", collapseSpaces(asText(raw.driverId)), MAX_NATIONAL_ID_LENGTH, "Escribe la cédula.");
-  const odometer = required("odometer", collapseSpaces(asText(raw.odometer)), MAX_ODOMETER_LENGTH, "Escribe el kilometraje.");
+  let selectedDriverId: number | null = null;
+  if (raw.selectedDriverId !== undefined && raw.selectedDriverId !== null) {
+    const id = raw.selectedDriverId;
+    if (typeof id === "number" && Number.isSafeInteger(id) && id > 0) selectedDriverId = id;
+    else errors.selectedDriverId = "Elige un conductor válido.";
+  }
+  // Optional: blank is stored as an empty string (the column is NOT NULL text).
+  // With a picked driver the registered national id is used and the server checks it exists;
+  // without one the typed id is required.
+  const driverNationalId = collapseSpaces(asText(raw.driverId));
+  if (driverNationalId.length > MAX_NATIONAL_ID_LENGTH) errors.driverId = `Máximo ${MAX_NATIONAL_ID_LENGTH} caracteres.`;
+  else if (!driverNationalId && selectedDriverId === null) errors.driverId = "Escribe la cédula.";
+  const odometer = collapseSpaces(asText(raw.odometer));
+  if (odometer.length > MAX_ODOMETER_LENGTH) errors.odometer = `Máximo ${MAX_ODOMETER_LENGTH} caracteres.`;
   const route = required("route", collapseSpaces(asText(raw.route)), MAX_ROUTE_LENGTH, "Escribe la ruta o el destino.");
 
   const muleNotApplicable = raw.muleNotApplicable === true;
@@ -113,7 +133,8 @@ export function validateInspection(input: unknown): InspectionValidation {
     const answer = asRecord(rawAnswers[item.id]);
     const status = answer?.status;
     if (status !== "BIEN" && status !== "MAL") {
-      errors[item.id] = "Marca BIEN o MAL.";
+      // Only critical points must be answered; a non-critical one may stay blank, but not hold junk.
+      if (item.critical || (status !== undefined && status !== null && status !== "")) errors[item.id] = "Marca BIEN o MAL.";
       continue;
     }
     if (status === "BIEN") {
@@ -143,6 +164,7 @@ export function validateInspection(input: unknown): InspectionValidation {
       trailerPlate: trailerPlateText || null,
       driverName,
       driverNationalId,
+      selectedDriverId,
       odometer,
       route,
       muleNotApplicable,

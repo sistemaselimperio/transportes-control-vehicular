@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listFleetPlates } from "@/modules/vehicles/application/vehicle-queries";
 import { normalizePlateKey } from "@/modules/inspections/domain/inspection-links";
+import { listDriverOptions } from "@/modules/drivers/application/driver-queries";
 import { PreoperationalFlow } from "@/modules/inspections/ui/preoperational-form";
 
 export const metadata: Metadata = {
@@ -12,7 +13,8 @@ export const metadata: Metadata = {
 
 /** Public on purpose (see `src/proxy.ts`): drivers fill it in from the phone without an account. */
 export default async function Page() {
-  // Plates only, written the way drivers type them: no driver data ever reaches this public page.
-  const plates = (await listFleetPlates()).map(normalizePlateKey);
-  return <PreoperationalFlow plates={plates} />;
+  // Plates and driver names only: no national id or other driver data ever reaches this public page.
+  const [fleetPlates, drivers] = await Promise.all([listFleetPlates(), listDriverOptions()]);
+  const plates = fleetPlates.map(normalizePlateKey);
+  return <PreoperationalFlow plates={plates} drivers={drivers} />;
 }

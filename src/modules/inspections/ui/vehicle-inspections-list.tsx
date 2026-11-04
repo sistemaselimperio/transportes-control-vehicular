@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { VehicleInspectionRow } from "../infrastructure/inspection-repository";
-import { StatusBadge } from "./inspection-badges";
+import { exitStatus } from "../domain/exit-decision";
+import { ExitBadge, StatusBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 /** Latest inspections of one vehicle for its file; the caller wraps it in the file's section. */
@@ -23,6 +24,7 @@ export function VehicleInspectionsList({ vehicleId, rows, limit }: { vehicleId: 
               <span className="min-w-0 flex-1 basis-40 truncate font-medium">{r.driverName}</span>
               {r.asTrailer && <span className="text-xs text-muted-foreground">Como remolque</span>}
               <StatusBadge critical={r.hasCriticalFailure} />
+              <ExitBadge status={exitStatus(r)} />
             </Link>
           </li>
         ))}

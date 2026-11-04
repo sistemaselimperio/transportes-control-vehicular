@@ -23,7 +23,8 @@ export async function submitInspectionAction(input: unknown): Promise<SubmitInsp
 
   if (!isBot) {
     try {
-      await insertInspection(value);
+      const saved = await insertInspection(value);
+      if (!saved.ok) return { ok: false, errors: { driverId: "Escribe la cédula." } };
     } catch (e) {
       console.error("inspection insert failed", e);
       return { ok: false, errors: { form: "No se pudo guardar la inspección. Intenta de nuevo." } };

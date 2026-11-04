@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, findChecklistItem } from "./preoperational-checklist";
 import {
   applicableItems,
+  uncheckedCount,
+  type InspectionAnswers,
   bogotaDateTime,
   failedCriticalItems,
   MAX_SIGNATURE_LENGTH,
@@ -52,6 +54,43 @@ describe("applicableItems", () => {
   });
 });
 
+describe("validateInspection national id", () => {
+  it("is required without a selected driver", () => {
+    const result = validateInspection(draft({ driverId: " " }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.driverId).toBeTruthy();
+  });
+
+  it("may be blank with a selected driver (the server checks the registered one)", () => {
+    const result = validateInspection(draft({ driverId: "", selectedDriverId: 3 }));
+    expect(result.ok && result.value.driverNationalId).toBe("");
+  });
+
+  it("still caps its length when present", () => {
+    expect(validateInspection(draft({ driverId: "1".repeat(21), selectedDriverId: 3 })).ok).toBe(false);
+  });
+});
+
+describe("validateInspection selectedDriverId", () => {
+  it("defaults to null when absent or null", () => {
+    const absent = validateInspection(draft());
+    const explicit = validateInspection(draft({ selectedDriverId: null }));
+    expect(absent.ok && absent.value.selectedDriverId).toBeNull();
+    expect(explicit.ok && explicit.value.selectedDriverId).toBeNull();
+  });
+
+  it("keeps a positive integer id", () => {
+    const result = validateInspection(draft({ selectedDriverId: 7 }));
+    expect(result.ok && result.value.selectedDriverId).toBe(7);
+  });
+
+  it.each([0, -1, 1.5, "7", NaN, {}, true])("rejects %j", (bad) => {
+    const result = validateInspection(draft({ selectedDriverId: bad }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.selectedDriverId).toBeTruthy();
+  });
+});
+
 describe("validateInspection", () => {
   it("accepts a complete inspection and normalizes the header", () => {
     const result = validateInspection(draft({ driverName: "  Juan   Pérez " }));
@@ -77,13 +116,23 @@ describe("validateInspection", () => {
     expect(result.ok && result.value.trailerPlate).toBe("R12345");
   });
 
-  it("requires every header field except the trailer plate", () => {
+  it("requires every header field except the trailer plate and the odometer", () => {
     const result = validateInspection(
       draft({ plate: " ", driverName: "", driverId: "", odometer: "", route: "  " }),
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(Object.keys(result.errors).sort()).toEqual(["driverId", "driverName", "odometer", "plate", "route"]);
+    expect(Object.keys(result.errors).sort()).toEqual(["driverId", "driverName", "plate", "route"]);
+  });
+
+  it("accepts a blank odometer as an empty string and caps a present one", () => {
+    const blank = validateInspection(draft({ odometer: "  " }));
+    expect(blank.ok && blank.value.odometer).toBe("");
+    const missing = validateInspection(draft({ odometer: undefined }));
+    expect(missing.ok && missing.value.odometer).toBe("");
+    const tooLong = validateInspection(draft({ odometer: "1".repeat(21) }));
+    expect(tooLong.ok).toBe(false);
+    if (!tooLong.ok) expect(tooLong.errors.odometer).toBeTruthy();
   });
 
   it("rejects a malformed date or time", () => {
@@ -107,7 +156,22 @@ describe("validateInspection", () => {
     expect(result.errors).toHaveProperty("route");
   });
 
-  it("requires every applicable item to be answered", () => {
+  it("lets non-critical items stay unanswered", () => {
+    const answers = allBien() as Record<string, unknown>;
+    delete answers["tires.spare"];
+    delete answers["cabin.horn"];
+    const result = validateInspection(draft({ answers }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.value.answers)).not.toContain("tires.spare");
+  });
+
+  it("still requires the description of a non-critical MAL item", () => {
+    const result = validateInspection(draft({ answers: { ...allBien(), "tires.spare": { status: "MAL" } } }));
+    expect(result.ok).toBe(false);
+  });
+
+  it("requires every applicable critical item to be answered", () => {
     const answers = allBien() as Record<string, unknown>;
     delete answers["brakes.pedal"];
     const result = validateInspection(draft({ answers }));
@@ -179,11 +243,12 @@ describe("validateInspection", () => {
 
   it("requires the mule items when they apply", () => {
     const answers = allBien() as Record<string, unknown>;
+    delete answers["mule.fifth-wheel"];
     delete answers["mule.landing-gear"];
     const result = validateInspection(draft({ answers }));
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(Object.keys(result.errors)).toEqual(["mule.landing-gear"]);
+    expect(Object.keys(result.errors)).toEqual(["mule.fifth-wheel"]);
   });
 
   it("ignores answers for unknown items", () => {
@@ -236,5 +301,24 @@ describe("bogotaDateTime", () => {
 
   it("pads the hour and keeps midnight as 00", () => {
     expect(bogotaDateTime(new Date("2026-06-10T05:05:00Z"))).toEqual({ date: "2026-06-10", time: "00:05" });
+  });
+});
+
+describe("uncheckedCount", () => {
+  it("is zero when everything applicable is answered", () => {
+    expect(uncheckedCount(allBien() as InspectionAnswers, false)).toBe(0);
+  });
+
+  it("counts the applicable items without an answer", () => {
+    const answers = allBien() as Record<string, { status: "BIEN" | "MAL" }>;
+    delete answers["tires.spare"];
+    delete answers["cabin.horn"];
+    expect(uncheckedCount(answers, false)).toBe(2);
+  });
+
+  it("ignores the mule items when they do not apply", () => {
+    const answers = allBien(true) as Record<string, { status: "BIEN" | "MAL" }>;
+    expect(uncheckedCount(answers, true)).toBe(0);
+    expect(uncheckedCount(answers, false)).toBe(applicableItems(false).length - applicableItems(true).length);
   });
 });

@@ -277,6 +277,14 @@
 /* Printed pages (e.g. a saved inspection): modest margins; the app chrome hides itself with `print:`. */
 @media print {
   @page {
+    size: letter;
     margin: 10mm;
+  }
+
+  /* Paper is white: the app's tinted background would otherwise show below a short sheet. */
+  html,
+  body,
+  [data-theme] {
+    background: #fff !important;
   }
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, parseInspectionFilters } from "./inspection-filters";
+import { escapeLikePattern, exitFilterParam, INSPECTIONS_PAGE_SIZE, parseInspectionFilters } from "./inspection-filters";
 
 describe("parseInspectionFilters", () => {
   it("defaults to no filters on the first page", () => {
-    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, driverId: null, vehicleId: null, page: 1 });
+    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, driverId: null, vehicleId: null, exit: "ALL", page: 1 });
   });
 
   it("normalizes the plate like the form does", () => {
@@ -42,6 +42,26 @@ describe("parseInspectionFilters driver and vehicle", () => {
     for (const bad of ["0", "-2", "1.5", "abc", "", "99999999999"]) {
       expect(parseInspectionFilters({ conductor: bad }).driverId).toBeNull();
       expect(parseInspectionFilters({ vehiculo: bad }).vehicleId).toBeNull();
+    }
+  });
+});
+
+describe("parseInspectionFilters exit status", () => {
+  it("maps the salida parameter to a status filter", () => {
+    expect(parseInspectionFilters({ salida: "pendientes" }).exit).toBe("PENDING");
+    expect(parseInspectionFilters({ salida: "apto" }).exit).toBe("APTO");
+    expect(parseInspectionFilters({ salida: "no-apto" }).exit).toBe("NO_APTO");
+  });
+
+  it("falls back to all for anything else", () => {
+    for (const bad of ["", "todas", "APTO!", "x"]) expect(parseInspectionFilters({ salida: bad }).exit).toBe("ALL");
+    expect(parseInspectionFilters({}).exit).toBe("ALL");
+  });
+
+  it("round-trips through exitFilterParam", () => {
+    expect(exitFilterParam("ALL")).toBeNull();
+    for (const exit of ["PENDING", "APTO", "NO_APTO"] as const) {
+      expect(parseInspectionFilters({ salida: exitFilterParam(exit)! }).exit).toBe(exit);
     }
   });
 });

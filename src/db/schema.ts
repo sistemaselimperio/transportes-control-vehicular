@@ -51,6 +51,7 @@ export const documentTypeEnum = transportes.enum("document_type", [
   "TECNO",
   "POLICY",
 ]);
+export const exitDecisionEnum = transportes.enum("exit_decision", ["APTO", "NO_APTO"]);
 export const policyKindEnum = transportes.enum("policy_kind", ["TR", "RC"]);
 export const taxKindEnum = transportes.enum("tax_kind", [
   "PAID_YEAR",
@@ -373,8 +374,22 @@ export const preoperationalInspections = transportes.table(
     hasCriticalFailure: boolean("has_critical_failure").notNull().default(false),
     /** PNG data URL of the drawn signature. */
     signature: text().notNull(),
+    /** Decision of the maintenance chief; null while pending. Overwritten when she changes it. */
+    exitDecision: exitDecisionEnum("exit_decision"),
+    /** HH:MM, Colombia local time; only set with APTO. */
+    exitAuthorizedTime: text("exit_authorized_time"),
+    exitDecidedAt: timestamp("exit_decided_at", { withTimezone: true }),
+    exitDecidedBy: text("exit_decided_by").references(() => user.id, { onDelete: "set null" }),
+    /** Novelty closure, only for inspections with some item MAL. */
+    closureDate: date("closure_date", { mode: "string" }),
+    closureWorkOrder: text("closure_work_order"),
+    closureAction: text("closure_action"),
+    closureResponsible: text("closure_responsible"),
+    closureRecordedAt: timestamp("closure_recorded_at", { withTimezone: true }),
+    closureRecordedBy: text("closure_recorded_by").references(() => user.id, { onDelete: "set null" }),
   },
   (t) => [
+    index("preoperational_inspections_exit_decision_idx").on(t.exitDecision),
     index("preoperational_inspections_date_idx").on(t.inspectionDate, t.createdAt),
     index("preoperational_inspections_plate_idx").on(t.plate),
     index("preoperational_inspections_vehicle_idx").on(t.vehicleId),

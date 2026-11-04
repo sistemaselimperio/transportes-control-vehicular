@@ -64,6 +64,13 @@
       "when": 1793743055750,
       "tag": "0008_lying_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793800385090,
+      "tag": "0009_fair_the_call",
+      "breakpoints": true
     }
   ]
 }

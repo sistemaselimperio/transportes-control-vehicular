@@ -38,6 +38,7 @@ export type ReadName =
   | "expiredCounts"
   | "logbookPage"
   | "driverRows"
+  | "driverOptions"
   | "ownerRows"
   | "saleRows";
 
@@ -51,6 +52,7 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   expiredCounts: [expiredCounts, fleet, owners],
   logbookPage: [logbook, fleet, owners, drivers],
   driverRows: [drivers, fleet],
+  driverOptions: [drivers],
   ownerRows: [owners, fleet],
   saleRows: [sales, fleet, owners],
 };

@@ -28,8 +28,40 @@ function uniqueMatch<T extends { id: number }>(items: readonly T[], key: string,
   return matches.length === 1 ? matches[0]!.id : null;
 }
 
+/** The registered driver the user picked from the list, or null when none or the id is unknown. */
+export function findSelectedDriver<T extends { id: number }>(
+  selectedDriverId: number | null | undefined,
+  drivers: readonly T[],
+): T | null {
+  if (selectedDriverId == null) return null;
+  return drivers.find((d) => d.id === selectedDriverId) ?? null;
+}
+
+/** Hint of a national id for the public page: the last four digits only, null when there is no id. */
+export function maskNationalId(value: string | null): string | null {
+  const digits = normalizeNationalIdKey(value ?? "");
+  if (digits === "") return null;
+  return `••••${digits.length > 4 ? digits.slice(-4) : ""}`;
+}
+
+/**
+ * Header identity of the driver. A picked, registered driver supplies the stored name and national
+ * id (whatever the client sent is ignored); without a registered id the typed one is required.
+ */
+export function applySelectedDriver(
+  header: { driverName: string; driverNationalId: string; selectedDriverId: number | null },
+  drivers: readonly { id: number; name: string; nationalId: string | null }[],
+): { ok: true; driverName: string; driverNationalId: string } | { ok: false } {
+  const selected = findSelectedDriver(header.selectedDriverId, drivers);
+  const driverName = selected?.name ?? header.driverName;
+  const registered = selected?.nationalId?.trim() ?? "";
+  const driverNationalId = registered || header.driverNationalId;
+  return driverNationalId === "" ? { ok: false } : { ok: true, driverName, driverNationalId };
+}
+
+/** A picked driver wins; otherwise the typed national id decides, as before. */
 export function resolveInspectionLinks(
-  header: { plate: string; trailerPlate: string | null; driverNationalId: string },
+  header: { plate: string; trailerPlate: string | null; driverNationalId: string; selectedDriverId?: number | null },
   vehicles: readonly { id: number; plate: string }[],
   drivers: readonly { id: number; nationalId: string | null }[],
 ): InspectionLinks {
@@ -37,6 +69,8 @@ export function resolveInspectionLinks(
   return {
     vehicleId: uniqueMatch(vehicles, normalizePlateKey(header.plate), plateOf),
     trailerVehicleId: uniqueMatch(vehicles, normalizePlateKey(header.trailerPlate ?? ""), plateOf),
-    driverId: uniqueMatch(drivers, normalizeNationalIdKey(header.driverNationalId), (d) => normalizeNationalIdKey(d.nationalId ?? "")),
+    driverId:
+      findSelectedDriver(header.selectedDriverId, drivers)?.id ??
+      uniqueMatch(drivers, normalizeNationalIdKey(header.driverNationalId), (d) => normalizeNationalIdKey(d.nationalId ?? "")),
   };
 }

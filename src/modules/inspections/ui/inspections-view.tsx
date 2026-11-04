@@ -3,10 +3,12 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
-import type { InspectionFilters } from "../domain/inspection-filters";
+import { exitStatus } from "../domain/exit-decision";
+import { EXIT_FILTER_OPTIONS, exitFilterParam, type InspectionFilters } from "../domain/inspection-filters";
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
-import { NotRegisteredBadge, StatusBadge } from "./inspection-badges";
+import { ExitBadge, NotRegisteredBadge, StatusBadge, UncheckedBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 function pageHref(filters: InspectionFilters, page: number) {
@@ -16,6 +18,8 @@ function pageHref(filters: InspectionFilters, page: number) {
   if (filters.to) params.set("hasta", filters.to);
   if (filters.driverId) params.set("conductor", String(filters.driverId));
   if (filters.vehicleId) params.set("vehiculo", String(filters.vehicleId));
+  const exit = exitFilterParam(filters.exit);
+  if (exit) params.set("salida", exit);
   if (page > 1) params.set("pagina", String(page));
   const qs = params.toString();
   return qs ? `/preoperacionales?${qs}` : "/preoperacionales";
@@ -51,7 +55,7 @@ export function InspectionsView({
   filters: InspectionFilters;
   hasNext: boolean;
 }) {
-  const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId);
+  const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId || filters.exit !== "ALL");
   return (
     <section className="space-y-5">
       <PageHeader
@@ -95,6 +99,18 @@ export function InspectionsView({
           </Label>
           <Input id="insp-to" name="hasta" type="date" defaultValue={filters.to ?? ""} className="h-11 md:h-9" />
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="insp-exit" className="text-sm text-foreground">
+            Salida
+          </Label>
+          <NativeSelect id="insp-exit" name="salida" defaultValue={exitFilterParam(filters.exit) ?? ""} className="h-11 w-40 md:h-9">
+            {EXIT_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={exitFilterParam(o.value) ?? ""}>
+                {o.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
         <Button type="submit" className="h-11 px-4 md:h-9">
           Filtrar
         </Button>
@@ -121,7 +137,11 @@ export function InspectionsView({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <PlateCell row={r} linked={false} />
-                    <StatusBadge critical={r.hasCriticalFailure} />
+                    <span className="flex flex-wrap items-center justify-end gap-1">
+                      <StatusBadge critical={r.hasCriticalFailure} />
+                      <UncheckedBadge count={r.uncheckedCount} />
+                      <ExitBadge status={exitStatus(r)} />
+                    </span>
                   </div>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
                     {r.driverName}
@@ -146,7 +166,7 @@ export function InspectionsView({
               <table className="w-full text-sm">
                 <thead className="text-left">
                   <tr className="border-b">
-                    {["Fecha y hora", "Placa", "Conductor", "Ruta", "Estado"].map((h) => (
+                    {["Fecha y hora", "Placa", "Conductor", "Ruta", "Estado", "Salida"].map((h) => (
                       <th key={h} scope="col" className="micro-label px-4 py-3 font-medium">
                         {h}
                       </th>
@@ -175,7 +195,13 @@ export function InspectionsView({
                       </td>
                       <td className="px-4 py-3">{r.route}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge critical={r.hasCriticalFailure} />
+                        <span className="flex flex-wrap items-center gap-1">
+                          <StatusBadge critical={r.hasCriticalFailure} />
+                          <UncheckedBadge count={r.uncheckedCount} />
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <ExitBadge status={exitStatus(r)} />
                       </td>
                     </tr>
                   ))}

@@ -24,6 +24,7 @@ const regular = (id: string, label: string): ChecklistItem => ({ id, label, crit
 
 export const FORM_CODE = "FO-PESV-016";
 export const FORM_VERSION = "01";
+export const FORM_ISSUED = "29/10/2026";
 
 export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   {

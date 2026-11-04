@@ -1,7 +1,23 @@
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { maskNationalId } from "@/modules/inspections/domain/inspection-links";
 import { checkDriverDeletion } from "../domain/driver-deletion";
 import type { DriverRow } from "../domain/driver-row";
+
+export type DriverOption = { id: number; name: string; /** "••••1234", or null when no national id is registered. */ nationalHint: string | null };
+
+/**
+ * The drivers who still work (not INACTIVE), by name: what the public form may show. The national
+ * id is masked here, so the full value never leaves the server.
+ */
+export async function loadDriverOptions(): Promise<DriverOption[]> {
+  const rows = await db
+    .select({ id: schema.drivers.id, name: schema.drivers.name, nationalId: schema.drivers.nationalId })
+    .from(schema.drivers)
+    .where(ne(schema.drivers.status, "INACTIVE"))
+    .orderBy(asc(schema.drivers.name));
+  return rows.map((r) => ({ id: r.id, name: r.name, nationalHint: maskNationalId(r.nationalId) }));
+}
 
 /** Every driver with the plates of their current (open) assignments. */
 export async function loadDriverRows(): Promise<DriverRow[]> {
