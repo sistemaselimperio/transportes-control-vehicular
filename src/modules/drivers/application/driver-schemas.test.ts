@@ -20,6 +20,11 @@ describe("driverSchema", () => {
     });
   });
 
+  it("rejects a placeholder like 'Sin conductor' instead of a person", () => {
+    const result = driverSchema.safeParse({ name: "SIN CONDUCTOR", status: "ACTIVE" });
+    expect(result.success).toBe(false);
+  });
+
   it("treats blank optional fields as not provided", () => {
     expect(driverSchema.parse({ name: "Juan", nationalId: "", phone: " ", company: "", status: "ACTIVE" })).toEqual({
       name: "Juan",

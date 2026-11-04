@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { isMunicipalityLabel } from "@/modules/shared/domain/municipalities";
 import { titleCase } from "@/modules/shared/domain/title-case";
+import { isPlaceholderDriverName, PLACEHOLDER_DRIVER_MESSAGE } from "@/modules/drivers/domain/placeholder-name";
 import type { NewVehicleInput } from "./vehicle-commands";
 
 const isoDate = z
@@ -33,7 +34,7 @@ const driverSchema = z
     z.object({ kind: z.literal("existing"), id: z.number().int().positive(), date: isoDate }),
     z.object({
       kind: z.literal("new"),
-      name: personName,
+      name: personName.refine((v) => !isPlaceholderDriverName(v), PLACEHOLDER_DRIVER_MESSAGE),
       nationalId: text,
       phone: text,
       date: isoDate,

@@ -1,6 +1,7 @@
 /** Zod schemas that parse the raw form values (strings) of each vehicle action. */
 import { z } from "zod";
 import { oilItemsField } from "@/modules/maintenance/application/oil-items-schema";
+import { isPlaceholderDriverName, PLACEHOLDER_DRIVER_MESSAGE } from "@/modules/drivers/domain/placeholder-name";
 
 const VALID_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -111,6 +112,9 @@ export const assignDriverSchema = z
     }
     if (v.mode === "new" && v.name == null) {
       ctx.addIssue({ code: "custom", message: "Ingresa el nombre del conductor." });
+    }
+    if (v.mode === "new" && v.name != null && isPlaceholderDriverName(v.name)) {
+      ctx.addIssue({ code: "custom", message: PLACEHOLDER_DRIVER_MESSAGE });
     }
   });
 
