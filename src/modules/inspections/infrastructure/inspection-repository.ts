@@ -319,3 +319,9 @@ export async function listVehicleInspections(vehicleId: number, limit: number): 
     .limit(limit);
   return rows.map(({ vehicleId: tractorId, ...row }) => ({ ...row, asTrailer: tractorId !== vehicleId }));
 }
+
+/** Deletes an inspection for good; false when it did not exist. */
+export async function deleteInspection(id: string): Promise<boolean> {
+  const deleted = await db.delete(t).where(eq(t.id, id)).returning({ id: t.id });
+  return deleted.length > 0;
+}

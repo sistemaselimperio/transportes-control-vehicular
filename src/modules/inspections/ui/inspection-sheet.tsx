@@ -9,8 +9,9 @@ import { uncheckedCount } from "../domain/preoperational-inspection";
 import type { InspectionDetail } from "../infrastructure/inspection-repository";
 import { ChecklistTable, FillingInstructions, LABEL_CELL, LEFT_COLUMN_SECTIONS, RULE, SheetHeader } from "./form-sheet";
 import { NotRegisteredBadge } from "./inspection-badges";
+import { DeleteInspectionButton } from "./delete-inspection-button";
 import { ExitPanel, ExitSummary, type ExitPanelProps } from "./exit-panel";
-import { formatSheetDate, formatSheetTime, formatSignoff } from "./inspection-format";
+import { formatInspectionDate, formatSheetDate, formatSheetTime, formatSignoff } from "./inspection-format";
 import { PrintButton } from "./print-button";
 
 const LINK = "underline underline-offset-2 outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-ring/70";
@@ -176,6 +177,15 @@ export function InspectionSheet({
         signoff: formatSignoff(closure.recordedByName, closure.recordedAt),
       }
     : null;
+  const exitProps: ExitPanelProps = {
+    inspectionId: inspection.id,
+    inspectionDate: inspection.inspectionDate,
+    hasCriticalFailure: inspection.hasCriticalFailure,
+    hasFailedItems: failedItems,
+    decision,
+    closure: closureView,
+    defaults,
+  };
   const [authorizedHours = "", authorizedMinutes = ""] = (decision?.authorizedTime ?? "").split(":");
   const [closureYear = "", closureMonth = "", closureDay = ""] = (closure?.date ?? "").split("-");
   const unchecked = uncheckedCount(answers, inspection.muleNotApplicable);
@@ -213,24 +223,21 @@ export function InspectionSheet({
           <ArrowLeft aria-hidden />
           Preoperacionales
         </Link>
-        <PrintButton />
+        <div className="flex flex-wrap items-center gap-2">
+          {canDecide && (
+            <DeleteInspectionButton
+              inspectionId={inspection.id}
+              summary={`${inspection.plate} · ${formatInspectionDate(inspection.inspectionDate)} ${inspection.inspectionTime}`}
+              afterDelete="/preoperacionales"
+            />
+          )}
+          <PrintButton />
+        </div>
       </div>
 
       <RegisteredLinks inspection={inspection} />
 
-      {canDecide ? (
-        <ExitPanel
-          inspectionId={inspection.id}
-          inspectionDate={inspection.inspectionDate}
-          hasCriticalFailure={inspection.hasCriticalFailure}
-          hasFailedItems={failedItems}
-          decision={decision}
-          closure={closureView}
-          defaults={defaults}
-        />
-      ) : (
-        <ExitSummary decision={decision} closure={closureView} hasFailedItems={failedItems} />
-      )}
+      {canDecide ? <ExitPanel {...exitProps} /> : <ExitSummary {...exitProps} />}
 
       <div
         className={

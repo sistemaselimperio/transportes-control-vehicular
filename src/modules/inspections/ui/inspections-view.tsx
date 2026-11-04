@@ -8,8 +8,11 @@ import { Label } from "@/components/ui/label";
 import { exitStatus } from "../domain/exit-decision";
 import { EXIT_FILTER_OPTIONS, exitFilterParam, type InspectionFilters } from "../domain/inspection-filters";
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
+import { DeleteInspectionButton } from "./delete-inspection-button";
 import { ExitBadge, NotRegisteredBadge, StatusBadge, UncheckedBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
+
+const rowSummary = (r: InspectionListRow) => `${r.plate} · ${formatInspectionDate(r.inspectionDate)} ${r.inspectionTime}`;
 
 function pageHref(filters: InspectionFilters, page: number) {
   const params = new URLSearchParams();
@@ -45,15 +48,20 @@ function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean })
   );
 }
 
-/** Read-only list of submitted inspections: a GET filter form, the rows and simple prev / next paging. */
+/**
+ * List of submitted inspections: a GET filter form, the rows and simple prev / next paging. Only the
+ * admin (`canDelete`) gets a delete action per row.
+ */
 export function InspectionsView({
   rows,
   filters,
   hasNext,
+  canDelete,
 }: {
   rows: readonly InspectionListRow[];
   filters: InspectionFilters;
   hasNext: boolean;
+  canDelete: boolean;
 }) {
   const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId || filters.exit !== "ALL");
   return (
@@ -130,7 +138,13 @@ export function InspectionsView({
         <>
           <ul className="grid gap-3 md:hidden">
             {rows.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="relative">
+                {/* Outside the card link: a button cannot sit inside a link. */}
+                {canDelete && (
+                  <div className="absolute right-2 bottom-2 z-10">
+                    <DeleteInspectionButton inspectionId={r.id} summary={rowSummary(r)} iconOnly />
+                  </div>
+                )}
                 <Link
                   href={`/preoperacionales/${r.id}`}
                   className="block space-y-2 rounded-2xl border bg-card p-4 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/70"
@@ -171,6 +185,11 @@ export function InspectionsView({
                         {h}
                       </th>
                     ))}
+                    {canDelete && (
+                      <th scope="col" className="px-4 py-3">
+                        <span className="sr-only">Acciones</span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -203,6 +222,11 @@ export function InspectionsView({
                       <td className="px-4 py-3">
                         <ExitBadge status={exitStatus(r)} />
                       </td>
+                      {canDelete && (
+                        <td className="px-2 py-1 text-right">
+                          <DeleteInspectionButton inspectionId={r.id} summary={rowSummary(r)} iconOnly />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
