@@ -129,8 +129,11 @@
  * surfaces, like the olive of the yellow palette). Plates take the sky fill too, matching the active
  * nav item. Status colors, destructive and the other series colors keep their meaning and are not
  * overridden.
+ * `body:has(...)` lifts the tokens to <body> so portaled dialogs, drawers and popovers (rendered
+ * outside the shell) get the theme too.
  */
-[data-theme="sky"] {
+[data-theme="sky"],
+body:has([data-theme="sky"]) {
   --tint-hue: 230;
   --plate: #87ceeb;
   --plate-foreground: #0f1d24;
