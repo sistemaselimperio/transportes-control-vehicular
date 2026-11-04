@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, FileText, Search } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -165,6 +165,10 @@ export function InspectionsView({
                   <p className="num text-xs text-muted-foreground">
                     {formatInspectionDate(r.inspectionDate)} · {r.inspectionTime}
                   </p>
+                  <span className="flex items-center gap-1.5 pt-1 text-sm font-medium text-foreground">
+                    <FileText className="size-4" aria-hidden />
+                    Ver formato
+                  </span>
                 </Link>
               </li>
             ))}
@@ -185,11 +189,9 @@ export function InspectionsView({
                         {h}
                       </th>
                     ))}
-                    {canDelete && (
-                      <th scope="col" className="px-4 py-3">
-                        <span className="sr-only">Acciones</span>
-                      </th>
-                    )}
+                    <th scope="col" className="px-4 py-3">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -222,11 +224,19 @@ export function InspectionsView({
                       <td className="px-4 py-3">
                         <ExitBadge status={exitStatus(r)} />
                       </td>
-                      {canDelete && (
-                        <td className="px-2 py-1 text-right">
-                          <DeleteInspectionButton inspectionId={r.id} summary={rowSummary(r)} iconOnly />
-                        </td>
-                      )}
+                      <td className="px-2 py-1">
+                        <span className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/preoperacionales/${r.id}`}
+                            aria-label={`Ver formato ${rowSummary(r)}`}
+                            className={buttonVariants({ variant: "ghost", size: "sm", className: "h-9 gap-1.5 px-2.5 whitespace-nowrap" })}
+                          >
+                            <FileText aria-hidden />
+                            Ver formato
+                          </Link>
+                          {canDelete && <DeleteInspectionButton inspectionId={r.id} summary={rowSummary(r)} iconOnly />}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
