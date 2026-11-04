@@ -2,16 +2,21 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusMark } from "@/components/app/status-mark";
-import { VehicleLogbookSection } from "@/modules/logbook/ui/vehicle-logbook";
+import { logbookHref } from "@/modules/logbook/domain/logbook";
+import { VehicleLogbookPanel } from "@/modules/logbook/ui/vehicle-logbook";
+import { VehicleTripsList } from "@/modules/trips/ui/vehicle-trips-list";
+import type { TripRow } from "@/modules/trips/domain/trip-row";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { VehicleInspectionRow } from "@/modules/inspections/infrastructure/inspection-repository";
 import type { VehicleDetail } from "../application/vehicle-queries";
+import type { HistoryTab } from "../domain/history-tab";
 import { technicalGroups } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
+import { VehicleHistorySection } from "./vehicle-history-section";
 import { PeoplePopover } from "./people-popover";
 import { TabParamScroll } from "./tab-param-scroll";
 import {
@@ -156,7 +161,7 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
 /**
  * Vehicle file ordered by what the dispatcher needs first: identity, status and expiries in the
  * header; then the technical sheet that says exactly which vehicle this is; then who runs it and
- * how far it has gone; then its papers; then the logbook; and last the
+ * how far it has gone; then its papers; then its history (inspections, trips, logbook); and last the
  * notes. The only overlays are the action forms, which `readOnly` removes along with every write control.
  */
 export function VehicleDetailView({
@@ -164,12 +169,16 @@ export function VehicleDetailView({
   readOnly = false,
   allowed,
   inspections = [],
-  inspectionsLimit = 20,
+  trips = [],
+  historyTab = "bitacora",
 }: {
   detail: VehicleDetail;
   /** Latest pre-operational inspections of this vehicle, newest first; read per request, not cached. */
   inspections?: readonly VehicleInspectionRow[];
-  inspectionsLimit?: number;
+  /** Latest trips of this vehicle, newest start first. */
+  trips?: readonly TripRow[];
+  /** Tab of the Historial section the page opens on. */
+  historyTab?: HistoryTab;
   readOnly?: boolean;
   /** Actions a read-only user may still run (see `FileActions`). */
   allowed?: readonly ActionKey[];
@@ -231,11 +240,20 @@ export function VehicleDetailView({
           </div>
         </div>
 
-        <VehicleLogbookSection plate={r.plate} logbook={detail.logbook} canManage={!readOnly} />
-
-        <Section id="preoperacionales" title="Preoperacionales" note={inspections.length > 0 ? `${inspections.length}${inspections.length >= inspectionsLimit ? "+" : ""}` : undefined}>
-          <VehicleInspectionsList vehicleId={r.id} rows={inspections} limit={inspectionsLimit} />
-        </Section>
+        <VehicleHistorySection
+          initialTab={historyTab}
+          panels={{
+            preoperacionales: <VehicleInspectionsList rows={inspections} />,
+            viajes: <VehicleTripsList rows={trips} />,
+            bitacora: <VehicleLogbookPanel logbook={detail.logbook} />,
+          }}
+          links={{
+            preoperacionales: { href: `/preoperacionales?vehiculo=${r.id}`, label: "Ver preoperacionales" },
+            viajes: { href: `/viajes?${new URLSearchParams({ placa: r.plate })}`, label: "Ver viajes" },
+            // Staff cannot open the Bitácora page, so they get no link to it.
+            bitacora: readOnly ? null : { href: logbookHref(r.plate, "servicios"), label: "Ver bitácora" },
+          }}
+        />
 
         {(r.notes || detail.sale) && (
           <Section id="notas" title={detail.sale ? "Notas y venta" : "Notas"}>

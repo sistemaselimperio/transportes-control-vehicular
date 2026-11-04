@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, type ComponentType, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 
 export interface TabItem<K extends string> {
@@ -8,6 +8,8 @@ export interface TabItem<K extends string> {
   label: string;
   /** Optional live count shown next to the label. */
   count?: number;
+  /** Optional outline icon before the label; only the `segmented` variant shows it. */
+  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }
 
 /**
@@ -25,6 +27,7 @@ export function TabBar<K extends string>({
   idPrefix,
   panelId,
   chips = false,
+  variant = "underline",
 }: {
   label: string;
   items: ReadonlyArray<TabItem<K>>;
@@ -33,7 +36,14 @@ export function TabBar<K extends string>({
   idPrefix: string;
   panelId: string;
   chips?: boolean;
+  /**
+   * `segmented`: a muted track as wide as its options (full width on phones) with the active option
+   * raised in white; for a top level whose panels hold underlined tabs, so the two levels read apart.
+   */
+  variant?: "underline" | "segmented";
 }) {
+  const segmented = variant === "segmented";
+  const underline = !segmented;
   const listRef = useRef<HTMLDivElement>(null);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -59,7 +69,8 @@ export function TabBar<K extends string>({
       onKeyDown={onKeyDown}
       className={cn(
         "flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        "border-b-2 border-border",
+        segmented && "gap-1 rounded-lg bg-muted p-1 max-sm:grid max-sm:grid-cols-3 sm:w-fit",
+        underline && "border-b-2 border-border",
         chips && "max-xl:grid max-xl:grid-cols-3 max-xl:gap-2 max-xl:overflow-visible max-xl:border-b-0 lg:max-xl:grid-cols-6",
       )}
     >
@@ -76,16 +87,23 @@ export function TabBar<K extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onSelect(item.key)}
             className={cn(
-              "-mb-0.5 flex h-11 shrink-0 cursor-pointer items-center gap-2 border-b-2 border-transparent px-4 text-sm whitespace-nowrap text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset active:scale-[0.98]",
+              "flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset active:scale-[0.98]",
+              segmented && "h-9 min-w-0 justify-center gap-1.5 rounded-md px-3 text-sm font-medium max-sm:px-1.5 max-sm:text-xs",
+              segmented && selected && "bg-card text-foreground shadow-sm",
+              underline && "-mb-0.5 h-11 border-b-2 border-transparent px-4 text-sm",
               chips &&
                 "relative overflow-hidden max-xl:mb-0 max-xl:h-auto max-xl:min-h-14 max-xl:min-w-0 max-xl:flex-col-reverse max-xl:items-start max-xl:justify-center max-xl:gap-1 max-xl:rounded-xl max-xl:border max-xl:border-border max-xl:bg-card max-xl:px-3 max-xl:py-2 max-xl:text-left max-xl:text-xs max-xl:whitespace-normal",
               selected &&
+                underline &&
                 (chips
                   ? "border-brand bg-secondary/70 font-semibold text-foreground max-xl:bg-secondary"
                   : "border-brand font-semibold text-foreground"),
             )}
           >
-            {item.label}
+            {segmented && item.icon && (
+              <item.icon aria-hidden className={cn("size-4 shrink-0", selected ? "text-foreground" : "text-muted-foreground")} />
+            )}
+            <span className={cn(segmented && "truncate")}>{item.label}</span>
             {item.count !== undefined && (
               <span
                 className={cn(

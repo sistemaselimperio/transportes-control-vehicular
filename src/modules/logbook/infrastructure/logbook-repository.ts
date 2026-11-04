@@ -82,6 +82,12 @@ export interface RowsPage<T> {
 
 const pageOffset = (page: number) => (page - 1) * LOGBOOK_PAGE_SIZE;
 
+/** A page (`limit + 1` rows tell whether a next one exists), the first `limit` rows, or everything. */
+function limitRows<Q extends { limit(n: number): Q; offset(n: number): Q }>(query: Q, page?: number, limit?: number): Q {
+  if (page !== undefined) return query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+  return limit === undefined ? query : query.limit(limit);
+}
+
 function toPage<T>(rows: T[]): RowsPage<T> {
   return { rows: rows.slice(0, LOGBOOK_PAGE_SIZE), hasNext: rows.length > LOGBOOK_PAGE_SIZE };
 }
@@ -115,7 +121,7 @@ async function withDrivers<T extends { vehicleId: number; date: string }>(
   }));
 }
 
-async function selectServices(scope: LogbookScope, page?: number) {
+async function selectServices(scope: LogbookScope, page?: number, limit?: number) {
   const t = schema.vehicleServices;
   const query = db
     .select({
@@ -135,11 +141,11 @@ async function selectServices(scope: LogbookScope, page?: number) {
     .where(scopeFilter(t, scope, SERVICE_FILTERS))
     .orderBy(desc(t.date), desc(t.id))
     .$dynamic();
-  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+  return limitRows(query, page, limit);
 }
 
-export async function loadServiceRows(scope: LogbookScope): Promise<ServiceRow[]> {
-  return withDrivers(await selectServices(scope));
+export async function loadServiceRows(scope: LogbookScope, limit?: number): Promise<ServiceRow[]> {
+  return withDrivers(await selectServices(scope, undefined, limit));
 }
 
 /** One page of services; drivers are resolved for those rows only. */
@@ -148,7 +154,7 @@ export async function loadServicePage(scope: LogbookScope, page: number): Promis
   return { rows: await withDrivers(found.rows), hasNext: found.hasNext };
 }
 
-async function selectOil(scope: LogbookScope, page?: number) {
+async function selectOil(scope: LogbookScope, page?: number, limit?: number) {
   const t = schema.oilChanges;
   const query = db
     .select({
@@ -172,7 +178,7 @@ async function selectOil(scope: LogbookScope, page?: number) {
     .where(scopeFilter(t, scope, OIL_FILTERS))
     .orderBy(desc(t.date), desc(t.id))
     .$dynamic();
-  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+  return limitRows(query, page, limit);
 }
 
 /** Adds each change's supplies, then its driver. */
@@ -194,8 +200,8 @@ async function completeOil(rows: Awaited<ReturnType<typeof selectOil>>): Promise
   return withDrivers(withItems);
 }
 
-export async function loadOilRows(scope: LogbookScope): Promise<OilRow[]> {
-  return completeOil(await selectOil(scope));
+export async function loadOilRows(scope: LogbookScope, limit?: number): Promise<OilRow[]> {
+  return completeOil(await selectOil(scope, undefined, limit));
 }
 
 export async function loadOilPage(scope: LogbookScope, page: number): Promise<RowsPage<OilRow>> {
@@ -203,7 +209,7 @@ export async function loadOilPage(scope: LogbookScope, page: number): Promise<Ro
   return { rows: await completeOil(found.rows), hasNext: found.hasNext };
 }
 
-async function selectTires(scope: LogbookScope, page?: number) {
+async function selectTires(scope: LogbookScope, page?: number, limit?: number) {
   const t = schema.tireChanges;
   const query = db
     .select({
@@ -222,11 +228,11 @@ async function selectTires(scope: LogbookScope, page?: number) {
     .where(scopeFilter(t, scope, TIRE_FILTERS))
     .orderBy(desc(t.date), desc(t.id))
     .$dynamic();
-  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+  return limitRows(query, page, limit);
 }
 
-export async function loadTireRows(scope: LogbookScope): Promise<TireRow[]> {
-  return withDrivers(await selectTires(scope));
+export async function loadTireRows(scope: LogbookScope, limit?: number): Promise<TireRow[]> {
+  return withDrivers(await selectTires(scope, undefined, limit));
 }
 
 export async function loadTirePage(scope: LogbookScope, page: number): Promise<RowsPage<TireRow>> {
@@ -234,7 +240,7 @@ export async function loadTirePage(scope: LogbookScope, page: number): Promise<R
   return { rows: await withDrivers(found.rows), hasNext: found.hasNext };
 }
 
-async function selectFuel(scope: LogbookScope, page?: number) {
+async function selectFuel(scope: LogbookScope, page?: number, limit?: number) {
   const t = schema.fuelFills;
   const query = db
     .select({
@@ -252,11 +258,11 @@ async function selectFuel(scope: LogbookScope, page?: number) {
     .where(scopeFilter(t, scope, FUEL_FILTERS))
     .orderBy(desc(t.date), desc(t.id))
     .$dynamic();
-  return page === undefined ? query : query.limit(LOGBOOK_PAGE_SIZE + 1).offset(pageOffset(page));
+  return limitRows(query, page, limit);
 }
 
-export async function loadFuelRows(scope: LogbookScope): Promise<FuelRow[]> {
-  return withDrivers(await selectFuel(scope));
+export async function loadFuelRows(scope: LogbookScope, limit?: number): Promise<FuelRow[]> {
+  return withDrivers(await selectFuel(scope, undefined, limit));
 }
 
 export async function loadFuelPage(scope: LogbookScope, page: number): Promise<RowsPage<FuelRow>> {
@@ -319,14 +325,14 @@ export async function loadDriversOfVehicle(vehicleId: number): Promise<Array<{ i
     .orderBy(asc(schema.drivers.name), asc(schema.drivers.id));
 }
 
-/** The four lists of one vehicle. */
-export async function loadVehicleLogbook(vehicleId: number): Promise<VehicleLogbook> {
+/** The latest `limit` rows of each of the four lists of one vehicle (all of them without a limit). */
+export async function loadVehicleLogbook(vehicleId: number, limit?: number): Promise<VehicleLogbook> {
   const scope = { vehicleId };
   const [services, oilChanges, tires, fuel] = await Promise.all([
-    loadServiceRows(scope),
-    loadOilRows(scope),
-    loadTireRows(scope),
-    loadFuelRows(scope),
+    loadServiceRows(scope, limit),
+    loadOilRows(scope, limit),
+    loadTireRows(scope, limit),
+    loadFuelRows(scope, limit),
   ]);
   return { services, oilChanges, tires, fuel };
 }

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 const SECTION_BY_TAB: Record<string, string> = {
   documentos: "documentos",
   mantenimiento: "mantenimiento",
-  bitacora: "bitacora",
+  bitacora: "historial",
   personas: "personas",
 };
 

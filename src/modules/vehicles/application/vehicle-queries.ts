@@ -7,6 +7,7 @@ import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
 import type { VehicleFileItem } from "@/modules/documents/application/vehicle-file-ports";
 import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
+import { HISTORY_LIMIT } from "../domain/history-tab";
 import { buildVehicleRow, formatKm, type VehicleGridRow, type VehicleRowInput } from "../domain/vehicle-row";
 import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
@@ -145,7 +146,7 @@ export async function getVehicleDetail(plate: string, today: IsoDate): Promise<V
     loadVehicleEditValues(plate),
     loadVehicleFormLists(),
     vehicleFileRepository.listByVehicle(input.vehicle.id),
-    loadVehicleLogbook(input.vehicle.id),
+    loadVehicleLogbook(input.vehicle.id, HISTORY_LIMIT),
     loadLastOilItems(input.vehicle.id),
   ]);
 
