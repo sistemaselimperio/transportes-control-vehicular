@@ -13,7 +13,8 @@ import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
 import { expireVehicleViewsAction, updateTechnicalDataAction, type ActionResult } from "../application/vehicle-actions";
 import { createBodyFromForm, editBodyFromForm } from "../application/vehicle-form-body";
 import type { VehicleEditValues, VehicleFormOptions } from "../application/vehicle-queries";
-import type { VehicleTechnicalData } from "../domain/technical-data";
+import { technicalDataSchema } from "../application/vehicle-action-schemas";
+import { assertModelYear, EMPTY_TECHNICAL_DATA, type VehicleTechnicalData } from "../domain/technical-data";
 import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { TechnicalFields } from "./vehicle-action-forms";
 
@@ -438,8 +439,15 @@ function MaintenanceFields({ options, step }: { options: VehicleFormOptions; ste
               ))}
             </NativeSelect>
           </Field>
-          <Field label="Kilometraje actual" htmlFor="nv-km" hint={broken ? "Sin odómetro." : "En km."}>
-            <Input id="nv-km" name="currentKm" inputMode="numeric" className={`${FIELD} num`} disabled={broken} />
+          <Field label="Kilometraje actual (km)" htmlFor="nv-km">
+            <Input
+              id="nv-km"
+              name="currentKm"
+              inputMode="numeric"
+              className={`${FIELD} num`}
+              placeholder={broken ? "Sin odómetro" : "Ej. 125000"}
+              disabled={broken}
+            />
           </Field>
         </Row>
         <CheckboxField
@@ -454,13 +462,32 @@ function MaintenanceFields({ options, step }: { options: VehicleFormOptions; ste
           <Field label="Fecha" htmlFor="nv-oil-date">
             <Input id="nv-oil-date" name="oilDate" type="date" className={FIELD} max={options.today} />
           </Field>
-          <Field label="Kilometraje" htmlFor="nv-oil-km">
-            <Input id="nv-oil-km" name="oilKm" inputMode="numeric" className={`${FIELD} num`} disabled={broken} />
+          <Field label="Kilometraje (km)" htmlFor="nv-oil-km">
+            <Input
+              id="nv-oil-km"
+              name="oilKm"
+              inputMode="numeric"
+              className={`${FIELD} num`}
+              placeholder={broken ? "Sin odómetro" : undefined}
+              disabled={broken}
+            />
           </Field>
         </Row>
       </Group>
     </Section>
   );
+}
+
+/** First problem in the technical-sheet fields of the form, or null when they can be saved. */
+function technicalDataError(fd: FormData, today: VehicleFormOptions["today"]): string | null {
+  const parsed = technicalDataSchema.safeParse(Object.fromEntries(fd.entries()));
+  if (!parsed.success) return parsed.error.issues[0]?.message ?? "Revisa los datos técnicos.";
+  try {
+    assertModelYear(parsed.data.modelYear ?? null, today);
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : "Revisa el modelo.";
+  }
 }
 
 /** "Nuevo vehículo" button with the full create form; opens the new vehicle's file when saved. */
@@ -482,9 +509,19 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
       >
         <ActionForm
           action={async (fd) => {
+            // Check the technical sheet before creating, so a bad value never leaves a half-saved vehicle.
+            const techError = technicalDataError(fd, options.today);
+            if (techError) return { ok: false, error: techError };
             const result = await sendVehicle("/api/vehiculos", "POST", createBodyFromForm(formValues(fd)));
-            if (result.ok) await expireVehicleViewsAction().catch(() => undefined);
-            if (result.ok && result.plate) router.push(`/flota/${encodeURIComponent(result.plate)}`);
+            if (!result.ok) return result;
+            if (result.plate) {
+              const tech = await updateTechnicalDataAction(result.plate, fd);
+              if (!tech.ok) {
+                return { ok: false, error: `El vehículo se creó, pero no se guardaron los datos técnicos: ${tech.error}` };
+              }
+            }
+            await expireVehicleViewsAction().catch(() => undefined);
+            if (result.plate) router.push(`/flota/${encodeURIComponent(result.plate)}`);
             return result;
           }}
           submitLabel="Crear vehículo"
@@ -496,6 +533,14 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
           <DriverFields options={options} step={3} />
           <DocumentFields options={options} step={4} />
           <MaintenanceFields options={options} step={5} />
+          <Section
+            title="Datos técnicos"
+            step={6}
+            optional
+            hint="Motor, chasis, cilindraje, capacidad y demás características."
+          >
+            <TechnicalFields values={EMPTY_TECHNICAL_DATA} />
+          </Section>
         </ActionForm>
       </SlideOver>
     </>
