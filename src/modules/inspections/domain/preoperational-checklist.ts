@@ -148,11 +148,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
       regular("ppe.gloves", "Guantes"),
     ],
   },
-  {
-    id: "prohibited",
-    title: "Elementos no permitidos",
-    items: [critical("prohibited.illegal-items", "Sin elementos ilegales a bordo")],
-  },
+  // Retired: "prohibited" / "prohibited.illegal-items" (Elementos no permitidos). Never reuse the ids.
 ];
 
 /** Every item of every section, in form order. */
