@@ -1,14 +1,12 @@
 "use client";
 
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
 export function LoginForm() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,13 +22,15 @@ export function LoginForm() {
       password: String(form.get("password") ?? ""),
       rememberMe: form.get("remember") === "on",
     });
-    setPending(false);
     if (error) {
+      setPending(false);
       setError("Usuario o contraseña incorrectos.");
       return;
     }
-    router.replace("/");
-    router.refresh();
+    // A full load, not a client navigation: nothing the router kept in memory from a previous
+    // session (another user's screens, a stuck "signing out" button) survives into this one.
+    // The button stays busy until the new page replaces this one.
+    window.location.replace("/");
   }
 
   function trackCapsLock(event: KeyboardEvent<HTMLInputElement>) {

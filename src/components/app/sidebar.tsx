@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
@@ -95,15 +95,15 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
 }
 
 function SidebarBody({ pathname, role, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
-  const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
     setSigningOut(true);
     try {
       await authClient.signOut();
-      router.replace("/login");
-      router.refresh();
+      // A full load, not a client navigation: the router keeps visited screens (and this button's
+      // "signing out" state) alive in memory, so they would come back for the next user who signs in.
+      window.location.replace("/login");
     } catch {
       setSigningOut(false);
     }
