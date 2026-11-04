@@ -371,7 +371,7 @@ describe("plates", () => {
   it("normalizes valid plates and reports invalid ones", () => {
     expect(parsePlateCell(" XVI-282")).toMatchObject({ plate: "XVI-282", issues: [] });
     expect(parsePlateCell("GZZ- 184").plate).toBe("GZZ-184");
-    expect(parsePlateCell("LFL-14H").plate).toBe("LFL14H");
+    expect(parsePlateCell("LFL-14H").plate).toBe("LFL-14H");
     const bad = parsePlateCell("ABC");
     expect(bad.plate).toBeNull();
     expect(bad.issues[0]).toMatchObject({ level: "error", field: "Placa" });

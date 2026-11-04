@@ -1,7 +1,7 @@
 /**
  * Canonical plate: uppercase, no spaces.
  * - Cars/trucks (3 letters + 3 digits) use a hyphen: "ABC-123".
- * - Motorcycles (3 letters + 2 digits + 1 letter) have none: "ABC12D".
+ * - Motorcycles (3 letters + 2 digits + 1 letter) too: "ABC-12D".
  * - Anything else (e.g. trailers "S88490") is only uppercased and stripped of spaces.
  */
 export function normalizePlate(raw: string): string {
@@ -12,7 +12,7 @@ export function normalizePlate(raw: string): string {
   if (car) return `${car[1]}-${car[2]}`;
 
   const moto = /^([A-Z]{3})-?(\d{2}[A-Z])$/.exec(compact);
-  if (moto) return `${moto[1]}${moto[2]}`;
+  if (moto) return `${moto[1]}-${moto[2]}`;
 
   return compact;
 }

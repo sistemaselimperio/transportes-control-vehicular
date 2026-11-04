@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
-import { updateTechnicalDataAction, type ActionResult } from "../application/vehicle-actions";
+import { expireVehicleViewsAction, updateTechnicalDataAction, type ActionResult } from "../application/vehicle-actions";
 import { createBodyFromForm, editBodyFromForm } from "../application/vehicle-form-body";
 import type { VehicleEditValues, VehicleFormOptions } from "../application/vehicle-queries";
 import type { VehicleTechnicalData } from "../domain/technical-data";
@@ -483,6 +483,7 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
         <ActionForm
           action={async (fd) => {
             const result = await sendVehicle("/api/vehiculos", "POST", createBodyFromForm(formValues(fd)));
+            if (result.ok) await expireVehicleViewsAction().catch(() => undefined);
             if (result.ok && result.plate) router.push(`/flota/${encodeURIComponent(result.plate)}`);
             return result;
           }}
@@ -530,6 +531,8 @@ export function EditVehicleForm({
           editBodyFromForm(formValues(fd)),
         );
         if (result.ok) {
+          // The PATCH only expired the server cache; this clears the browser's copy of the fleet screens.
+          await expireVehicleViewsAction().catch(() => undefined);
           if (result.plate && result.plate !== values.plate) {
             router.replace(`/flota/${encodeURIComponent(result.plate)}`);
           } else {

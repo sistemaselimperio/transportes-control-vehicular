@@ -199,7 +199,7 @@ describe("parseImperioSheet", () => {
   });
 
   it("normalizes motorcycle plates and the low displacement tax", () => {
-    expect(byPlate(vehicles, "LFL14H")).toMatchObject({
+    expect(byPlate(vehicles, "LFL-14H")).toMatchObject({
       className: "Motocicleta",
       tax: { kind: "EXEMPT_LOW_DISPLACEMENT", year: null },
       oilChange: null,
