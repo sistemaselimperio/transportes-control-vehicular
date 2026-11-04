@@ -103,7 +103,7 @@ describe("validateInspection", () => {
     expect(result.value).toMatchObject({
       date: "2026-03-14",
       time: "06:30",
-      plate: "ABC123",
+      plate: "ABC-123",
       trailerPlate: null,
       driverName: "Juan Pérez",
       driverNationalId: "1234567",
@@ -113,6 +113,16 @@ describe("validateInspection", () => {
       hasCriticalFailure: false,
       signature: SIGNATURE,
     });
+  });
+
+  it("writes car and motorcycle plates with their hyphen, however they were typed", () => {
+    const plateOf = (plate: string) => {
+      const result = validateInspection(draft({ plate }));
+      return result.ok ? result.value.plate : null;
+    };
+    expect(plateOf("abc123")).toBe("ABC-123");
+    expect(plateOf("ABC-123")).toBe("ABC-123");
+    expect(plateOf("abc 12d")).toBe("ABC-12D");
   });
 
   it("keeps a trailer plate when given", () => {

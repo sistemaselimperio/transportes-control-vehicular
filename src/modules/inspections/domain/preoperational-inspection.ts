@@ -4,6 +4,7 @@
  * checklist points must be answered. Header
  * values are free text on purpose, they are not checked against the fleet or the drivers.
  */
+import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, type ChecklistItem } from "./preoperational-checklist";
 
 export type AnswerStatus = "BIEN" | "MAL";
@@ -51,7 +52,9 @@ const SIGNATURE_PATTERN = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
 
 /** Plates are free text here: trimmed, no inner spaces, upper case. */
 export function normalizeInspectionPlate(value: string): string {
-  return value.replace(/\s+/g, "").toUpperCase();
+  const compact = value.replace(/\s+/g, "").toUpperCase();
+  // Same spelling as the fleet ("ABC-123"); empty stays empty so the "required" check reports it.
+  return compact === "" ? "" : normalizePlate(compact);
 }
 
 const collapseSpaces = (value: string) => value.trim().replace(/\s+/g, " ");

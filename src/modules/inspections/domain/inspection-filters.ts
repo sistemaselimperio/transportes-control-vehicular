@@ -1,6 +1,7 @@
 /** Filters and paging of the internal inspections list, parsed from the page's query string. */
 import type { ExitStatus } from "./exit-decision";
-import { isIsoDate, normalizeInspectionPlate } from "./preoperational-inspection";
+import { normalizePlateKey } from "./inspection-links";
+import { isIsoDate } from "./preoperational-inspection";
 
 export const INSPECTIONS_PAGE_SIZE = 25;
 
@@ -54,7 +55,8 @@ const parseId = (value: string) => {
 };
 
 export function parseInspectionFilters(params: Params): InspectionFilters {
-  const plate = normalizeInspectionPlate(first(params.placa)).slice(0, 15);
+  // Without the hyphen: the list compares it against the stored plate with its hyphen removed.
+  const plate = normalizePlateKey(first(params.placa)).slice(0, 15);
   let from = parseDate(first(params.desde));
   let to = parseDate(first(params.hasta));
   if (from && to && from > to) [from, to] = [to, from];

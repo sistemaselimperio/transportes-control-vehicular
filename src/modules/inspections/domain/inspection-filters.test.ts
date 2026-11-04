@@ -10,6 +10,10 @@ describe("parseInspectionFilters", () => {
     expect(parseInspectionFilters({ placa: " abc 12 " }).plate).toBe("ABC12");
   });
 
+  it("drops the hyphen so 'ABC-123' and 'ABC123' find the same inspections", () => {
+    expect(parseInspectionFilters({ placa: "abc-123" }).plate).toBe("ABC123");
+  });
+
   it("keeps valid dates and drops invalid ones", () => {
     const filters = parseInspectionFilters({ desde: "2026-03-01", hasta: "not-a-date" });
     expect(filters.from).toBe("2026-03-01");

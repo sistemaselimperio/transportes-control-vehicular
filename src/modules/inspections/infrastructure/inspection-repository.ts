@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, like, lte, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, lte, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import type { ClosureInput, ExitDecision, ExitDecisionInput } from "../domain/exit-decision";
@@ -134,7 +134,9 @@ export async function listInspections(
   filters: InspectionFilters,
 ): Promise<{ rows: InspectionListRow[]; hasNext: boolean }> {
   const conditions: SQL[] = [];
-  if (filters.plate) conditions.push(like(t.plate, `%${escapeLikePattern(filters.plate)}%`));
+  if (filters.plate) {
+    conditions.push(like(sql`replace(${t.plate}, '-', '')`, `%${escapeLikePattern(filters.plate)}%`));
+  }
   if (filters.from) conditions.push(gte(t.inspectionDate, filters.from));
   if (filters.to) conditions.push(lte(t.inspectionDate, filters.to));
   if (filters.driverId) conditions.push(eq(t.driverId, filters.driverId));
