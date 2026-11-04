@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, ChevronLeft, ChevronRight, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { CalendarRange, ChevronLeft, ChevronRight, Plus, Search, Trash2, Truck, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -10,6 +10,7 @@ import { TabBar } from "@/components/app/tab-bar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { cn } from "@/lib/utils";
 import { GROUP_LABELS } from "@/modules/dashboard/domain/dashboard-metrics";
 import { formatPrice } from "@/modules/sales/domain/sale-row";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
@@ -53,6 +54,16 @@ function rangePresets(today: string): { key: string; label: string; from: string
     { key: "this-year", label: "Este año", from: `${year}-01-01`, to: today },
   ];
 }
+
+/** Every filter control shares one height: 44px touch targets on phones, 36px from `md`. */
+const CONTROL = "h-11 md:h-9";
+
+/** The period track: everything, the quick ranges, then a custom range. Short labels keep it on one row. */
+const PERIOD_OPTIONS = (presets: ReturnType<typeof rangePresets>) => [
+  { key: "all", label: "Todo" },
+  ...presets.map((p) => ({ key: p.key, label: p.key === "last-3-months" ? "3 meses" : p.label })),
+  { key: "custom", label: "Rango" },
+];
 
 const NEW_LABELS: Record<LogbookTab, { button: string; create: string; edit: string }> = {
   servicios: { button: "Mantenimiento", create: "Registrar mantenimiento", edit: "Editar mantenimiento" },
@@ -273,17 +284,17 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
         panelId="logbook-panel"
       />
 
-      <div className="rounded-xl border bg-card">
-        <div role="search" aria-label="Filtros de la bitácora" className="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="flex flex-col gap-1.5 sm:w-48">
-            <label htmlFor="logbook-plate" className="block text-sm font-medium">
-              Placa
-            </label>
+      <div role="search" aria-label="Filtros de la bitácora" className="space-y-2.5">
+        {/* Scope first: which vehicle and which period. */}
+        <div className="flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
+          <div className="relative md:w-52">
+            <Truck aria-hidden className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
             <NativeSelect
               id="logbook-plate"
+              aria-label="Placa"
               value={plates.find((p) => normalizePlateQuery(p) === normalizePlateQuery(plate)) ?? ""}
               onChange={(e) => changePlate(e.target.value)}
-              className="h-11 md:h-9"
+              className={cn(CONTROL, "num w-full pl-9", plate && "font-semibold")}
             >
               <option value="">Todas las placas</option>
               {plates.map((p) => (
@@ -293,147 +304,147 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
               ))}
             </NativeSelect>
           </div>
-          <div className="flex flex-col gap-1.5 sm:w-48">
-            <label htmlFor="logbook-period" className="block text-sm font-medium">
-              Período
-            </label>
-            <NativeSelect
-              id="logbook-period"
-              value={period}
-              onChange={(e) => changePeriod(e.target.value)}
-              className="h-11 md:h-9"
-            >
-              <option value="all">Todo el historial</option>
-              {presets.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.label}
-                </option>
-              ))}
-              <option value="custom">Personalizado…</option>
-            </NativeSelect>
-          </div>
-          {period === "custom" && (
-            // A div, not a fieldset: some browsers ignore `gap` on fieldset grid/flex layouts.
-            <div role="group" aria-label="Rango de fechas" className="grid grid-cols-2 gap-4 sm:flex sm:gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="logbook-from" className="block text-sm font-medium">
-                  Desde
-                </label>
-                <Input
-                  id="logbook-from"
-                  type="date"
-                  value={from}
-                  max={to || today}
-                  onChange={(e) => changeRange(e.target.value, to)}
-                  className="h-11 sm:w-40 md:h-9"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="logbook-to" className="block text-sm font-medium">
-                  Hasta
-                </label>
-                <Input
-                  id="logbook-to"
-                  type="date"
-                  value={to}
-                  min={from || undefined}
-                  max={today}
-                  onChange={(e) => changeRange(from, e.target.value)}
-                  className="h-11 sm:w-40 md:h-9"
-                />
-              </div>
-            </div>
-          )}
-          {listing && (
-            <>
-              <div className="flex flex-col gap-1.5 sm:w-64">
-                <label htmlFor="logbook-search" className="block text-sm font-medium">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="logbook-search"
-                    type="search"
-                    value={search}
-                    maxLength={LOGBOOK_SEARCH_MAX}
-                    placeholder="Descripción, proveedor, notas…"
-                    onChange={(e) => changeSearch(e.target.value)}
-                    className="h-11 pl-9 md:h-9"
-                  />
-                </div>
-              </div>
-              {tab === "servicios" && (
-                <div className="flex flex-col gap-1.5 sm:w-40">
-                  <label htmlFor="logbook-kind" className="block text-sm font-medium">
-                    Tipo
-                  </label>
-                  <NativeSelect
-                    id="logbook-kind"
-                    value={kind}
-                    onChange={(e) => changeKind(e.target.value as ServiceKind | "")}
-                    className="h-11 md:h-9"
-                  >
-                    <option value="">Todos</option>
-                    {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-              )}
-              <div className="flex flex-col gap-1.5 sm:w-48">
-                <label htmlFor="logbook-driver" className="block text-sm font-medium">
-                  Conductor
-                </label>
-                <NativeSelect
-                  id="logbook-driver"
-                  value={listing.drivers.some((d) => String(d.id) === driverId) ? driverId : ""}
-                  onChange={(e) => changeDriver(e.target.value)}
-                  className="h-11 md:h-9"
+
+          <div
+            role="radiogroup"
+            aria-label="Período"
+            className="flex gap-1 overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none] md:w-fit [&::-webkit-scrollbar]:hidden"
+          >
+            {PERIOD_OPTIONS(presets).map((o) => {
+              const selected = period === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => changePeriod(o.key)}
+                  className={cn(
+                    "inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98] md:h-7",
+                    selected && "bg-card text-foreground shadow-sm",
+                  )}
                 >
-                  <option value="">Todos</option>
-                  {listing.drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-            </>
-          )}
+                  {o.key === "custom" && <CalendarRange aria-hidden className="size-3.5" />}
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+
           {(plate || period !== "all" || search || kind || driverId) && (
             <Button
               type="button"
               variant="ghost"
-              className="h-11 self-start px-3 text-muted-foreground sm:self-auto md:h-9"
+              className="h-11 self-start px-3 text-muted-foreground md:ml-auto md:h-9 md:self-auto"
               onClick={clearFilters}
             >
               <X aria-hidden />
-              Limpiar
+              Limpiar filtros
             </Button>
           )}
         </div>
-        <div
-          className="flex flex-col gap-1 border-t bg-muted/40 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
-          aria-live="polite"
-        >
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <CalendarRange aria-hidden className="size-4" />
-            <span className="num">{rangeText}</span>
-          </span>
-          <span className="flex flex-col gap-0.5 sm:items-end">
-            <span className="num font-semibold text-foreground">Flota: {summaryText(fleet)}</span>
-            {listing && (
-              <span className="num font-semibold text-foreground">
-                {listing.plate}: {summaryText(listing.data)}
-                {narrowed ? " (filtrado)" : ""}
-              </span>
-            )}
-          </span>
-        </div>
+
+        {period === "custom" && (
+          // A div, not a fieldset: some browsers ignore `gap` on fieldset grid/flex layouts.
+          <div
+            role="group"
+            aria-label="Rango de fechas"
+            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-top-1 duration-150 motion-reduce:animate-none"
+          >
+            <label htmlFor="logbook-from">Desde</label>
+            <Input
+              id="logbook-from"
+              type="date"
+              value={from}
+              max={to || today}
+              onChange={(e) => changeRange(e.target.value, to)}
+              className={cn(CONTROL, "num w-40 text-foreground")}
+            />
+            <label htmlFor="logbook-to">hasta</label>
+            <Input
+              id="logbook-to"
+              type="date"
+              value={to}
+              min={from || undefined}
+              max={today}
+              onChange={(e) => changeRange(from, e.target.value)}
+              className={cn(CONTROL, "num w-40 text-foreground")}
+            />
+          </div>
+        )}
+
+        {/* Narrowing inside one vehicle's records. */}
+        {listing && (
+          <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
+            <div className="relative md:flex-1 md:max-w-md">
+              <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="logbook-search"
+                type="search"
+                aria-label="Buscar"
+                value={search}
+                maxLength={LOGBOOK_SEARCH_MAX}
+                placeholder="Buscar descripción, proveedor, notas…"
+                onChange={(e) => changeSearch(e.target.value)}
+                className={cn(CONTROL, "pl-9")}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 md:flex">
+              {tab === "servicios" && (
+                <NativeSelect
+                  id="logbook-kind"
+                  aria-label="Tipo de mantenimiento"
+                  value={kind}
+                  onChange={(e) => changeKind(e.target.value as ServiceKind | "")}
+                  className={cn(CONTROL, "md:w-44", kind && "font-semibold")}
+                >
+                  <option value="">Tipo: todos</option>
+                  {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+              <NativeSelect
+                id="logbook-driver"
+                aria-label="Conductor"
+                value={listing.drivers.some((d) => String(d.id) === driverId) ? driverId : ""}
+                onChange={(e) => changeDriver(e.target.value)}
+                className={cn(CONTROL, "md:w-52", driverId && "font-semibold")}
+              >
+                <option value="">Conductor: todos</option>
+                {listing.drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Totals as figures: what the filters add up to. */}
+      <dl aria-live="polite" className="flex flex-col gap-x-10 gap-y-3 rounded-lg bg-muted/50 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-baseline">
+        <div>
+          <dt className="text-xs text-muted-foreground">Período</dt>
+          <dd className="num text-sm font-medium">{rangeText}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Flota</dt>
+          <dd className="num text-sm font-semibold">{summaryText(fleet)}</dd>
+        </div>
+        {listing && (
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              {listing.plate}
+              {narrowed ? " · filtrado" : ""}
+            </dt>
+            <dd className="num text-sm font-semibold">{summaryText(listing.data)}</dd>
+          </div>
+        )}
+      </dl>
 
       <div
         id="logbook-panel"
