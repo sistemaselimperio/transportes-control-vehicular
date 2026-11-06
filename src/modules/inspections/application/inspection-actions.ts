@@ -5,6 +5,7 @@
  * so it trusts nothing: the domain validation runs again here and the critical-failure flag is
  * computed from the answers, never taken from the client.
  */
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { insertInspection } from "../infrastructure/inspection-repository";
 import { failedCriticalItems, validateInspection, type InspectionErrors } from "../domain/preoperational-inspection";
 
@@ -25,6 +26,7 @@ export async function submitInspectionAction(input: unknown): Promise<SubmitInsp
     try {
       const saved = await insertInspection(value);
       if (!saved.ok) return { ok: false, errors: { driverId: "Escribe la cédula." } };
+      expireAfterAction({ kind: "inspection" });
     } catch (e) {
       console.error("inspection insert failed", e);
       return { ok: false, errors: { form: "No se pudo guardar la inspección. Intenta de nuevo." } };

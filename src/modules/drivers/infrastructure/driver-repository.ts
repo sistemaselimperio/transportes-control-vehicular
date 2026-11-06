@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { maskNationalId } from "@/modules/inspections/domain/inspection-links";
 import { checkDriverDeletion } from "../domain/driver-deletion";
@@ -19,9 +19,9 @@ export async function loadDriverOptions(): Promise<DriverOption[]> {
   return rows.map((r) => ({ id: r.id, name: r.name, nationalHint: maskNationalId(r.nationalId) }));
 }
 
-/** Every driver with the plates of their current (open) assignments. */
+/** Every driver with the plates of their current (open) assignments and whether they have inspections. */
 export async function loadDriverRows(): Promise<DriverRow[]> {
-  const [drivers, assignments] = await Promise.all([
+  const [drivers, assignments, inspected] = await Promise.all([
     db.select().from(schema.drivers),
     db
       .select({ driverId: schema.driverAssignments.driverId, plate: schema.vehicles.plate })
@@ -29,7 +29,12 @@ export async function loadDriverRows(): Promise<DriverRow[]> {
       .innerJoin(schema.vehicles, eq(schema.driverAssignments.vehicleId, schema.vehicles.id))
       .where(isNull(schema.driverAssignments.toDate))
       .orderBy(asc(schema.vehicles.plate)),
+    db
+      .selectDistinct({ driverId: schema.preoperationalInspections.driverId })
+      .from(schema.preoperationalInspections)
+      .where(isNotNull(schema.preoperationalInspections.driverId)),
   ]);
+  const withInspections = new Set(inspected.map((r) => r.driverId));
 
   const plates = new Map<number, string[]>();
   for (const a of assignments) {
@@ -46,10 +51,11 @@ export async function loadDriverRows(): Promise<DriverRow[]> {
     company: d.company,
     status: d.status,
     plates: plates.get(d.id) ?? [],
+    hasInspections: withInspections.has(d.id),
   }));
 }
 
-type DriverValues = Omit<DriverRow, "id" | "plates">;
+type DriverValues = Omit<DriverRow, "id" | "plates" | "hasInspections">;
 
 /** Id of the driver holding that national ID, ignoring `exceptId`. */
 export async function findDriverIdByNationalId(nationalId: string, exceptId?: number) {

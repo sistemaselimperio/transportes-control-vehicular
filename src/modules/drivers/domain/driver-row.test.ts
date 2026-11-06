@@ -9,6 +9,7 @@ const row = (over: Partial<DriverRow>): DriverRow => ({
   company: null,
   status: "ACTIVE",
   plates: [],
+  hasInspections: false,
   ...over,
 });
 

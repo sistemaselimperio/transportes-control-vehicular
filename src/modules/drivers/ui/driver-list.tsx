@@ -39,7 +39,7 @@ const Status = ({ status }: { status: DriverStatus }) => (
   <StatusPill status={STATUS_TONE[status]}>{DRIVER_STATUS_LABELS[status]}</StatusPill>
 );
 
-/** Opens the pre-operational inspections list filtered to the inspections linked to this driver. */
+/** Opens the pre-operational inspections list filtered to this driver; shown only when they have some. */
 function InspectionsLink({ row }: { row: DriverRow }) {
   return (
     <Link
@@ -105,7 +105,7 @@ export function DriverList({
               <span className="min-w-0 font-medium">{r.name}</span>
               <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                 <Status status={r.status} />
-                <InspectionsLink row={r} />
+                {r.hasInspections && <InspectionsLink row={r} />}
                 <EditButton row={r} onEdit={onEdit} />
                 <DeleteButton row={r} onDelete={onDelete} />
               </div>
@@ -167,7 +167,7 @@ export function DriverList({
                     <Plates plates={r.plates} />
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                    <InspectionsLink row={r} />
+                    {r.hasInspections && <InspectionsLink row={r} />}
                     <EditButton row={r} onEdit={onEdit} />
                     <DeleteButton row={r} onDelete={onDelete} />
                   </td>

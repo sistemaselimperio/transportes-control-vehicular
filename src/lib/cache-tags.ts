@@ -15,6 +15,8 @@ export const CACHE_TAGS = {
   trips: "trips",
   /** Service, tire and fuel records. */
   logbook: "logbook",
+  /** Pre-operational inspections; only reads derived from them are cached (who has inspections). */
+  inspections: "inspections",
   /** Dashboard figures; derived from the fleet and its owners. */
   dashboard: "dashboard",
   /** Expired-vehicle counts of the nav; derived from the fleet and its owners. */
@@ -23,12 +25,12 @@ export const CACHE_TAGS = {
   files: "fleet-files",
 } as const;
 
-type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.trips | typeof CACHE_TAGS.logbook;
+type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.trips | typeof CACHE_TAGS.logbook | typeof CACHE_TAGS.inspections;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
 
-const { fleet, owners, drivers, sales, trips, logbook, dashboard, expiredCounts, files } = CACHE_TAGS;
+const { fleet, owners, drivers, sales, trips, logbook, inspections, dashboard, expiredCounts, files } = CACHE_TAGS;
 
 export type ReadName =
   | "fleetRows"
@@ -54,7 +56,8 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   dashboard: [dashboard, fleet, owners],
   expiredCounts: [expiredCounts, fleet, owners],
   logbookPage: [logbook, fleet, owners, drivers],
-  driverRows: [drivers, fleet],
+  /** Inspections because each row says whether the driver has any. */
+  driverRows: [drivers, fleet, inspections],
   driverOptions: [drivers],
   ownerRows: [owners, fleet],
   saleRows: [sales, fleet, owners],
@@ -82,6 +85,8 @@ export type Change =
   | { kind: "logbook" }
   /** Logbook writes that also change oil changes or the odometer (bulk delete, Excel import). */
   | { kind: "logbook-with-oil" }
+  /** An inspection submitted or deleted. */
+  | { kind: "inspection" }
   | { kind: "vehicle-file"; plate: string };
 
 const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTag[]> = {
@@ -92,6 +97,7 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   trip: [trips],
   logbook: [logbook],
   "logbook-with-oil": [logbook, fleet],
+  inspection: [inspections],
 };
 
 /** The tags a write must expire so every read that shows what it changed is recomputed. */

@@ -17,6 +17,7 @@ const CHANGES: Change[] = [
   { kind: "trip" },
   { kind: "logbook" },
   { kind: "logbook-with-oil" },
+  { kind: "inspection" },
   { kind: "vehicle-file", plate: "ABC-123" },
 ];
 
@@ -62,6 +63,12 @@ describe("changeTags", () => {
         CACHE_TAGS.expiredCounts,
       ]),
     );
+  });
+
+  it("an inspection refreshes the driver list, which shows who has inspections", () => {
+    const tags = changeTags({ kind: "inspection" });
+    expect(tags).toEqual([CACHE_TAGS.inspections]);
+    expect(READ_DEPENDENCIES.driverRows).toContain(CACHE_TAGS.inspections);
   });
 
   it("a driver edit leaves the dashboard and the nav counts alone", () => {
@@ -116,6 +123,7 @@ describe("read / change consistency", () => {
     trip: [CACHE_TAGS.trips],
     logbook: [CACHE_TAGS.logbook],
     "logbook-with-oil": [CACHE_TAGS.logbook, CACHE_TAGS.fleet],
+    inspection: [CACHE_TAGS.inspections],
     "vehicle-file": [CACHE_TAGS.files],
   };
 

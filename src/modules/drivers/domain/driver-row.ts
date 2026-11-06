@@ -11,6 +11,8 @@ export interface DriverRow {
   status: DriverStatus;
   /** Plates of the vehicles currently assigned to the driver. */
   plates: string[];
+  /** Whether at least one pre-operational inspection is linked to the driver. */
+  hasInspections: boolean;
 }
 
 export const DRIVER_STATUS_LABELS: Record<DriverStatus, string> = {

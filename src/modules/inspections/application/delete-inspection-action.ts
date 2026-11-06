@@ -5,6 +5,7 @@
  * link). Inspections managers only (staff); the confirmation lives in the UI.
  */
 import { revalidatePath } from "next/cache";
+import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
 import { requireSectionManager } from "@/lib/session";
 import { deleteInspection } from "../infrastructure/inspection-repository";
@@ -21,6 +22,7 @@ export async function deleteInspectionAction(id: string): Promise<DeleteInspecti
     }
     revalidatePath("/preoperacionales");
     revalidatePath("/flota/[placa]", "page");
+    expireAfterAction({ kind: "inspection" });
     return { ok: true };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, error: e.message };
