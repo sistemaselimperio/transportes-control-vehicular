@@ -58,8 +58,8 @@ export async function updateSale(id: number, values: SaleValues) {
   return rows.length === 1;
 }
 
-/** Removes every sale; returns how many went. */
-export async function deleteAllSales() {
-  const rows = await db.delete(schema.sales).returning({ id: schema.sales.id });
-  return rows.length;
+/** Removes one sale; returns false when no sale has that id. The vehicle keeps its SOLD status. */
+export async function deleteSale(id: number) {
+  const rows = await db.delete(schema.sales).where(eq(schema.sales.id, id)).returning({ id: schema.sales.id });
+  return rows.length === 1;
 }

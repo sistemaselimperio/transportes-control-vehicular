@@ -1,14 +1,13 @@
 "use client";
 
-import { CheckCircle2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
-import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
 import { TabBar } from "@/components/app/tab-bar";
 import { Input } from "@/components/ui/input";
 import { GROUP_LABELS, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
-import { deleteAllSalesAction } from "../application/sale-actions";
+import { NoticeToast, useNotice } from "@/modules/logbook/ui/notice";
 import {
   ALL_YEARS,
   countByYear,
@@ -47,7 +46,7 @@ export function SalesView({
   const [year, setYear] = useState(() => resolveYear(initialYear, rows));
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<SaleRow | undefined>();
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, notify] = useNotice();
 
   // Tab counts follow the search, so they always match what a tab will show.
   const counts = countByYear(filterSales(rows, { year: ALL_YEARS, query }));
@@ -70,12 +69,6 @@ export function SalesView({
       <PageHeader
         title="Ventas"
         description={`Vehículos vendidos y a quién${group ? ` · ${GROUP_LABELS[group]}` : ""}.`}
-        actions={
-          <DeleteAllButton count={rows.length} title="Eliminar todas las ventas" action={deleteAllSalesAction}>
-            <p className="font-medium">Se eliminarán TODOS los registros de ventas, no solo los que ves en pantalla.</p>
-            <p className="text-muted-foreground">Los vehículos no se eliminan y conservan su estado de vendido.</p>
-          </DeleteAllButton>
-        }
       />
 
       <TabBar
@@ -118,18 +111,11 @@ export function SalesView({
           rows={visible}
           empty={rows.length === 0 ? "Aún no hay ventas registradas." : "Ninguna venta coincide con los filtros."}
           onEdit={setEditing}
+          onResult={(r) => notify(r.ok ? { tone: "ok", text: r.message } : { tone: "error", text: r.error })}
         />
       </div>
 
-      {message && (
-        <p
-          role="status"
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-ok-foreground/20 bg-ok px-4 py-3 text-sm text-ok-foreground shadow-soft"
-        >
-          <CheckCircle2 className="size-4 shrink-0" aria-hidden />
-          {message}
-        </p>
-      )}
+      <NoticeToast notice={notice} />
 
       <SlideOver
         open={editing !== undefined}
@@ -143,8 +129,7 @@ export function SalesView({
             sale={editing}
             onCancel={() => setEditing(undefined)}
             onDone={(msg) => {
-              setMessage(msg);
-              setTimeout(() => setMessage(null), 6000);
+              notify({ tone: "ok", text: msg });
               setEditing(undefined);
             }}
           />

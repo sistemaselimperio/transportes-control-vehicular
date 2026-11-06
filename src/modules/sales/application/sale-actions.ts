@@ -11,7 +11,7 @@ import { requireSectionManager } from "@/lib/session";
 import { assertNotFuture, RuleError } from "@/modules/vehicles/domain/vehicle-rules";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { todayInBogota } from "@/modules/shared/domain/dates";
-import { deleteAllSales, updateSale } from "../infrastructure/sale-repository";
+import { deleteSale, updateSale } from "../infrastructure/sale-repository";
 import { saleEditSchema, saleIdSchema } from "./sale-schemas";
 
 const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
@@ -46,11 +46,10 @@ export async function updateSaleAction(id: number, fd: FormData): Promise<Action
   });
 }
 
-/** Removes every sale record; the vehicles keep their SOLD status. */
-export async function deleteAllSalesAction(): Promise<ActionResult> {
+/** Removes one sale record; the vehicle keeps its SOLD status. */
+export async function deleteSaleAction(id: number): Promise<ActionResult> {
   return run(async () => {
-    const count = await deleteAllSales();
-    if (count === 0) throw new RuleError("No hay ventas para eliminar.");
-    return count === 1 ? "Se eliminó 1 venta." : `Se eliminaron ${count} ventas.`;
+    if (!(await deleteSale(saleIdSchema.parse(id)))) throw new RuleError("La venta ya no existe.");
+    return "Venta eliminada.";
   });
 }
