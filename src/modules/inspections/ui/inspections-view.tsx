@@ -1,32 +1,16 @@
-import { ChevronLeft, ChevronRight, ClipboardCheck, FileText, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, FileText } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
-import { Label } from "@/components/ui/label";
+import { buttonVariants } from "@/components/ui/button";
 import { exitStatus } from "../domain/exit-decision";
-import { EXIT_FILTER_OPTIONS, exitFilterParam, type InspectionFilters } from "../domain/inspection-filters";
+import { inspectionsHref, type InspectionFilters } from "../domain/inspection-filters";
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
 import { DeleteInspectionButton } from "./delete-inspection-button";
+import { InspectionFiltersForm } from "./inspection-filters-form";
 import { ExitBadge, NotRegisteredBadge, StatusBadge, UncheckedBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 const rowSummary = (r: InspectionListRow) => `${r.plate} · ${formatInspectionDate(r.inspectionDate)} ${r.inspectionTime}`;
-
-function pageHref(filters: InspectionFilters, page: number) {
-  const params = new URLSearchParams();
-  if (filters.plate) params.set("placa", filters.plate);
-  if (filters.from) params.set("desde", filters.from);
-  if (filters.to) params.set("hasta", filters.to);
-  if (filters.driverId) params.set("conductor", String(filters.driverId));
-  if (filters.vehicleId) params.set("vehiculo", String(filters.vehicleId));
-  const exit = exitFilterParam(filters.exit);
-  if (exit) params.set("salida", exit);
-  if (page > 1) params.set("pagina", String(page));
-  const qs = params.toString();
-  return qs ? `/preoperacionales?${qs}` : "/preoperacionales";
-}
 
 /** The plate as a link to the vehicle's file when it is registered, else plain text plus a badge. */
 function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean }) {
@@ -49,7 +33,7 @@ function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean })
 }
 
 /**
- * List of submitted inspections: a GET filter form, the rows and simple prev / next paging. Only the
+ * List of submitted inspections: the live filter form, the rows and simple prev / next paging. Only the
  * role that manages inspections (`canDelete`) gets a delete action per row.
  */
 export function InspectionsView({
@@ -71,63 +55,7 @@ export function InspectionsView({
         description="Inspecciones diarias que envían los conductores desde el formulario FO-PESV-016."
       />
 
-      <form method="get" action="/preoperacionales" className="flex flex-wrap items-end gap-3">
-        {/* The registered driver / vehicle filters come from links elsewhere; keep them when filtering. */}
-        {filters.driverId && <input type="hidden" name="conductor" value={filters.driverId} />}
-        {filters.vehicleId && <input type="hidden" name="vehiculo" value={filters.vehicleId} />}
-        <div className="space-y-1.5">
-          <Label htmlFor="insp-plate" className="text-sm text-foreground">
-            Placa
-          </Label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              id="insp-plate"
-              name="placa"
-              defaultValue={filters.plate}
-              autoComplete="off"
-              autoCapitalize="characters"
-              placeholder="ABC123"
-              className="h-11 w-40 pl-9 uppercase md:h-9"
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="insp-from" className="text-sm text-foreground">
-            Desde
-          </Label>
-          <Input id="insp-from" name="desde" type="date" defaultValue={filters.from ?? ""} className="h-11 md:h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="insp-to" className="text-sm text-foreground">
-            Hasta
-          </Label>
-          <Input id="insp-to" name="hasta" type="date" defaultValue={filters.to ?? ""} className="h-11 md:h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="insp-exit" className="text-sm text-foreground">
-            Salida
-          </Label>
-          <NativeSelect id="insp-exit" name="salida" defaultValue={exitFilterParam(filters.exit) ?? ""} className="h-11 w-40 md:h-9">
-            {EXIT_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={exitFilterParam(o.value) ?? ""}>
-                {o.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-        <Button type="submit" className="h-11 px-4 md:h-9">
-          Filtrar
-        </Button>
-        {filtered && (
-          <Link href="/preoperacionales" className={buttonVariants({ variant: "ghost", className: "h-11 px-4 md:h-9" })}>
-            Limpiar
-          </Link>
-        )}
-      </form>
+      <InspectionFiltersForm filters={filters} />
 
       {rows.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -250,7 +178,7 @@ export function InspectionsView({
         <nav aria-label="Paginación" className="flex items-center justify-between gap-3">
           {filters.page > 1 ? (
             <Link
-              href={pageHref(filters, filters.page - 1)}
+              href={inspectionsHref(filters, filters.page - 1)}
               className={buttonVariants({ variant: "outline", className: "h-11 px-4 md:h-9" })}
             >
               <ChevronLeft aria-hidden />
@@ -262,7 +190,7 @@ export function InspectionsView({
           <span className="num text-sm text-muted-foreground">Página {filters.page}</span>
           {hasNext ? (
             <Link
-              href={pageHref(filters, filters.page + 1)}
+              href={inspectionsHref(filters, filters.page + 1)}
               className={buttonVariants({ variant: "outline", className: "h-11 px-4 md:h-9" })}
             >
               Más antiguas

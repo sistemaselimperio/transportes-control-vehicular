@@ -75,4 +75,19 @@ export function parseInspectionFilters(params: Params): InspectionFilters {
   };
 }
 
+/** The list URL for some filters: only the ones with a value go in the query string. */
+export function inspectionsHref(filters: InspectionFilters, page = 1): string {
+  const params = new URLSearchParams();
+  if (filters.plate) params.set("placa", filters.plate);
+  if (filters.from) params.set("desde", filters.from);
+  if (filters.to) params.set("hasta", filters.to);
+  if (filters.driverId) params.set("conductor", String(filters.driverId));
+  if (filters.vehicleId) params.set("vehiculo", String(filters.vehicleId));
+  const exit = exitFilterParam(filters.exit);
+  if (exit) params.set("salida", exit);
+  if (page > 1) params.set("pagina", String(page));
+  const qs = params.toString();
+  return qs ? `/preoperacionales?${qs}` : "/preoperacionales";
+}
+
 export { escapeLikePattern } from "@/modules/shared/domain/like-pattern";

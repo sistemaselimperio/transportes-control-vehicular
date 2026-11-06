@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { escapeLikePattern, exitFilterParam, INSPECTIONS_PAGE_SIZE, parseInspectionFilters } from "./inspection-filters";
+import {
+  escapeLikePattern,
+  exitFilterParam,
+  INSPECTIONS_PAGE_SIZE,
+  inspectionsHref,
+  parseInspectionFilters,
+} from "./inspection-filters";
 
 describe("parseInspectionFilters", () => {
   it("defaults to no filters on the first page", () => {
@@ -80,5 +86,32 @@ describe("INSPECTIONS_PAGE_SIZE", () => {
   it("is a sensible page size", () => {
     expect(INSPECTIONS_PAGE_SIZE).toBeGreaterThan(0);
     expect(INSPECTIONS_PAGE_SIZE).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("inspectionsHref", () => {
+  const none = parseInspectionFilters({});
+
+  it("is the bare path without filters", () => {
+    expect(inspectionsHref(none)).toBe("/preoperacionales");
+  });
+
+  it("carries only the filters that have a value", () => {
+    expect(inspectionsHref({ ...none, plate: "SWA" })).toBe("/preoperacionales?placa=SWA");
+    expect(inspectionsHref({ ...none, from: "2026-03-01", exit: "NO_APTO" })).toBe(
+      "/preoperacionales?desde=2026-03-01&salida=no-apto",
+    );
+  });
+
+  it("keeps the driver and vehicle links and adds the page after the first", () => {
+    expect(inspectionsHref({ ...none, driverId: 4, vehicleId: 9 }, 2)).toBe(
+      "/preoperacionales?conductor=4&vehiculo=9&pagina=2",
+    );
+  });
+
+  it("round-trips through parseInspectionFilters", () => {
+    const filters = { ...none, plate: "SWA123", from: "2026-01-01", to: "2026-02-01", exit: "PENDING" as const };
+    const params = Object.fromEntries(new URL(inspectionsHref(filters), "http://x").searchParams);
+    expect(parseInspectionFilters(params)).toEqual(filters);
   });
 });
