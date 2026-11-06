@@ -16,7 +16,7 @@ import {
 
 export const KIND_LABELS: Record<ItemKind, string> = {
   SOAT: "SOAT",
-  TECNO: "Tecnomecánica",
+  TECNO: "Tecno",
   POLICY: "Póliza",
   TAX: "Impuesto",
   OIL: "Cambio de aceite",
@@ -32,7 +32,7 @@ export const ACTION_LABELS: Record<ItemKind, string> = {
 
 export const ACTION_TITLES: Record<ItemKind, string> = {
   SOAT: "Renovar SOAT",
-  TECNO: "Renovar tecnomecánica",
+  TECNO: "Renovar Tecno",
   POLICY: "Renovar póliza",
   TAX: "Actualizar impuesto",
   OIL: "Registrar cambio de aceite",

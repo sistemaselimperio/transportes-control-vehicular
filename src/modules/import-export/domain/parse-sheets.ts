@@ -140,7 +140,7 @@ function buildMotorVehicle(input: MotorRowInput): ParsedVehicle {
 
   const soat = parseDocumentCell(input.soat ?? null, "SOAT");
   issues.push(...soat.issues);
-  const tecno = parseDocumentCell(input.tecno ?? null, "Tecnomecánica");
+  const tecno = parseDocumentCell(input.tecno ?? null, "Tecno");
   issues.push(...tecno.issues);
 
   for (const extra of input.extras ?? []) {

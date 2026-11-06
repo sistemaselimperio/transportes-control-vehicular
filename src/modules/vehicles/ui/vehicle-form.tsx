@@ -376,7 +376,7 @@ function DocumentFields({ options, step }: { options: VehicleFormOptions; step?:
       <Group label="Obligatorios">
         <Row>
           <DocumentDateField prefix="soat" label="SOAT" />
-          <DocumentDateField prefix="tecno" label="Tecnomecánica" />
+          <DocumentDateField prefix="tecno" label="Tecno" />
         </Row>
       </Group>
       <Group label="Póliza">

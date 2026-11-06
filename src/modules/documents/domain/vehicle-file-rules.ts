@@ -9,7 +9,7 @@ export type FileCategory = "POLICY" | "SOAT" | "TECNO" | "TAX" | "LOGBOOK" | "OW
 export const FILE_CATEGORIES: Record<FileCategory, { label: string }> = {
   POLICY: { label: "Póliza" },
   SOAT: { label: "SOAT" },
-  TECNO: { label: "Tecnomecánica" },
+  TECNO: { label: "Tecno" },
   TAX: { label: "Impuestos" },
   LOGBOOK: { label: "Bitácoras" },
   /** Short on purpose: it shares a row of three narrow cards on the vehicle file. */

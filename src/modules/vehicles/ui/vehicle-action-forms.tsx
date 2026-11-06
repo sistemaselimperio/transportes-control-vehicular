@@ -55,7 +55,7 @@ export function RenewDocumentForm({
       <Field label="Documento" htmlFor="doc-type">
         <NativeSelect id="doc-type" name="type" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="SOAT">SOAT</option>
-          <option value="TECNO">Tecnomecánica</option>
+          <option value="TECNO">Tecno</option>
           <option value="POLICY">Póliza</option>
         </NativeSelect>
       </Field>
