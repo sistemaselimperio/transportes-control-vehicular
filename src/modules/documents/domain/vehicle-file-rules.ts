@@ -41,6 +41,14 @@ export function assertCanUpload(input: {
   }
 }
 
+/**
+ * How many leading pages of an uploaded PDF are kept, or null to keep them all.
+ * The SOAT certificate fits in its first two pages; the rest is boilerplate.
+ */
+export function pdfPageLimit(category: FileCategory): number | null {
+  return category === "SOAT" ? 2 : null;
+}
+
 /** "512 B", "250 KB", "1,5 MB". */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

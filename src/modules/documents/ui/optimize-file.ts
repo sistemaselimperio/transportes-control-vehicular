@@ -78,6 +78,27 @@ async function optimizePdf(file: File): Promise<File> {
   }
 }
 
+/**
+ * Keeps only the first `maxPages` pages of a PDF. Best effort: a non-PDF, a PDF that
+ * already fits, or any failure returns the original file.
+ */
+export async function trimPdfPages(file: File, maxPages: number | null): Promise<File> {
+  if (maxPages === null || file.type !== "application/pdf") return file;
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const source = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    if (source.getPageCount() <= maxPages) return file;
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(source, Array.from({ length: maxPages }, (_, i) => i));
+    pages.forEach((page) => out.addPage(page));
+    const bytes = await out.save();
+    return new File([new Uint8Array(bytes)], file.name, { type: "application/pdf" });
+  } catch (e) {
+    console.warn("pdf trimming failed, uploading the original", e);
+    return file;
+  }
+}
+
 export async function optimizeFile(file: File): Promise<File> {
   const plan = planOptimization({ mimeType: file.type, size: file.size });
   if (plan === "keep") return file;

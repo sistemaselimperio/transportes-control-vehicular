@@ -7,7 +7,20 @@ import {
   MAX_FILE_BYTES,
   assertCanUpload,
   formatFileSize,
+  pdfPageLimit,
 } from "./vehicle-file-rules";
+
+describe("pdfPageLimit", () => {
+  it("keeps only the first two pages of a SOAT", () => {
+    expect(pdfPageLimit("SOAT")).toBe(2);
+  });
+
+  it("does not trim any other category", () => {
+    for (const k of FILE_CATEGORY_KEYS.filter((c) => c !== "SOAT")) {
+      expect(pdfPageLimit(k)).toBeNull();
+    }
+  });
+});
 
 const ok = { category: "SOAT", mimeType: "application/pdf", size: 1000 } as const;
 

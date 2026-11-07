@@ -15,9 +15,10 @@ import {
   ALLOWED_MIME,
   FILE_CATEGORIES,
   formatFileSize,
+  pdfPageLimit,
   type FileCategory,
 } from "../domain/vehicle-file-rules";
-import { optimizeFile } from "./optimize-file";
+import { optimizeFile, trimPdfPages } from "./optimize-file";
 
 const ACCEPT = ALLOWED_MIME.join(",");
 
@@ -76,7 +77,7 @@ export function VehicleFilesPanel({
     setStage({ category, step: "optimizing" });
     startTransition(async () => {
       try {
-        const file = await optimizeFile(picked);
+        const file = await optimizeFile(await trimPdfPages(picked, pdfPageLimit(category)));
         setStage({ category, step: "uploading" });
         const fd = new FormData();
         fd.set("category", category);
