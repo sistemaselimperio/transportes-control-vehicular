@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, OctagonX } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,7 +87,7 @@ function useColombiaNow(): { date: string; time: string } {
   return { date, time };
 }
 
-/** The public page: the form, then a green or red result screen, then back to a blank form. */
+/** The public page: the form, then a "sent" confirmation, then back to a blank form. */
 export function PreoperationalFlow({
   plates,
   drivers,
@@ -101,7 +101,6 @@ export function PreoperationalFlow({
   if (done) {
     return (
       <ResultScreen
-        done={done}
         onAnother={() => {
           setDone(null);
           setRound((r) => r + 1);
@@ -744,44 +743,16 @@ function NovedadRow({
   );
 }
 
-function ResultScreen({ done, onAnother }: { done: Done; onAnother: () => void }) {
-  const blocked = done.failedCritical.length > 0;
+/** Neutral confirmation: the exit decision belongs to maintenance, not to this screen. */
+function ResultScreen({ onAnother }: { onAnother: () => void }) {
   return (
-    <main
-      className={cn(
-        "flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center",
-        blocked ? "bg-danger-foreground text-white" : "bg-ok text-ok-foreground",
-      )}
-    >
-      {blocked ? <OctagonX className="size-20" aria-hidden /> : <CircleCheck className="size-20" aria-hidden />}
+    <main className="flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center">
+      <CircleCheck className="size-20 text-primary" aria-hidden />
       <div role="status" className="max-w-md space-y-3">
-        <h1 className="text-4xl leading-tight font-black tracking-tight uppercase">
-          {blocked ? "El vehículo no sale" : "Inspección enviada"}
-        </h1>
-        <p className="text-xl font-semibold">
-          {blocked ? "Avise al despachador y a la Jefe de Mantenimiento." : "Todos los puntos críticos están en BIEN. Buen viaje."}
-        </p>
+        <h1 className="text-3xl leading-tight font-bold tracking-tight">Formulario enviado</h1>
+        <p className="text-lg text-muted-foreground">La inspección preoperacional quedó registrada correctamente.</p>
       </div>
-      {blocked && (
-        <div className="w-full max-w-md rounded-xl bg-white/15 p-4 text-left">
-          <p className="mb-2 text-sm font-bold tracking-wide uppercase">Puntos críticos en MAL</p>
-          <ul className="list-disc space-y-1 pl-5 text-lg font-medium">
-            {done.failedCritical.map((item) => (
-              <li key={item.id}>{item.label}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <Button
-        type="button"
-        onClick={onAnother}
-        className={cn(
-          "h-14 w-full max-w-md text-lg",
-          blocked
-            ? "bg-white text-danger-foreground hover:bg-white/90"
-            : "bg-ok-foreground text-white hover:bg-ok-foreground/90",
-        )}
-      >
+      <Button type="button" onClick={onAnother} className="h-14 w-full max-w-md text-lg">
         Enviar otra inspección
       </Button>
     </main>
