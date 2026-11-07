@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   assertCanAnchorTrailer,
   canAnchorTrailerStatus,
+  canTowTrailer,
   isTrailerClass,
   TRAILER_CLASS_NAME,
 } from "./trailer";
 import { RuleError } from "./vehicle-rules";
 
-const tractor = { plate: "TRC-500", isTrailer: false };
+const tractor = { plate: "TRC-500", isTrailer: false, canTow: true };
 const trailer = { plate: "S88490", isTrailer: true, status: "ACTIVE" as const };
 
 describe("isTrailerClass", () => {
@@ -27,7 +28,23 @@ describe("canAnchorTrailerStatus", () => {
   });
 });
 
+describe("canTowTrailer", () => {
+  it("lets only trucks and tractor units pull a trailer", () => {
+    expect(canTowTrailer("Tractocamión")).toBe(true);
+    expect(canTowTrailer(" camion ")).toBe(true);
+    for (const name of ["Camioneta", "Automóvil", "Motocicleta", "Remolque", "Montacargas", "Cargador", "Equipo", "Tractor"]) {
+      expect(canTowTrailer(name)).toBe(false);
+    }
+  });
+});
+
 describe("assertCanAnchorTrailer", () => {
+  it("rejects a vehicle whose class cannot pull a trailer", () => {
+    expect(() =>
+      assertCanAnchorTrailer({ tractor: { plate: "WOM-158", isTrailer: false, canTow: false }, trailer }),
+    ).toThrow(new RuleError("WOM-158 no puede llevar remolque: solo camiones y tractocamiones."));
+  });
+
   it("accepts an active or in-workshop trailer for a tractor", () => {
     expect(() => assertCanAnchorTrailer({ tractor, trailer })).not.toThrow();
     expect(() =>
@@ -55,7 +72,7 @@ describe("assertCanAnchorTrailer", () => {
 
   it("rejects anchoring to another trailer", () => {
     expect(() =>
-      assertCanAnchorTrailer({ tractor: { plate: "R31597", isTrailer: true }, trailer }),
+      assertCanAnchorTrailer({ tractor: { plate: "R31597", isTrailer: true, canTow: false }, trailer }),
     ).toThrow(new RuleError("Un remolque no puede llevar otro remolque."));
   });
 });

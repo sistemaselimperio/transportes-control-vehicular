@@ -6,6 +6,7 @@ import { RuleError } from "../domain/vehicle-rules";
 const base: Omit<VehicleSnapshot, "id" | "plate"> = {
   status: "ACTIVE",
   isTrailer: false,
+  canTow: true,
   odometerWorking: true,
   currentKm: 1000,
   oilMode: "both",
@@ -21,7 +22,7 @@ function setup(existing: VehicleSnapshot[] = [truck, tractor]) {
   const repo = {
     findByPlates: async (plates: string[]) => existing.filter((v) => plates.includes(v.plate)),
     findClass: async (id: number) =>
-      id === 2 ? { id: 2, isTrailer: false, oilIntervalMonths: null, oilIntervalKm: null } : null,
+      id === 2 ? { id: 2, isTrailer: false, canTow: true, oilIntervalMonths: null, oilIntervalKm: null } : null,
     updateVehicle: async (id: number, fields: VehicleUpdate) => void updates.push({ id, fields }),
   } as unknown as VehicleCommandRepository;
   return { commands: createVehicleCommands(repo, () => "2026-10-17"), updates };

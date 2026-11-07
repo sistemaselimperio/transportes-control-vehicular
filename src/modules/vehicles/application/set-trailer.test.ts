@@ -6,6 +6,7 @@ import { RuleError } from "../domain/vehicle-rules";
 const base: Omit<VehicleSnapshot, "id" | "plate"> = {
   status: "ACTIVE",
   isTrailer: false,
+  canTow: true,
   odometerWorking: true,
   currentKm: 1000,
   oilMode: "both",
@@ -14,7 +15,7 @@ const base: Omit<VehicleSnapshot, "id" | "plate"> = {
   assignment: null,
 };
 const tractor: VehicleSnapshot = { ...base, id: 5, plate: "TRC-500" };
-const trailer: VehicleSnapshot = { ...base, id: 7, plate: "S88490", isTrailer: true };
+const trailer: VehicleSnapshot = { ...base, id: 7, plate: "S88490", isTrailer: true, canTow: false };
 
 function setup(existing: VehicleSnapshot[] = [tractor, trailer]) {
   const calls: Array<{ tractorId: number; trailerId: number | null }> = [];
@@ -47,6 +48,15 @@ describe("setTrailer", () => {
       await expect(commands.setTrailer("TRC-500", "S88490")).rejects.toThrow(RuleError);
       expect(calls).toEqual([]);
     }
+  });
+
+  it("rejects a tractor whose class cannot pull a trailer, without writing", async () => {
+    const van: VehicleSnapshot = { ...base, id: 3, plate: "WOM-158", canTow: false };
+    const { commands, calls } = setup([van, trailer]);
+    await expect(commands.setTrailer("WOM-158", "S88490")).rejects.toThrow(
+      "WOM-158 no puede llevar remolque: solo camiones y tractocamiones.",
+    );
+    expect(calls).toEqual([]);
   });
 
   it("rejects a vehicle that is not a trailer, a trailer as tractor and unknown plates", async () => {

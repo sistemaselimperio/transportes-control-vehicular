@@ -149,7 +149,7 @@ export function createVehicleCommands(
       if (input.trailerPlate) {
         const trailer = await loadOne(parsePlate(input.trailerPlate));
         assertCanAnchorTrailer({
-          tractor: { plate, isTrailer: cls.isTrailer },
+          tractor: { plate, isTrailer: cls.isTrailer, canTow: cls.canTow },
           trailer,
         });
         trailerId = trailer.id;

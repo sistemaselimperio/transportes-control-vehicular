@@ -8,7 +8,7 @@ import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared
 import type { VehicleFileItem } from "@/modules/documents/application/vehicle-file-ports";
 import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { HISTORY_LIMIT } from "../domain/history-tab";
-import { isTrailerClass } from "../domain/trailer";
+import { canTowTrailer, isTrailerClass } from "../domain/trailer";
 import { buildVehicleRow, formatKm, type VehicleGridRow, type VehicleRowInput } from "../domain/vehicle-row";
 import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
@@ -65,7 +65,8 @@ export interface VehicleActionContext {
 export interface VehicleFormOptions {
   today: IsoDate;
   /** `isTrailer` marks the Remolque class, whose forms show only plate and owner. */
-  classes: Array<{ id: number; name: string; isTrailer: boolean }>;
+  /** `canTow`: the class can pull a trailer, so its forms offer one. */
+  classes: Array<{ id: number; name: string; isTrailer: boolean; canTow: boolean }>;
   /** Trailers that can be anchored (not sold or idle); `towedByPlate` is the tractor each one is anchored to now. */
   trailers: Array<{ plate: string; towedByPlate: string | null }>;
   owners: Array<{ id: number; name: string }>;
@@ -95,7 +96,7 @@ export interface TowingLinks {
 async function loadFormLists(): Promise<Pick<VehicleFormOptions, "classes" | "trailers">> {
   const [lists, trailers] = await Promise.all([loadVehicleFormLists(), loadAnchorableTrailers()]);
   return {
-    classes: lists.classes.map((c) => ({ ...c, isTrailer: isTrailerClass(c.name) })),
+    classes: lists.classes.map((c) => ({ ...c, isTrailer: isTrailerClass(c.name), canTow: canTowTrailer(c.name) })),
     trailers,
   };
 }

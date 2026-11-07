@@ -10,6 +10,7 @@ const tractor: VehicleSnapshot = {
   plate: "TRC-500",
   status: "ACTIVE",
   isTrailer: false,
+  canTow: true,
   odometerWorking: true,
   currentKm: 1000,
   oilMode: "both",
@@ -18,7 +19,7 @@ const tractor: VehicleSnapshot = {
   assignment: null,
 };
 
-const trailer: VehicleSnapshot = { ...tractor, id: 7, plate: "S88490", isTrailer: true };
+const trailer: VehicleSnapshot = { ...tractor, id: 7, plate: "S88490", isTrailer: true, canTow: false };
 
 function setup(existing: VehicleSnapshot[] = [tractor]) {
   const created: NewVehicleRecord[] = [];
@@ -26,9 +27,9 @@ function setup(existing: VehicleSnapshot[] = [tractor]) {
     findByPlates: async (plates: string[]) => existing.filter((v) => plates.includes(v.plate)),
     findClass: async (id: number) =>
       id === 1
-        ? { id: 1, isTrailer: false, oilIntervalMonths: 3, oilIntervalKm: 5000 }
+        ? { id: 1, isTrailer: false, canTow: true, oilIntervalMonths: 3, oilIntervalKm: 5000 }
         : id === 3
-          ? { id: 3, isTrailer: true, oilIntervalMonths: null, oilIntervalKm: null }
+          ? { id: 3, isTrailer: true, canTow: false, oilIntervalMonths: null, oilIntervalKm: null }
           : null,
     createVehicle: async (record: NewVehicleRecord) => {
       created.push(record);

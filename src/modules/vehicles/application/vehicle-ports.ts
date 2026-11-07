@@ -11,6 +11,8 @@ export interface VehicleSnapshot {
   status: VehicleStatus;
   /** Whether its class is "Remolque". */
   isTrailer: boolean;
+  /** Whether its class can pull a trailer (see `canTowTrailer`). */
+  canTow: boolean;
   odometerWorking: boolean;
   currentKm: number | null;
   oilMode: OilMode;
@@ -70,6 +72,7 @@ export interface SaleRecord {
 export interface VehicleClassInfo {
   id: number;
   isTrailer: boolean;
+  canTow: boolean;
   oilIntervalMonths: number | null;
   oilIntervalKm: number | null;
 }

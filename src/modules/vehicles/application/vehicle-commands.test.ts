@@ -11,6 +11,7 @@ function snapshot(overrides: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     plate: "AAA-111",
     status: "ACTIVE",
     isTrailer: false,
+  canTow: true,
     odometerWorking: true,
     currentKm: 100000,
     oilMode: "both",

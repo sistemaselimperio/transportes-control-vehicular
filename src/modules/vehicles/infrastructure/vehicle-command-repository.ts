@@ -5,7 +5,7 @@ import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { supabaseFileStorage } from "@/modules/documents/infrastructure/supabase-file-storage";
 import { listAllStoragePaths } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
-import { isTrailerClass } from "../domain/trailer";
+import { canTowTrailer, isTrailerClass } from "../domain/trailer";
 import type {
   DriverTarget,
   OwnerTarget,
@@ -160,6 +160,7 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
         plate: vehicle.plate,
         status: vehicle.status,
         isTrailer: isTrailerClass(cls.name),
+        canTow: canTowTrailer(cls.name),
         odometerWorking: vehicle.odometerWorking,
         currentKm: vehicle.currentKm,
         oilMode: vehicle.oilMode,
@@ -190,6 +191,7 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
       ? {
           id: cls.id,
           isTrailer: isTrailerClass(cls.name),
+          canTow: canTowTrailer(cls.name),
           oilIntervalMonths: cls.oilIntervalMonths,
           oilIntervalKm: cls.oilIntervalKm,
         }

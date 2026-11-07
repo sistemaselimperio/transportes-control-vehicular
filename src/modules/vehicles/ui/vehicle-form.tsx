@@ -513,6 +513,8 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
   const [open, setOpen] = useState(false);
   const [classId, setClassId] = useState<number | null>(null);
   const isTrailer = options.classes.find((c) => c.id === classId)?.isTrailer ?? false;
+  // Only trucks and tractor units pull a trailer, so only their form offers one.
+  const canTow = options.classes.find((c) => c.id === classId)?.canTow ?? false;
   return (
     <>
       <Button className="h-11 px-4 md:h-10" onClick={() => {
@@ -556,7 +558,7 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
             step={1}
             isTrailer={isTrailer}
             onClassChange={setClassId}
-            withTrailer
+            withTrailer={canTow}
           />
           <OwnerFields options={options} step={2} />
           {!isTrailer && (
