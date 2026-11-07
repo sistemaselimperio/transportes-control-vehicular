@@ -10,6 +10,7 @@ function snapshot(overrides: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     id: 1,
     plate: "AAA-111",
     status: "ACTIVE",
+    isTrailer: false,
     odometerWorking: true,
     currentKm: 100000,
     oilMode: "both",
@@ -34,6 +35,8 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99, oi
     findClass: async () => null,
     createVehicle: async () => 0,
     updateVehicle: async () => {},
+    setTrailer: async (tractorId, trailerId) =>
+      void calls.push({ op: "setTrailer", args: { tractorId, trailerId } }),
     addDocument: async (id, doc) => void calls.push({ op: "addDocument", args: { id, doc } }),
     addTax: async (id, tax) => void calls.push({ op: "addTax", args: { id, tax } }),
     addOilChange: async (id, oil, km, items) =>

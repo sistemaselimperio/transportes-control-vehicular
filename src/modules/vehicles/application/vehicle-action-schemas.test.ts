@@ -5,11 +5,18 @@ import {
   renewDocumentSchema,
   sellSchema,
   technicalDataSchema,
+  trailerSchema,
   transferOwnerSchema,
   updateKmSchema,
 } from "./vehicle-action-schemas";
 
 describe("form schemas", () => {
+  it("reads the chosen trailer, blank meaning none", () => {
+    expect(trailerSchema.parse({ trailer: " S88490 " })).toEqual({ trailer: "S88490" });
+    expect(trailerSchema.parse({ trailer: "" })).toEqual({ trailer: null });
+    expect(trailerSchema.parse({})).toEqual({ trailer: null });
+  });
+
   it("parses km with thousands separators and blank optional fields", () => {
     expect(
       oilChangeSchema.parse({ date: "2026-10-01", km: "359.174", intervalMonths: "", notes: "  " }),

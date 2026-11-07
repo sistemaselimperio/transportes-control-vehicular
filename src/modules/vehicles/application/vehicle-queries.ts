@@ -8,9 +8,12 @@ import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared
 import type { VehicleFileItem } from "@/modules/documents/application/vehicle-file-ports";
 import { vehicleFileRepository } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { HISTORY_LIMIT } from "../domain/history-tab";
+import { isTrailerClass } from "../domain/trailer";
 import { buildVehicleRow, formatKm, type VehicleGridRow, type VehicleRowInput } from "../domain/vehicle-row";
 import { loadPeople } from "../infrastructure/vehicle-command-repository";
 import {
+  loadAnchorableTrailers,
+  loadTowingLinks,
   loadVehicleEditValues,
   loadVehicleFormLists,
   loadFleetPlates,
@@ -61,9 +64,10 @@ export interface VehicleActionContext {
 /** Pickers for the create / edit vehicle forms. */
 export interface VehicleFormOptions {
   today: IsoDate;
-  classes: Array<{ id: number; name: string }>;
-  /** Plates that can tow (not sold). */
-  plates: string[];
+  /** `isTrailer` marks the Remolque class, whose forms show only plate and owner. */
+  classes: Array<{ id: number; name: string; isTrailer: boolean }>;
+  /** Trailers that can be anchored (not sold or idle); `towedByPlate` is the tractor each one is anchored to now. */
+  trailers: Array<{ plate: string; towedByPlate: string | null }>;
   owners: Array<{ id: number; name: string }>;
   drivers: Array<{ id: number; name: string; nationalId: string | null }>;
   imperioOwnerId: number | null;
@@ -78,7 +82,22 @@ export interface VehicleEditValues {
   municipality: string | null;
   serviceType: "PARTICULAR" | "PUBLICO";
   oilMode: OilMode;
-  towingPlate: string | null;
+}
+
+/** The anchoring between a tractor and its trailer, as seen from one vehicle. */
+export interface TowingLinks {
+  /** The trailer anchored to this vehicle. */
+  trailerPlate: string | null;
+  /** The tractor this vehicle (a trailer) is anchored to. */
+  towedByPlate: string | null;
+}
+
+async function loadFormLists(): Promise<Pick<VehicleFormOptions, "classes" | "trailers">> {
+  const [lists, trailers] = await Promise.all([loadVehicleFormLists(), loadAnchorableTrailers()]);
+  return {
+    classes: lists.classes.map((c) => ({ ...c, isTrailer: isTrailerClass(c.name) })),
+    trailers,
+  };
 }
 
 export async function getVehicleFormOptions(today: IsoDate): Promise<VehicleFormOptions> {
@@ -86,7 +105,7 @@ export async function getVehicleFormOptions(today: IsoDate): Promise<VehicleForm
   cacheLife("minutes");
   cacheTag(...readTags("vehicleFormOptions"));
 
-  const [lists, people] = await Promise.all([loadVehicleFormLists(), loadPeople()]);
+  const [lists, people] = await Promise.all([loadFormLists(), loadPeople()]);
   return { today, ...lists, ...people };
 }
 
@@ -94,6 +113,7 @@ export interface VehicleDetail {
   row: VehicleGridRow;
   actions: VehicleActionContext;
   edit: { values: VehicleEditValues; options: VehicleFormOptions };
+  towing: TowingLinks;
   ownerships: HistoryItem[];
   drivers: HistoryItem[];
   logbook: VehicleLogbook;
@@ -140,14 +160,15 @@ export async function getVehicleDetail(plate: string, today: IsoDate): Promise<V
 
   const [input] = await loadVehicleRowInputs(today, plate);
   if (!input) return null;
-  const [history, people, editValues, lists, files, logbook, lastOilItems] = await Promise.all([
+  const [history, people, editValues, lists, files, logbook, lastOilItems, towing] = await Promise.all([
     loadVehicleHistory(input.vehicle.id),
     loadPeople(),
     loadVehicleEditValues(plate),
-    loadVehicleFormLists(),
+    loadFormLists(),
     vehicleFileRepository.listByVehicle(input.vehicle.id),
     loadVehicleLogbook(input.vehicle.id, HISTORY_LIMIT),
     loadLastOilItems(input.vehicle.id),
+    loadTowingLinks(input.vehicle.id),
   ]);
 
   const ownerships = history.ownerships.map((o) => ({
@@ -180,6 +201,7 @@ export async function getVehicleDetail(plate: string, today: IsoDate): Promise<V
       values: editValues!,
       options: { today: input.today, ...lists, ...people },
     },
+    towing,
     ownerships,
     drivers,
     logbook,

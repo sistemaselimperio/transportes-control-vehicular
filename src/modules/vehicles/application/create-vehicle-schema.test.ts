@@ -20,7 +20,7 @@ describe("createVehicleSchema", () => {
       oilMode: "both",
       odometerWorking: true,
       currentKm: null,
-      towingPlate: null,
+      trailerPlate: null,
       owner: null,
       driver: null,
       documents: [],

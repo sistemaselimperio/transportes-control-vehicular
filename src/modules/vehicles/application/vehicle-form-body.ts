@@ -66,7 +66,7 @@ export function createBodyFromForm(v: FormValues) {
     oilMode: v.oilMode || undefined,
     odometerWorking: !checked(v.odometerBroken),
     currentKm: int(v.currentKm),
-    towingPlate: str(v.towingPlate),
+    trailerPlate: str(v.trailerPlate),
     owner: owner(v),
     driver: driver(v),
     documents: documents(v),
@@ -75,8 +75,9 @@ export function createBodyFromForm(v: FormValues) {
   };
 }
 
+/** Editable fields the form did not render (a trailer's form has only plate and class) are left out, so they stay as they are. */
 export function editBodyFromForm(v: FormValues) {
-  return {
+  const body = {
     plate: v.plate ?? "",
     classId: int(v.classId),
     brandLine: str(v.brandLine),
@@ -84,6 +85,9 @@ export function editBodyFromForm(v: FormValues) {
     municipality: str(v.municipality),
     serviceType: v.serviceType || undefined,
     oilMode: v.oilMode || undefined,
-    towingPlate: str(v.towingPlate),
   };
+  const rendered = (key: string) => key in v;
+  return Object.fromEntries(
+    Object.entries(body).filter(([key]) => ["plate", "classId"].includes(key) || rendered(key)),
+  ) as typeof body;
 }

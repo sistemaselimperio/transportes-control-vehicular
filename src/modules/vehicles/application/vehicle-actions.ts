@@ -23,6 +23,7 @@ import {
   sellSchema,
   statusSchema,
   technicalDataSchema,
+  trailerSchema,
   transferOwnerSchema,
   updateKmSchema,
   updateTaxSchema,
@@ -158,6 +159,14 @@ export async function changeStatusAction(plate: string, fd: FormData): Promise<A
   return run(async () => {
     const v = parse(statusSchema, formValues(fd));
     return commands.changeStatus(parse(plateSchema, plate), v.status);
+  });
+}
+
+/** Anchors the chosen trailer to this tractor, or clears it when none is chosen. */
+export async function setTrailerAction(plate: string, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const v = parse(trailerSchema, formValues(fd));
+    return commands.setTrailer(parse(plateSchema, plate), v.trailer);
   });
 }
 

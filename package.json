@@ -13,6 +13,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
     "db:import": "tsx src/db/import-excel.ts",
+    "db:load-trailers": "tsx src/db/load-trailers.ts",
     "db:studio": "drizzle-kit studio",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "storage:bucket": "tsx src/db/create-storage-bucket.ts"

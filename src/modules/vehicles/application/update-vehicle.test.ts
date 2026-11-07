@@ -5,6 +5,7 @@ import { RuleError } from "../domain/vehicle-rules";
 
 const base: Omit<VehicleSnapshot, "id" | "plate"> = {
   status: "ACTIVE",
+  isTrailer: false,
   odometerWorking: true,
   currentKm: 1000,
   oilMode: "both",
@@ -20,7 +21,7 @@ function setup(existing: VehicleSnapshot[] = [truck, tractor]) {
   const repo = {
     findByPlates: async (plates: string[]) => existing.filter((v) => plates.includes(v.plate)),
     findClass: async (id: number) =>
-      id === 2 ? { id: 2, oilIntervalMonths: null, oilIntervalKm: null } : null,
+      id === 2 ? { id: 2, isTrailer: false, oilIntervalMonths: null, oilIntervalKm: null } : null,
     updateVehicle: async (id: number, fields: VehicleUpdate) => void updates.push({ id, fields }),
   } as unknown as VehicleCommandRepository;
   return { commands: createVehicleCommands(repo, () => "2026-10-17"), updates };
@@ -58,15 +59,5 @@ describe("updateVehicle", () => {
       setup([{ ...truck, status: "SOLD" }]).commands.updateVehicle("ABC-123", { notes: "x" }),
     ).rejects.toThrow(RuleError);
     await expect(setup().commands.updateVehicle("ZZZ-999", { notes: "x" })).rejects.toThrow(RuleError);
-  });
-
-  it("links and unlinks the towing vehicle, never to itself", async () => {
-    const { commands, updates } = setup();
-    await commands.updateVehicle("ABC-123", { towingPlate: "trc500" });
-    await commands.updateVehicle("ABC-123", { towingPlate: null });
-    expect(updates.map((u) => u.fields)).toEqual([{ towingVehicleId: 5 }, { towingVehicleId: null }]);
-    await expect(commands.updateVehicle("ABC-123", { towingPlate: "ABC-123" })).rejects.toThrow(
-      RuleError,
-    );
   });
 });

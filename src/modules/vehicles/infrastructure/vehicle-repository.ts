@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { FileCategory } from "@/modules/documents/domain/vehicle-file-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import { canAnchorTrailerStatus, isTrailerClass } from "../domain/trailer";
 import type { DocumentData, VehicleRowInput } from "../domain/vehicle-row";
 
 type DocType = "SOAT" | "TECNO" | "POLICY";
@@ -198,7 +199,7 @@ export async function loadLastOilItems(vehicleId: number): Promise<OilItem[]> {
   return items;
 }
 
-/** Vehicle classes and the plates that can tow, for the create / edit forms. */
+/** Vehicle classes and the plates still in the fleet, for the create / edit forms. */
 export async function loadVehicleFormLists() {
   const [classes, plates] = await Promise.all([
     db
@@ -224,9 +225,48 @@ export async function loadFleetPlates(): Promise<string[]> {
   return rows.map((r) => r.plate);
 }
 
+/**
+ * Trailers that can be anchored (class Remolque, not sold or idle), with the tractor each one is
+ * anchored to now, if any: choosing one that is anchored elsewhere moves it.
+ */
+export async function loadAnchorableTrailers(): Promise<Array<{ plate: string; towedByPlate: string | null }>> {
+  const tractor = alias(schema.vehicles, "tractor");
+  const rows = await db
+    .select({
+      plate: schema.vehicles.plate,
+      status: schema.vehicles.status,
+      className: schema.vehicleClasses.name,
+      towedByPlate: tractor.plate,
+    })
+    .from(schema.vehicles)
+    .innerJoin(schema.vehicleClasses, eq(schema.vehicles.classId, schema.vehicleClasses.id))
+    .leftJoin(tractor, eq(schema.vehicles.towingVehicleId, tractor.id))
+    .orderBy(asc(schema.vehicles.plate));
+  return rows
+    .filter((r) => isTrailerClass(r.className) && canAnchorTrailerStatus(r.status))
+    .map(({ plate, towedByPlate }) => ({ plate, towedByPlate }));
+}
+
+/** The trailer anchored to a tractor and the tractor a trailer is anchored to (both null when unlinked). */
+export async function loadTowingLinks(vehicleId: number) {
+  const tractor = alias(schema.vehicles, "tractor");
+  const [[trailer], [own]] = await Promise.all([
+    db
+      .select({ plate: schema.vehicles.plate })
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.towingVehicleId, vehicleId))
+      .limit(1),
+    db
+      .select({ towedByPlate: tractor.plate })
+      .from(schema.vehicles)
+      .leftJoin(tractor, eq(schema.vehicles.towingVehicleId, tractor.id))
+      .where(eq(schema.vehicles.id, vehicleId)),
+  ]);
+  return { trailerPlate: trailer?.plate ?? null, towedByPlate: own?.towedByPlate ?? null };
+}
+
 /** Current editable data of one vehicle (prefills the edit form). */
 export async function loadVehicleEditValues(plate: string) {
-  const towing = alias(schema.vehicles, "towing");
   const [row] = await db
     .select({
       plate: schema.vehicles.plate,
@@ -236,10 +276,8 @@ export async function loadVehicleEditValues(plate: string) {
       municipality: schema.vehicles.municipality,
       serviceType: schema.vehicles.serviceType,
       oilMode: schema.vehicles.oilMode,
-      towingPlate: towing.plate,
     })
     .from(schema.vehicles)
-    .leftJoin(towing, eq(schema.vehicles.towingVehicleId, towing.id))
     .where(eq(schema.vehicles.plate, plate));
   return row ?? null;
 }

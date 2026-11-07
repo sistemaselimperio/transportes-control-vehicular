@@ -10,6 +10,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import { isTrailerClass } from "../domain/trailer";
 import type { VehicleInspectionRow } from "@/modules/inspections/infrastructure/inspection-repository";
 import type { VehicleDetail } from "../application/vehicle-queries";
 import type { HistoryTab } from "../domain/history-tab";
@@ -23,6 +24,7 @@ import {
   ActionButtons,
   EditDataButton,
   FileActions,
+  InlineAction,
   SellButton,
   SoldNotice,
   StatusSwitch,
@@ -122,7 +124,43 @@ function Figure({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function FileHeader({ r }: { r: VehicleGridRow }) {
+/** Header of a trailer: only its plate, its owner and the tractor it is anchored to. */
+function TrailerHeader({ r, towedByPlate }: { r: VehicleGridRow; towedByPlate: string | null }) {
+  return (
+    <header className="space-y-2 border-b pb-4">
+      <Link
+        href="/flota"
+        className="group/back inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground md:min-h-8"
+      >
+        <ArrowLeft
+          className="size-4 transition-transform duration-150 group-hover/back:-translate-x-0.5"
+          aria-hidden
+        />
+        Flota
+      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <h1 className="plate plate-lg">{r.plate}</h1>
+        <div className="min-w-0 flex-1 basis-56">
+          {r.className && <p className="micro-label">{r.className}</p>}
+          <p className="mt-0.5 truncate text-lg leading-tight font-semibold tracking-tight">
+            {r.ownerName ?? <span className="font-normal text-muted-foreground">Sin propietario</span>}
+          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {towedByPlate ? `Anclado a ${towedByPlate}` : "Sin anclar a un vehículo"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full [&_button:not(:disabled)]:cursor-pointer">
+          <StatusSwitch />
+          <EditDataButton />
+          <ActionButtons keys={["owner"]} />
+          <SellButton />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function FileHeader({ r, trailerPlate }: { r: VehicleGridRow; trailerPlate: string | null }) {
   return (
     <header className="space-y-2 border-b pb-4">
       <Link
@@ -145,6 +183,10 @@ function FileHeader({ r }: { r: VehicleGridRow }) {
             </p>
             <PeoplePopover driverName={r.driverName} driverPhone={r.driverPhone} ownerName={r.ownerName} />
           </div>
+          <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+            Remolque: <span className={trailerPlate ? "font-medium text-foreground" : ""}>{trailerPlate ?? "ninguno"}</span>
+            <InlineAction action="trailer">{trailerPlate ? "Cambiar" : "Anclar"}</InlineAction>
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full [&_button:not(:disabled)]:cursor-pointer">
           <StatusSwitch />
@@ -185,6 +227,28 @@ export function VehicleDetailView({
 }) {
   const r = detail.row;
   const sold = r.vehicleStatus === "SOLD";
+  const isTrailer = isTrailerClass(r.className ?? "");
+
+  if (isTrailer) {
+    return (
+      <FileActions
+        plate={r.plate}
+        status={r.vehicleStatus}
+        ctx={detail.actions}
+        edit={detail.edit}
+        towing={detail.towing}
+        technical={r.technical}
+        current={{ owner: r.ownerName, driver: null }}
+        readOnly={readOnly}
+        allowed={allowed}
+      >
+        <div className="space-y-6">
+          <TrailerHeader r={r} towedByPlate={detail.towing.towedByPlate} />
+          {sold && <SoldNotice />}
+        </div>
+      </FileActions>
+    );
+  }
 
   return (
     <FileActions
@@ -192,6 +256,7 @@ export function VehicleDetailView({
       status={r.vehicleStatus}
       ctx={detail.actions}
       edit={detail.edit}
+      towing={detail.towing}
       technical={r.technical}
       current={{ owner: r.ownerName, driver: r.driverName }}
       readOnly={readOnly}
@@ -200,7 +265,7 @@ export function VehicleDetailView({
       <TabParamScroll />
       <div className="space-y-10">
         <div className="space-y-6">
-          <FileHeader r={r} />
+          <FileHeader r={r} trailerPlate={detail.towing.trailerPlate} />
           {sold && <SoldNotice />}
         </div>
 

@@ -82,7 +82,7 @@ export const createVehicleSchema = z.object({
   oilMode: z.enum(["date", "km", "both"]).default("both"),
   odometerWorking: z.boolean().default(true),
   currentKm: count(999_999_999),
-  towingPlate: text,
+  trailerPlate: text,
   owner: ownerSchema.nullish().transform((v) => v ?? null),
   driver: driverSchema.nullish().transform((v) => v ?? null),
   documents: z.array(documentSchema).max(10).default([]),

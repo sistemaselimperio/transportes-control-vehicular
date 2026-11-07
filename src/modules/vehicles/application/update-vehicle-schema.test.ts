@@ -3,10 +3,9 @@ import { updateVehicleSchema } from "./update-vehicle-schema";
 
 describe("updateVehicleSchema", () => {
   it("keeps absent keys out and turns blank text into null", () => {
-    expect(updateVehicleSchema.parse({ brandLine: "  Hino ", notes: "  ", towingPlate: null })).toEqual({
+    expect(updateVehicleSchema.parse({ brandLine: "  Hino ", notes: "  " })).toEqual({
       brandLine: "Hino",
       notes: null,
-      towingPlate: null,
     });
   });
 
@@ -18,7 +17,6 @@ describe("updateVehicleSchema", () => {
         municipality: "Tunja (Boyacá)",
         serviceType: "PUBLICO",
         oilMode: "date",
-        towingPlate: "TRC500",
       }),
     ).toEqual({
       plate: "XYZ987",
@@ -26,7 +24,6 @@ describe("updateVehicleSchema", () => {
       municipality: "Tunja (Boyacá)",
       serviceType: "PUBLICO",
       oilMode: "date",
-      towingPlate: "TRC500",
     });
   });
 
@@ -38,6 +35,8 @@ describe("updateVehicleSchema", () => {
     expect(updateVehicleSchema.safeParse({}).success).toBe(false);
     expect(updateVehicleSchema.safeParse({ status: "SOLD" }).success).toBe(false);
     expect(updateVehicleSchema.safeParse({ classId: "2" }).success).toBe(false);
+    // The trailer link is changed from the tractor, never through the vehicle edit.
+    expect(updateVehicleSchema.safeParse({ towingPlate: "TRC500" }).success).toBe(false);
     expect(updateVehicleSchema.safeParse({ plate: "  " }).success).toBe(false);
     expect(updateVehicleSchema.safeParse({ municipality: "Tunja" }).success).toBe(false);
   });

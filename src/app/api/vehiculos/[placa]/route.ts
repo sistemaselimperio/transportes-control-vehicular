@@ -8,7 +8,7 @@ import {
   vehicleCommands,
 } from "../_lib/responses";
 
-/** Edits the vehicle's own data (plate, class, brand, notes, municipality, service, oil mode, towing). */
+/** Edits the vehicle's own data (plate, class, brand, notes, municipality, service, oil mode). */
 export async function PATCH(request: Request, { params }: { params: Promise<{ placa: string }> }) {
   const rejection = await rejectUnlessFleetManager(request);
   if (rejection) return rejection;

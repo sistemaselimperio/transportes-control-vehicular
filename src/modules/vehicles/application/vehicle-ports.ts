@@ -9,6 +9,8 @@ export interface VehicleSnapshot {
   id: number;
   plate: string;
   status: VehicleStatus;
+  /** Whether its class is "Remolque". */
+  isTrailer: boolean;
   odometerWorking: boolean;
   currentKm: number | null;
   oilMode: OilMode;
@@ -67,6 +69,7 @@ export interface SaleRecord {
 /** Class defaults a new vehicle needs (oil interval for its first change). */
 export interface VehicleClassInfo {
   id: number;
+  isTrailer: boolean;
   oilIntervalMonths: number | null;
   oilIntervalKm: number | null;
 }
@@ -85,8 +88,9 @@ export interface NewVehicleRecord {
     odometerWorking: boolean;
     currentKm: number | null;
     currentKmAt: IsoDate | null;
-    towingVehicleId: number | null;
   };
+  /** Trailer to anchor to the new vehicle (it moves here if it was anchored elsewhere). */
+  trailerId: number | null;
   owner: { target: OwnerTarget; fromDate: IsoDate } | null;
   driver: { target: DriverTarget; fromDate: IsoDate } | null;
   documents: DocumentRecord[];
@@ -105,7 +109,6 @@ export type VehicleUpdate = Partial<
     | "municipality"
     | "serviceType"
     | "oilMode"
-    | "towingVehicleId"
   >
 > &
   Partial<VehicleTechnicalData>;
@@ -124,6 +127,11 @@ export interface VehicleCommandRepository {
   /** Inserts the vehicle with its owner, driver, documents, tax and oil change; returns its id. */
   createVehicle(record: NewVehicleRecord): Promise<number>;
   updateVehicle(vehicleId: number, fields: VehicleUpdate): Promise<void>;
+  /**
+   * Anchors `trailerId` to the tractor, or leaves it without trailer when null. Atomic: detaches the
+   * tractor's previous trailer and moves the chosen one away from any other tractor.
+   */
+  setTrailer(tractorId: number, trailerId: number | null): Promise<void>;
 
   addDocument(vehicleId: number, doc: DocumentRecord): Promise<void>;
   addTax(vehicleId: number, tax: TaxRecord): Promise<void>;

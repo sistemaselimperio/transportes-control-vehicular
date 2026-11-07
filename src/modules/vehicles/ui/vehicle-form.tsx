@@ -17,6 +17,7 @@ import { technicalDataSchema } from "../application/vehicle-action-schemas";
 import { assertModelYear, EMPTY_TECHNICAL_DATA, type VehicleTechnicalData } from "../domain/technical-data";
 import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { TechnicalFields } from "./vehicle-action-forms";
+import { TrailerSelect } from "./trailer-select";
 
 const FIELD = "h-10 md:h-9";
 /** Selects match the input height so paired controls line up. */
@@ -141,22 +142,34 @@ function CheckboxField({
   );
 }
 
-/** Plate, class, brand, municipality, service, oil mode, towing and notes: shared by create and edit. */
+/**
+ * Plate, class, brand, municipality, service, oil mode, trailer and notes: shared by create and edit.
+ * A trailer (class Remolque) only has plate and class here: `isTrailer` hides the rest, and
+ * `lockClass` (editing an existing trailer) keeps its class in a hidden field instead of a picker.
+ */
 function VehicleDataFields({
   options,
   values,
   idPrefix,
   step,
+  isTrailer,
+  lockClass = false,
+  onClassChange,
+  withTrailer = false,
 }: {
   options: VehicleFormOptions;
   values?: VehicleEditValues;
   idPrefix: string;
   step?: number;
+  isTrailer: boolean;
+  lockClass?: boolean;
+  onClassChange: (classId: number | null) => void;
+  /** Offer the trailer picker (create form; the vehicle file anchors it from its own action). */
+  withTrailer?: boolean;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
-  const towingCandidates = options.plates.filter((p) => p !== values?.plate);
   return (
-    <Section title="Vehículo" step={step}>
+    <Section title={isTrailer ? "Remolque" : "Vehículo"} step={step}>
       <Group label="Identificación">
         <Row>
           <Field label="Placa" htmlFor={id("plate")} required>
@@ -165,78 +178,82 @@ function VehicleDataFields({
               name="plate"
               className={`${FIELD} num uppercase`}
               defaultValue={values?.plate}
-              placeholder="ABC123"
+              placeholder={isTrailer ? "S88490" : "ABC123"}
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
               required
             />
           </Field>
-          <Field label="Clase" htmlFor={id("class")} required>
-            <NativeSelect id={id("class")} name="classId" className={SELECT} defaultValue={values?.classId ?? ""} required>
-              <option value="" disabled>
-                Selecciona…
-              </option>
-              {options.classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+          {lockClass ? (
+            <input type="hidden" name="classId" value={values?.classId} />
+          ) : (
+            <Field label="Clase" htmlFor={id("class")} required>
+              <NativeSelect
+                id={id("class")}
+                name="classId"
+                className={SELECT}
+                defaultValue={values?.classId ?? ""}
+                onChange={(e) => onClassChange(e.target.value === "" ? null : Number(e.target.value))}
+                required
+              >
+                <option value="" disabled>
+                  Selecciona…
+                </option>
+                {options.classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+        </Row>
+        {!isTrailer && (
+          <Field label="Marca y línea" htmlFor={id("brand")}>
+            <Input
+              id={id("brand")}
+              name="brandLine"
+              className={FIELD}
+              placeholder="Ej. Kenworth T800"
+              defaultValue={values?.brandLine ?? ""}
+            />
+          </Field>
+        )}
+      </Group>
+
+      {!isTrailer && (
+        <>
+          <Group label="Matrícula">
+            <Row>
+              <MunicipalityPicker idPrefix={id("place")} defaultValue={values?.municipality} selectClassName={SELECT} />
+            </Row>
+            <Row>
+              <Field label="Servicio" htmlFor={id("service")}>
+                <NativeSelect id={id("service")} name="serviceType" className={SELECT} defaultValue={values?.serviceType ?? "PARTICULAR"}>
+                  <option value="PARTICULAR">Particular</option>
+                  <option value="PUBLICO">Público</option>
+                </NativeSelect>
+              </Field>
+            </Row>
+          </Group>
+
+          {withTrailer && <TrailerSelect id={id("trailer")} trailers={options.trailers} />}
+
+          <Field label="Controlar el aceite por" htmlFor={id("oilmode")} hint="Define cuándo se avisa el próximo cambio.">
+            <NativeSelect id={id("oilmode")} name="oilMode" className={SELECT} defaultValue={values?.oilMode ?? "both"}>
+              {Object.entries(OIL_MODE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </NativeSelect>
           </Field>
-        </Row>
-        <Field label="Marca y línea" htmlFor={id("brand")}>
-          <Input
-            id={id("brand")}
-            name="brandLine"
-            className={FIELD}
-            placeholder="Ej. Kenworth T800"
-            defaultValue={values?.brandLine ?? ""}
-          />
-        </Field>
-      </Group>
-
-      <Group label="Matrícula">
-        <Row>
-          <MunicipalityPicker idPrefix={id("place")} defaultValue={values?.municipality} selectClassName={SELECT} />
-        </Row>
-        <Row>
-          <Field label="Servicio" htmlFor={id("service")}>
-            <NativeSelect id={id("service")} name="serviceType" className={SELECT} defaultValue={values?.serviceType ?? "PARTICULAR"}>
-              <option value="PARTICULAR">Particular</option>
-              <option value="PUBLICO">Público</option>
-            </NativeSelect>
+          <Field label="Notas" htmlFor={id("notes")}>
+            <Textarea id={id("notes")} name="notes" rows={2} defaultValue={values?.notes ?? ""} />
           </Field>
-          <Field label="Remolcado por" htmlFor={id("towing")}>
-            <NativeSelect
-              id={id("towing")}
-              name="towingPlate"
-              className={SELECT}
-              defaultValue={values?.towingPlate ?? ""}
-            >
-              <option value="">No es remolque</option>
-              {towingCandidates.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-        </Row>
-      </Group>
-
-      <Field label="Controlar el aceite por" htmlFor={id("oilmode")} hint="Define cuándo se avisa el próximo cambio.">
-        <NativeSelect id={id("oilmode")} name="oilMode" className={SELECT} defaultValue={values?.oilMode ?? "both"}>
-          {Object.entries(OIL_MODE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
-      <Field label="Notas" htmlFor={id("notes")}>
-        <Textarea id={id("notes")} name="notes" rows={2} defaultValue={values?.notes ?? ""} />
-      </Field>
+        </>
+      )}
     </Section>
   );
 }
@@ -494,9 +511,14 @@ function technicalDataError(fd: FormData, today: VehicleFormOptions["today"]): s
 export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [classId, setClassId] = useState<number | null>(null);
+  const isTrailer = options.classes.find((c) => c.id === classId)?.isTrailer ?? false;
   return (
     <>
-      <Button className="h-11 px-4 md:h-10" onClick={() => setOpen(true)}>
+      <Button className="h-11 px-4 md:h-10" onClick={() => {
+          setClassId(null);
+          setOpen(true);
+        }}>
         <Plus aria-hidden />
         Nuevo vehículo
       </Button>
@@ -504,17 +526,17 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
         open={open}
         onOpenChange={setOpen}
         title="Nuevo vehículo"
-        description="Solo placa y clase son obligatorias."
+        description={isTrailer ? "Solo placa y propietario." : "Solo placa y clase son obligatorias."}
         wide
       >
         <ActionForm
           action={async (fd) => {
             // Check the technical sheet before creating, so a bad value never leaves a half-saved vehicle.
-            const techError = technicalDataError(fd, options.today);
+            const techError = isTrailer ? null : technicalDataError(fd, options.today);
             if (techError) return { ok: false, error: techError };
             const result = await sendVehicle("/api/vehiculos", "POST", createBodyFromForm(formValues(fd)));
             if (!result.ok) return result;
-            if (result.plate) {
+            if (result.plate && !isTrailer) {
               const tech = await updateTechnicalDataAction(result.plate, fd);
               if (!tech.ok) {
                 return { ok: false, error: `El vehículo se creó, pero no se guardaron los datos técnicos: ${tech.error}` };
@@ -528,19 +550,30 @@ export function NewVehicleButton({ options }: { options: VehicleFormOptions }) {
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         >
-          <VehicleDataFields options={options} idPrefix="nv" step={1} />
+          <VehicleDataFields
+            options={options}
+            idPrefix="nv"
+            step={1}
+            isTrailer={isTrailer}
+            onClassChange={setClassId}
+            withTrailer
+          />
           <OwnerFields options={options} step={2} />
-          <DriverFields options={options} step={3} />
-          <DocumentFields options={options} step={4} />
-          <MaintenanceFields options={options} step={5} />
-          <Section
-            title="Datos técnicos"
-            step={6}
-            optional
-            hint="Motor, chasis, cilindraje, capacidad y demás características."
-          >
-            <TechnicalFields values={EMPTY_TECHNICAL_DATA} />
-          </Section>
+          {!isTrailer && (
+            <>
+              <DriverFields options={options} step={3} />
+              <DocumentFields options={options} step={4} />
+              <MaintenanceFields options={options} step={5} />
+              <Section
+                title="Datos técnicos"
+                step={6}
+                optional
+                hint="Motor, chasis, cilindraje, capacidad y demás características."
+              >
+                <TechnicalFields values={EMPTY_TECHNICAL_DATA} />
+              </Section>
+            </>
+          )}
         </ActionForm>
       </SlideOver>
     </>
@@ -565,11 +598,17 @@ export function EditVehicleForm({
   onCancel: () => void;
 }) {
   const router = useRouter();
+  // An existing trailer keeps its class; any other vehicle can still be switched to Remolque here.
+  const lockClass = options.classes.find((c) => c.id === values.classId)?.isTrailer ?? false;
+  const [classId, setClassId] = useState<number | null>(values.classId);
+  const isTrailer = lockClass || (options.classes.find((c) => c.id === classId)?.isTrailer ?? false);
   return (
     <ActionForm
       action={async (fd) => {
-        const tech = await updateTechnicalDataAction(values.plate, fd);
-        if (!tech.ok) return tech;
+        if (!isTrailer) {
+          const tech = await updateTechnicalDataAction(values.plate, fd);
+          if (!tech.ok) return tech;
+        }
         const result = await sendVehicle(
           `/api/vehiculos/${encodeURIComponent(values.plate)}`,
           "PATCH",
@@ -590,10 +629,19 @@ export function EditVehicleForm({
       onDone={onDone}
       onCancel={onCancel}
     >
-      <VehicleDataFields options={options} values={values} idPrefix="ev" />
-      <Section title="Datos técnicos" hint="Motor, chasis, cilindraje, capacidad y demás características.">
-        <TechnicalFields values={technical} />
-      </Section>
+      <VehicleDataFields
+        options={options}
+        values={values}
+        idPrefix="ev"
+        isTrailer={isTrailer}
+        lockClass={lockClass}
+        onClassChange={setClassId}
+      />
+      {!isTrailer && (
+        <Section title="Datos técnicos" hint="Motor, chasis, cilindraje, capacidad y demás características.">
+          <TechnicalFields values={technical} />
+        </Section>
+      )}
     </ActionForm>
   );
 }

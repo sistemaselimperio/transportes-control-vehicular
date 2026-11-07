@@ -19,8 +19,6 @@ export const updateVehicleSchema = z
     municipality: text.refine((v) => v == null || isMunicipalityLabel(v), "Elige un municipio de la lista."),
     serviceType: z.enum(["PARTICULAR", "PUBLICO"]).optional(),
     oilMode: z.enum(["date", "km", "both"]).optional(),
-    /** Null unlinks the towing vehicle. */
-    towingPlate: text,
   })
   .transform((v) => Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined)) as VehicleEdit)
   .refine((v) => Object.keys(v).length > 0, "Envía al menos un campo para editar.");

@@ -144,6 +144,9 @@ export const sellSchema = z.object({
   notes: textField,
 });
 
+/** Plate of the trailer to anchor; blank clears the tractor's trailer. */
+export const trailerSchema = z.object({ trailer: textField });
+
 export const plateSchema = z.string().min(1).max(20);
 
 export const oilChangeIdSchema = z.number().int().positive();

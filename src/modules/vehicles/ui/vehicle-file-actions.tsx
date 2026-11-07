@@ -8,6 +8,7 @@ import {
   Droplets,
   Gauge,
   HandCoins,
+  Link2,
   Pencil,
   Receipt,
   UserRound,
@@ -37,6 +38,7 @@ import {
   UpdateTaxForm,
 } from "./vehicle-action-forms";
 import { EditVehicleForm } from "./vehicle-form";
+import { AnchorTrailerForm } from "./trailer-select";
 import { AssignDriverForm, SellForm, TransferOwnerForm } from "./vehicle-people-forms";
 
 export type ActionKey =
@@ -48,6 +50,7 @@ export type ActionKey =
   | "km"
   | "driver"
   | "owner"
+  | "trailer"
   | "sell";
 
 const ACTIONS: Record<
@@ -62,6 +65,7 @@ const ACTIONS: Record<
   km: { label: "Kilometraje", title: "Actualizar kilometraje", icon: Gauge },
   driver: { label: "Asignar conductor", title: "Asignar conductor", icon: UserRound },
   owner: { label: "Traspasar", title: "Traspasar propietario", icon: ArrowRightLeft },
+  trailer: { label: "Remolque", title: "Anclar remolque", icon: Link2 },
   sell: { label: "Vender", title: "Vender vehículo", icon: HandCoins },
 };
 
@@ -96,6 +100,7 @@ export function FileActions({
   status,
   ctx,
   edit,
+  towing,
   technical,
   current,
   readOnly = false,
@@ -106,6 +111,8 @@ export function FileActions({
   status: VehicleStatus;
   ctx: VehicleActionContext;
   edit: VehicleDetail["edit"];
+  /** The trailer anchored to this vehicle, prefilling the trailer form. */
+  towing: VehicleDetail["towing"];
   /** Current "Datos generales" prefilling the technical data form. */
   technical: VehicleTechnicalData;
   /** Who the sale would close, shown in the sell form. */
@@ -194,6 +201,15 @@ export function FileActions({
         {active === "km" && <UpdateKmForm {...common} />}
         {active === "driver" && <AssignDriverForm {...common} current={current} />}
         {active === "owner" && <TransferOwnerForm {...common} />}
+        {active === "trailer" && (
+          <AnchorTrailerForm
+            plate={plate}
+            trailers={edit.options.trailers}
+            current={towing.trailerPlate}
+            onCancel={close}
+            onDone={common.onDone}
+          />
+        )}
         {active === "sell" && <SellForm {...common} current={current} />}
       </SlideOver>
     </Ctx.Provider>

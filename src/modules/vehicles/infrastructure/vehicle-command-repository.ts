@@ -1,10 +1,11 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { driverKey, stripAccents } from "@/modules/import-export/domain/cell-parsers";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { supabaseFileStorage } from "@/modules/documents/infrastructure/supabase-file-storage";
 import { listAllStoragePaths } from "@/modules/documents/infrastructure/vehicle-file-repository";
 import { KNOWN_OWNERS } from "@/modules/owners/domain/known-owners";
+import { isTrailerClass } from "../domain/trailer";
 import type {
   DriverTarget,
   OwnerTarget,
@@ -158,6 +159,7 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
         id: vehicle.id,
         plate: vehicle.plate,
         status: vehicle.status,
+        isTrailer: isTrailerClass(cls.name),
         odometerWorking: vehicle.odometerWorking,
         currentKm: vehicle.currentKm,
         oilMode: vehicle.oilMode,
@@ -178,15 +180,23 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
     const [cls] = await db
       .select({
         id: schema.vehicleClasses.id,
+        name: schema.vehicleClasses.name,
         oilIntervalMonths: schema.vehicleClasses.oilIntervalMonths,
         oilIntervalKm: schema.vehicleClasses.oilIntervalKm,
       })
       .from(schema.vehicleClasses)
       .where(eq(schema.vehicleClasses.id, id));
-    return cls ?? null;
+    return cls
+      ? {
+          id: cls.id,
+          isTrailer: isTrailerClass(cls.name),
+          oilIntervalMonths: cls.oilIntervalMonths,
+          oilIntervalKm: cls.oilIntervalKm,
+        }
+      : null;
   },
 
-  async createVehicle({ vehicle, owner, driver, documents, tax, oilChange }) {
+  async createVehicle({ vehicle, trailerId, owner, driver, documents, tax, oilChange }) {
     return db.transaction(async (tx) => {
       const [row] = await tx
         .insert(schema.vehicles)
@@ -194,6 +204,12 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
         .returning({ id: schema.vehicles.id });
       const vehicleId = row.id;
 
+      if (trailerId != null) {
+        await tx
+          .update(schema.vehicles)
+          .set({ towingVehicleId: vehicleId })
+          .where(eq(schema.vehicles.id, trailerId));
+      }
       if (owner) {
         const ownerId = (await resolveOwnerId(tx, owner.target, true))!;
         await tx.insert(schema.ownerships).values({ vehicleId, ownerId, fromDate: owner.fromDate });
@@ -215,6 +231,22 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
 
   async updateVehicle(vehicleId, fields) {
     await db.update(schema.vehicles).set(fields).where(eq(schema.vehicles.id, vehicleId));
+  },
+
+  async setTrailer(tractorId, trailerId) {
+    await db.transaction(async (tx) => {
+      // Detach first: a tractor has one trailer, and re-choosing the same one must still end anchored.
+      await tx
+        .update(schema.vehicles)
+        .set({ towingVehicleId: null })
+        .where(eq(schema.vehicles.towingVehicleId, tractorId));
+      if (trailerId != null) {
+        await tx
+          .update(schema.vehicles)
+          .set({ towingVehicleId: tractorId })
+          .where(eq(schema.vehicles.id, trailerId));
+      }
+    });
   },
 
   async addDocument(vehicleId, doc) {
@@ -295,6 +327,11 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
     await db.transaction(async (tx) => {
       await tx.insert(schema.sales).values({ vehicleId, ...sale });
       await tx.update(schema.vehicles).set({ status: "SOLD" }).where(eq(schema.vehicles.id, vehicleId));
+      // A sold vehicle leaves its tractor-trailer pair: as a tractor it frees its trailer, as a trailer it unhooks.
+      await tx
+        .update(schema.vehicles)
+        .set({ towingVehicleId: null })
+        .where(or(eq(schema.vehicles.towingVehicleId, vehicleId), eq(schema.vehicles.id, vehicleId)));
       await closeOwnership(tx, ownClose);
       await closeAssignment(tx, asgClose);
     });

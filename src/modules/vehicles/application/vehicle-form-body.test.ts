@@ -57,6 +57,11 @@ describe("createBodyFromForm", () => {
     expect(createVehicleSchema.safeParse(body).success).toBe(true);
   });
 
+  it("maps the chosen trailer, blank meaning none", () => {
+    expect(createBodyFromForm({ plate: "A", classId: "1", trailerPlate: "S88490" }).trailerPlate).toBe("S88490");
+    expect(createBodyFromForm({ plate: "A", classId: "1", trailerPlate: "" }).trailerPlate).toBeNull();
+  });
+
   it("maps the Imperio owner and a new driver", () => {
     const body = createBodyFromForm({
       plate: "A",
@@ -80,7 +85,7 @@ describe("createBodyFromForm", () => {
 });
 
 describe("editBodyFromForm", () => {
-  it("maps the editable fields, a blank towing plate unlinks it", () => {
+  it("maps the editable fields", () => {
     const body = editBodyFromForm({
       plate: "XYZ987",
       classId: "2",
@@ -89,7 +94,6 @@ describe("editBodyFromForm", () => {
       notes: "",
       serviceType: "PUBLICO",
       oilMode: "date",
-      towingPlate: "",
     });
     expect(body).toEqual({
       plate: "XYZ987",
@@ -99,8 +103,13 @@ describe("editBodyFromForm", () => {
       notes: null,
       serviceType: "PUBLICO",
       oilMode: "date",
-      towingPlate: null,
     });
+    expect(updateVehicleSchema.safeParse(body).success).toBe(true);
+  });
+
+  it("leaves out the fields a trailer's form does not render", () => {
+    const body = editBodyFromForm({ plate: "S88490", classId: "10" });
+    expect(body).toEqual({ plate: "S88490", classId: 10 });
     expect(updateVehicleSchema.safeParse(body).success).toBe(true);
   });
 });

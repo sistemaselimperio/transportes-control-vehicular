@@ -9,6 +9,7 @@ import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "../domain/plate";
+import { assertCanAnchorTrailer } from "../domain/trailer";
 import { assertModelYear, type VehicleTechnicalData } from "../domain/technical-data";
 import {
   assertCanAssignDriver,
@@ -51,8 +52,8 @@ export interface NewVehicleInput {
   oilMode: OilMode;
   odometerWorking: boolean;
   currentKm: number | null;
-  /** Tractor unit pulling this vehicle (trailers only). */
-  towingPlate: string | null;
+  /** Trailer to anchor to this vehicle (tractors only); null leaves it without one. */
+  trailerPlate: string | null;
   owner: { target: OwnerTarget; date: IsoDate } | null;
   driver: { target: DriverTarget; date: IsoDate } | null;
   documents: DocumentRecord[];
@@ -66,7 +67,7 @@ export interface NewVehicleInput {
   } | null;
 }
 
-/** Editable vehicle data; absent keys stay as they are, `towingPlate: null` unlinks. */
+/** Editable vehicle data; absent keys stay as they are. The trailer link is changed with `setTrailer`. */
 export type VehicleEdit = Partial<
   Pick<
     NewVehicleInput,
@@ -77,7 +78,6 @@ export type VehicleEdit = Partial<
     | "municipality"
     | "serviceType"
     | "oilMode"
-    | "towingPlate"
   >
 >;
 
@@ -145,11 +145,14 @@ export function createVehicleCommands(
       const cls = await repo.findClass(input.classId);
       if (!cls) throw new RuleError("La clase de vehículo no existe.");
 
-      let towingVehicleId: number | null = null;
-      if (input.towingPlate) {
-        const towing = await loadOne(normalizePlate(input.towingPlate));
-        assertEditable(towing.status);
-        towingVehicleId = towing.id;
+      let trailerId: number | null = null;
+      if (input.trailerPlate) {
+        const trailer = await loadOne(parsePlate(input.trailerPlate));
+        assertCanAnchorTrailer({
+          tractor: { plate, isTrailer: cls.isTrailer },
+          trailer,
+        });
+        trailerId = trailer.id;
       }
 
       if (input.owner) assertNotFuture(input.owner.date, today());
@@ -202,8 +205,8 @@ export function createVehicleCommands(
           odometerWorking: input.odometerWorking,
           currentKm,
           currentKmAt,
-          towingVehicleId,
         },
+        trailerId,
         owner: input.owner ? { target: input.owner.target, fromDate: input.owner.date } : null,
         driver: input.driver ? { target: input.driver.target, fromDate: input.driver.date } : null,
         documents,
@@ -220,8 +223,7 @@ export function createVehicleCommands(
     ): Promise<CommandResult & { plate: string }> {
       const vehicle = await loadOne(currentPlate);
       assertEditable(vehicle.status);
-      const { towingPlate, ...rest } = edit;
-      const fields: VehicleUpdate = { ...rest };
+      const fields: VehicleUpdate = { ...edit };
 
       if (edit.plate !== undefined) {
         fields.plate = parsePlate(edit.plate);
@@ -233,22 +235,27 @@ export function createVehicleCommands(
       if (edit.classId !== undefined && !(await repo.findClass(edit.classId))) {
         throw new RuleError("La clase de vehículo no existe.");
       }
-      if (towingPlate !== undefined) {
-        if (towingPlate === null) {
-          fields.towingVehicleId = null;
-        } else {
-          const towing = await loadOne(parsePlate(towingPlate));
-          if (towing.id === vehicle.id) {
-            throw new RuleError("Un vehículo no puede remolcarse a sí mismo.");
-          }
-          assertEditable(towing.status);
-          fields.towingVehicleId = towing.id;
-        }
-      }
 
       await repo.updateVehicle(vehicle.id, fields);
       const plate = fields.plate ?? vehicle.plate;
       return { plate, message: `Vehículo ${plate} actualizado.` };
+    },
+
+    /**
+     * Anchors a trailer to a tractor, or clears it with `null`. A tractor has at most one trailer:
+     * the previous one is detached, and a trailer anchored elsewhere moves here.
+     */
+    async setTrailer(tractorPlate: string, trailerPlate: string | null): Promise<CommandResult> {
+      const tractor = await loadOne(parsePlate(tractorPlate));
+      assertEditable(tractor.status);
+      if (trailerPlate === null) {
+        await repo.setTrailer(tractor.id, null);
+        return { message: `${tractor.plate} quedó sin remolque.` };
+      }
+      const trailer = await loadOne(parsePlate(trailerPlate));
+      assertCanAnchorTrailer({ tractor, trailer });
+      await repo.setTrailer(tractor.id, trailer.id);
+      return { message: `Remolque ${trailer.plate} anclado a ${tractor.plate}.` };
     },
 
     async updateTechnicalData(plate: string, data: VehicleTechnicalData): Promise<CommandResult> {

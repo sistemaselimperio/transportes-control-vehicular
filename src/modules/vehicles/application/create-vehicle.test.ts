@@ -9,6 +9,7 @@ const tractor: VehicleSnapshot = {
   id: 5,
   plate: "TRC-500",
   status: "ACTIVE",
+  isTrailer: false,
   odometerWorking: true,
   currentKm: 1000,
   oilMode: "both",
@@ -17,12 +18,18 @@ const tractor: VehicleSnapshot = {
   assignment: null,
 };
 
+const trailer: VehicleSnapshot = { ...tractor, id: 7, plate: "S88490", isTrailer: true };
+
 function setup(existing: VehicleSnapshot[] = [tractor]) {
   const created: NewVehicleRecord[] = [];
   const repo = {
     findByPlates: async (plates: string[]) => existing.filter((v) => plates.includes(v.plate)),
     findClass: async (id: number) =>
-      id === 1 ? { id: 1, oilIntervalMonths: 3, oilIntervalKm: 5000 } : null,
+      id === 1
+        ? { id: 1, isTrailer: false, oilIntervalMonths: 3, oilIntervalKm: 5000 }
+        : id === 3
+          ? { id: 3, isTrailer: true, oilIntervalMonths: null, oilIntervalKm: null }
+          : null,
     createVehicle: async (record: NewVehicleRecord) => {
       created.push(record);
       return 42;
@@ -43,7 +50,7 @@ function input(overrides: Partial<NewVehicleInput> = {}): NewVehicleInput {
     oilMode: "both",
     odometerWorking: true,
     currentKm: 20000,
-    towingPlate: null,
+    trailerPlate: null,
     owner: null,
     driver: null,
     documents: [],
@@ -63,8 +70,8 @@ describe("createVehicle", () => {
       classId: 1,
       currentKm: 20000,
       currentKmAt: TODAY,
-      towingVehicleId: null,
     });
+    expect(created[0].trailerId).toBeNull();
   });
 
   it("rejects a plate that already exists", async () => {
@@ -78,19 +85,32 @@ describe("createVehicle", () => {
     await expect(commands.createVehicle(input({ classId: 9 }))).rejects.toThrow(RuleError);
   });
 
-  it("links a trailer to its towing vehicle", async () => {
-    const { commands, created } = setup();
-    await commands.createVehicle(input({ plate: "S88490", towingPlate: "trc500" }));
-    expect(created[0].vehicle.towingVehicleId).toBe(5);
+  it("anchors the chosen trailer to the new vehicle", async () => {
+    const { commands, created } = setup([trailer]);
+    await commands.createVehicle(input({ trailerPlate: "s88490" }));
+    expect(created[0].trailerId).toBe(7);
   });
 
-  it("rejects a missing or sold towing vehicle", async () => {
-    await expect(setup().commands.createVehicle(input({ towingPlate: "ZZZ-999" }))).rejects.toThrow(
+  it("rejects a missing, non-trailer, idle or sold trailer", async () => {
+    await expect(setup().commands.createVehicle(input({ trailerPlate: "ZZZ-999" }))).rejects.toThrow(
       RuleError,
     );
+    await expect(setup().commands.createVehicle(input({ trailerPlate: "TRC-500" }))).rejects.toThrow(
+      "no es un remolque",
+    );
+    for (const status of ["IDLE", "SOLD"] as const) {
+      const { commands, created } = setup([{ ...trailer, status }]);
+      await expect(commands.createVehicle(input({ trailerPlate: "S88490" }))).rejects.toThrow(RuleError);
+      expect(created).toEqual([]);
+    }
+  });
+
+  it("does not let a new trailer carry another trailer", async () => {
+    const { commands, created } = setup([trailer]);
     await expect(
-      setup([{ ...tractor, status: "SOLD" }]).commands.createVehicle(input({ towingPlate: "TRC-500" })),
-    ).rejects.toThrow(RuleError);
+      commands.createVehicle(input({ classId: 3, trailerPlate: "S88490" })),
+    ).rejects.toThrow("Un remolque no puede llevar otro remolque.");
+    expect(created).toEqual([]);
   });
 
   it("passes owner and driver through and rejects future dates", async () => {
