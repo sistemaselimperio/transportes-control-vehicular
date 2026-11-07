@@ -73,6 +73,11 @@ export const LOGBOOK_TABS: ReadonlyArray<{ key: LogbookTab; label: string }> = [
   { key: "combustible", label: "Combustible" },
 ];
 
+/** Logbook tabs that apply to a vehicle: a trailer has no engine and is never refueled, so no oil or fuel. */
+export function logbookTabsFor({ isTrailer }: { isTrailer: boolean }): ReadonlyArray<{ key: LogbookTab; label: string }> {
+  return isTrailer ? LOGBOOK_TABS.filter((t) => t.key !== "aceite" && t.key !== "combustible") : LOGBOOK_TABS;
+}
+
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Reads the `tab` search param; anything unknown means "servicios". */

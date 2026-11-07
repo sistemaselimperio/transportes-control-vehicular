@@ -220,14 +220,24 @@ export function FileActions({
  * Compact action buttons for one section (32px on desktop, 44px on phones). `primary` names the
  * one key drawn filled; the rest are outlined. Hidden once the vehicle is sold.
  */
-export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; primary?: ActionKey }) {
+export function ActionButtons({
+  keys,
+  primary,
+  iconOnly = [],
+}: {
+  keys: readonly ActionKey[];
+  primary?: ActionKey;
+  /** Actions shown as an icon alone; the action's title becomes its accessible name and tooltip. */
+  iconOnly?: readonly ActionKey[];
+}) {
   const { canOpen, open } = useFileActions();
   const shown = keys.filter(canOpen);
   if (shown.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
       {shown.map((key) => {
-        const { label, icon: Icon } = ACTIONS[key];
+        const { label, title, icon: Icon } = ACTIONS[key];
+        const bare = iconOnly.includes(key);
         return (
           <Button
             key={key}
@@ -236,12 +246,14 @@ export function ActionButtons({ keys, primary }: { keys: readonly ActionKey[]; p
             className={
               key === primary
                 ? "h-11 bg-foreground px-3 text-background hover:bg-foreground/85 md:h-8"
-                : "h-11 bg-transparent px-3 hover:bg-muted md:h-8"
+                : `h-11 bg-transparent hover:bg-muted md:h-8 ${bare ? "w-11 px-0 md:w-8" : "px-3"}`
             }
             onClick={() => open(key)}
+            aria-label={bare ? title : undefined}
+            title={bare ? title : undefined}
           >
             <Icon aria-hidden />
-            {label}
+            {!bare && label}
           </Button>
         );
       })}

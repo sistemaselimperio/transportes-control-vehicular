@@ -3,6 +3,7 @@ import {
   driverAtDate,
   LOGBOOK_SEARCH_MAX,
   logbookHref,
+  logbookTabsFor,
   monthBounds,
   normalizePlateQuery,
   parseLogbookQuery,
@@ -173,5 +174,15 @@ describe("summarizeFuel", () => {
         { gallons: null, urea: 47.67, amount: null },
       ]),
     ).toEqual({ count: 2, gallons: 10, urea: 47.67, amount: 50000 });
+  });
+});
+
+describe("logbookTabsFor", () => {
+  it("gives a vehicle every logbook tab", () => {
+    expect(logbookTabsFor({ isTrailer: false }).map((t) => t.key)).toEqual(["servicios", "aceite", "llantas", "combustible"]);
+  });
+
+  it("leaves oil and fuel out for a trailer: it has no engine and is never refueled", () => {
+    expect(logbookTabsFor({ isTrailer: true }).map((t) => t.key)).toEqual(["servicios", "llantas"]);
   });
 });

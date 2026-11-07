@@ -11,14 +11,21 @@ import { CompactFuel, CompactOilChanges, CompactServices, CompactTires } from ".
  * One tab per kind shows its read-only list; the link to the Bitácora page sits next to the
  * Historial tabs. The tab labels carry no counts: the lists are truncated, so a count would mislead.
  */
-export function VehicleLogbookPanel({ logbook }: { logbook: VehicleLogbook }) {
-  const [tab, setTab] = useState<LogbookTab>("servicios");
+export function VehicleLogbookPanel({
+  logbook,
+  tabs = LOGBOOK_TABS,
+}: {
+  logbook: VehicleLogbook;
+  /** Tabs to offer (see `logbookTabsFor`); the first one opens. */
+  tabs?: ReadonlyArray<{ key: LogbookTab; label: string }>;
+}) {
+  const [tab, setTab] = useState<LogbookTab>(tabs[0]?.key ?? "servicios");
 
   return (
     <div className="pt-3">
       <TabBar
         label="Registros de la bitácora"
-        items={LOGBOOK_TABS}
+        items={tabs}
         active={tab}
         onSelect={setTab}
         idPrefix="vehicle-logbook-tab"

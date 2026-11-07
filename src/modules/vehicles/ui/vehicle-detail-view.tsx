@@ -1,8 +1,8 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Link2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusMark } from "@/components/app/status-mark";
-import { logbookHref } from "@/modules/logbook/domain/logbook";
+import { logbookHref, logbookTabsFor } from "@/modules/logbook/domain/logbook";
 import { VehicleLogbookPanel } from "@/modules/logbook/ui/vehicle-logbook";
 import { VehicleTripsList } from "@/modules/trips/ui/vehicle-trips-list";
 import type { TripRow } from "@/modules/trips/domain/trip-row";
@@ -10,7 +10,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
-import { isTrailerClass } from "../domain/trailer";
+import { canTowTrailer, isTrailerClass } from "../domain/trailer";
 import type { VehicleInspectionRow } from "@/modules/inspections/infrastructure/inspection-repository";
 import type { VehicleDetail } from "../application/vehicle-queries";
 import type { HistoryTab } from "../domain/history-tab";
@@ -145,14 +145,26 @@ function TrailerHeader({ r, towedByPlate }: { r: VehicleGridRow; towedByPlate: s
           <p className="mt-0.5 truncate text-lg leading-tight font-semibold tracking-tight">
             {r.ownerName ?? <span className="font-normal text-muted-foreground">Sin propietario</span>}
           </p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {towedByPlate ? `Anclado a ${towedByPlate}` : "Sin anclar a un vehículo"}
-          </p>
+          {towedByPlate ? (
+            <p className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+              <Link2 className="size-3.5 shrink-0" aria-hidden />
+              Anclado a
+              <Link
+                href={fileHref(towedByPlate)}
+                className="plate rounded-[5px] outline-none transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
+                title={`Ver la ficha de ${towedByPlate}`}
+              >
+                {towedByPlate}
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-0.5 text-sm text-muted-foreground">Sin anclar a un vehículo</p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full [&_button:not(:disabled)]:cursor-pointer">
           <StatusSwitch />
           <EditDataButton />
-          <ActionButtons keys={["owner"]} />
+          <ActionButtons keys={["owner"]} iconOnly={["owner"]} />
           <SellButton />
         </div>
       </div>
@@ -160,7 +172,32 @@ function TrailerHeader({ r, towedByPlate }: { r: VehicleGridRow; towedByPlate: s
   );
 }
 
+const fileHref = (plate: string) => `/flota/${encodeURIComponent(plate)}`;
+
+/**
+ * The trailer this vehicle pulls: its plate as a chip that opens the trailer's file, with a quiet
+ * "Cambiar". Anchoring a first one is a header action instead (see `FileHeader`).
+ */
+function TrailerLink({ trailerPlate }: { trailerPlate: string }) {
+  return (
+    <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border bg-muted/40 py-1 pr-1 pl-2.5">
+      <Link2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="micro-label">Remolque</span>
+      <Link
+        href={fileHref(trailerPlate)}
+        className="plate rounded-[5px] outline-none transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
+        title={`Ver la ficha del remolque ${trailerPlate}`}
+      >
+        {trailerPlate}
+      </Link>
+      <InlineAction action="trailer">Cambiar</InlineAction>
+    </div>
+  );
+}
+
 function FileHeader({ r, trailerPlate }: { r: VehicleGridRow; trailerPlate: string | null }) {
+  // Only trucks and tractor units pull a trailer: the others get no anchor action at all.
+  const canAnchor = !trailerPlate && canTowTrailer(r.className ?? "");
   return (
     <header className="space-y-2 border-b pb-4">
       <Link
@@ -183,15 +220,12 @@ function FileHeader({ r, trailerPlate }: { r: VehicleGridRow; trailerPlate: stri
             </p>
             <PeoplePopover driverName={r.driverName} driverPhone={r.driverPhone} ownerName={r.ownerName} />
           </div>
-          <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
-            Remolque: <span className={trailerPlate ? "font-medium text-foreground" : ""}>{trailerPlate ?? "ninguno"}</span>
-            <InlineAction action="trailer">{trailerPlate ? "Cambiar" : "Anclar"}</InlineAction>
-          </p>
+          {trailerPlate && <TrailerLink trailerPlate={trailerPlate} />}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full [&_button:not(:disabled)]:cursor-pointer">
           <StatusSwitch />
           <EditDataButton />
-          <ActionButtons keys={["owner"]} />
+          <ActionButtons keys={canAnchor ? ["trailer", "owner"] : ["owner"]} iconOnly={["owner"]} />
           <SellButton />
         </div>
       </div>
@@ -242,9 +276,29 @@ export function VehicleDetailView({
         readOnly={readOnly}
         allowed={allowed}
       >
-        <div className="space-y-6">
-          <TrailerHeader r={r} towedByPlate={detail.towing.towedByPlate} />
-          {sold && <SoldNotice />}
+        <div className="space-y-10">
+          <div className="space-y-6">
+            <TrailerHeader r={r} towedByPlate={detail.towing.towedByPlate} />
+            {sold && <SoldNotice />}
+          </div>
+          {/* Trailers have no technical sheet or documents to track, but their maintenance is kept. */}
+          <Section
+            id="bitacora"
+            title="Bitácora"
+            actions={
+              // Staff cannot open the Bitácora page, so they get no link to it.
+              !readOnly && (
+                <Link
+                  href={logbookHref(r.plate, "servicios")}
+                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 transition-colors duration-150 hover:text-foreground md:min-h-7"
+                >
+                  Ver bitácora
+                </Link>
+              )
+            }
+          >
+            <VehicleLogbookPanel logbook={detail.logbook} tabs={logbookTabsFor({ isTrailer: true })} />
+          </Section>
         </div>
       </FileActions>
     );
