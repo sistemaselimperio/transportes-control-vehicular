@@ -109,7 +109,8 @@ function textYear(digits: string): number | null {
 
 /**
  * A logbook date however it was typed: a date cell, an Excel day serial, or a text
- * "d/m/yyyy", "d-m-yy", "d.m.yyyy", "yyyy-m-d" (repeated separators and spaces are fine).
+ * "d/m/yyyy", "d-m-yy", "d.m.yyyy", "yyyy-m-d" (repeated separators and spaces are fine),
+ * or with the month as a name: "Oct-10-2025", "10-ene-2026".
  * A year with a typo ("05-08-205") takes `fallbackYear`, the year of the row above:
  * the logbooks are kept in order.
  */
@@ -123,13 +124,33 @@ function parseLogDate(v: CellValue | undefined, fallbackYear: number | null): Pa
   }
   const text = cellText(v);
   if (text === "") return { value: null, error: null };
-  const parts = /^(\d{1,4})\s*[-/.]+\s*(\d{1,2})\s*[-/.]+\s*(\d{1,4})$/.exec(text);
+  // A stray ", 1" typed after the date is dropped; the month may be written as a name.
+  const parts = /^(\d{1,4})\s*[-/.]+\s*(\d{1,2})\s*[-/.]+\s*(\d{1,4})$/.exec(numericMonth(text.replace(/\s*,.*$/, "")));
   if (!parts) return { value: null, error: `Fecha no válida: "${text}".` };
   const [day, month, yearDigits] = parts[1].length === 4 ? [parts[3], parts[2], parts[1]] : [parts[1], parts[2], parts[3]];
   const year = textYear(yearDigits) ?? fallbackYear;
   if (year === null) return { value: null, error: `Fecha no válida: "${text}".` };
   const parsed = parseDateCell(`${Number(day)}/${Number(month)}/${year}`, "Fecha");
   return parsed.value === null ? { value: null, error: `Fecha inexistente: "${text}".` } : { value: parsed.value, error: null };
+}
+
+/** Three-letter month names, English and Spanish, to the month number. */
+const MONTHS: Record<string, number> = {
+  JAN: 1, ENE: 1, FEB: 2, MAR: 3, APR: 4, ABR: 4, MAY: 5, JUN: 6,
+  JUL: 7, AUG: 8, AGO: 8, SEP: 9, SET: 9, OCT: 10, NOV: 11, DEC: 12, DIC: 12,
+};
+
+/** "Oct-10-2025" or "10-oct-2025" (English or Spanish month name) as "10/10/2025"; anything else unchanged. */
+function numericMonth(text: string): string {
+  const named = /^([A-Za-z]{3})[a-z]*\.?\s*[-/.\s]\s*(\d{1,2})\s*[-/.\s]\s*(\d{1,4})$/.exec(text);
+  if (named && MONTHS[stripAccents(named[1]).toUpperCase()]) {
+    return `${named[2]}/${MONTHS[stripAccents(named[1]).toUpperCase()]}/${named[3]}`;
+  }
+  const after = /^(\d{1,2})\s*[-/.\s]\s*([A-Za-z]{3})[a-z]*\.?\s*[-/.\s]\s*(\d{1,4})$/.exec(text);
+  if (after && MONTHS[stripAccents(after[2]).toUpperCase()]) {
+    return `${after[1]}/${MONTHS[stripAccents(after[2]).toUpperCase()]}/${after[3]}`;
+  }
+  return text;
 }
 
 const yearOf = (date: IsoDate): number => Number(date.slice(0, 4));

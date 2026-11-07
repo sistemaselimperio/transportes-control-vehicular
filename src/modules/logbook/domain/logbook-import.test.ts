@@ -92,6 +92,25 @@ describe("parseLogbookWorkbook: MANTENIMIENTO", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it("reads a month written as a name, in English or Spanish, before or after the day", () => {
+    const result = parseLogbookWorkbook([
+      maintenanceSheet([
+        [8, { B: "Oct-10-2025", C: "A" }],
+        [9, { B: "Sep-11-2025", C: "B" }],
+        [10, { B: "10-ene-2026", C: "C" }],
+        [11, { B: "Abr 5 2026", C: "D" }],
+      ]),
+    ]);
+    expect(result.services.map((s) => s.date)).toEqual(["2025-10-10", "2025-09-11", "2026-01-10", "2026-04-05"]);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("reads a date followed by a stray comma and text", () => {
+    const result = parseLogbookWorkbook([maintenanceSheet([[10, { B: "22/04/2026, 1", C: "BUJES" }]])]);
+    expect(result.services.map((s) => s.date)).toEqual(["2026-04-22"]);
+    expect(result.issues).toEqual([]);
+  });
+
   it("takes the year of the row above when the year has a typo", () => {
     const result = parseLogbookWorkbook([
       maintenanceSheet([
