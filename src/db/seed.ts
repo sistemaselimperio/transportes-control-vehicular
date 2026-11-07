@@ -32,6 +32,11 @@ const CLASSES = [
     oilIntervalMonths: null,
     documentsDefaultNotApplicable: true,
   },
+  // Machines and equipment without a plate: identified by an internal code ("MON-LIU1").
+  // They run by hours, not km, so they have no km-based oil interval.
+  { name: "Cargador", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
+  { name: "Montacargas", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
+  { name: "Equipo", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
 ] as const;
 
 async function seedOwners() {
