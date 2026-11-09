@@ -9,6 +9,7 @@ const input = (over: Partial<TripInput> = {}): TripInput => ({
   plate: "ABC-123",
   area: "Cemento",
   status: "programado",
+  notes: null,
   ...over,
 });
 

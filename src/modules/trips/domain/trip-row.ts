@@ -15,6 +15,8 @@ export interface TripRow {
   vehicleId: number | null;
   area: TripArea;
   status: TripStatus;
+  /** Free-text remark; null when none. */
+  notes: string | null;
 }
 
 export interface TripFilters {
@@ -39,8 +41,8 @@ const searchKey = (text: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9ñ]/g, "");
 
-/** Rows matching the status and area filters and every word of the query in the plate, origin or destination. */
-export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" | "origin" | "destination">>(
+/** Rows matching the status and area filters and every word of the query in the plate, origin, destination or notes. */
+export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" | "origin" | "destination" | "notes">>(
   rows: readonly T[],
   filters: TripFilters,
 ): T[] {
@@ -48,7 +50,7 @@ export function filterTrips<T extends Pick<TripRow, "status" | "area" | "plate" 
   return rows.filter((r) => {
     if (filters.status !== "ALL" && r.status !== filters.status) return false;
     if (filters.area !== "ALL" && r.area !== filters.area) return false;
-    const fields = [r.plate, r.origin ?? "", r.destination].map(searchKey);
+    const fields = [r.plate, r.origin ?? "", r.destination, r.notes ?? ""].map(searchKey);
     return words.every((w) => fields.some((f) => f.includes(w)));
   });
 }

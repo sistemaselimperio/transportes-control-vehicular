@@ -82,6 +82,7 @@ export function TripList({
               )}
             </div>
             <div className="num text-sm text-muted-foreground">{formatTripDateTime(r.startAt)}</div>
+            {r.notes && <p className="line-clamp-2 text-sm text-muted-foreground">{r.notes}</p>}
             <div className="flex flex-wrap items-center gap-2 border-t pt-2">
               <Plate row={r} />
               <span className="text-sm text-muted-foreground">{r.area}</span>
@@ -118,7 +119,14 @@ export function TripList({
                 <tr key={r.id} className="hover:bg-muted/50">
                   <td className="num px-4 py-3 whitespace-nowrap">{formatTripDateTime(r.startAt)}</td>
                   <td className="px-4 py-3">{r.origin ?? "—"}</td>
-                  <td className="px-4 py-3 font-medium">{r.destination}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-medium">{r.destination}</span>
+                    {r.notes && (
+                      <p className="max-w-64 truncate text-xs text-muted-foreground" title={r.notes}>
+                        {r.notes}
+                      </p>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <Plate row={r} />
                   </td>

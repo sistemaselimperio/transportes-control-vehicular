@@ -14,6 +14,8 @@ const municipalityField = (message: string) =>
     .transform((v) => v.trim())
     .refine(isMunicipalityLabel, message);
 
+export const NOTES_MAX = 500;
+
 export const tripSchema = z.object({
   startAt: z
     .string("Ingresa la fecha de inicio.")
@@ -33,6 +35,13 @@ export const tripSchema = z.object({
     .default("")
     .transform((v) => (v === "" ? "programado" : v))
     .pipe(z.enum(TRIP_STATUSES, "Estado no válido.")),
+  /** Optional remark: trimmed, blank becomes null. */
+  notes: z
+    .string()
+    .default("")
+    .transform((v) => v.trim())
+    .refine((v) => v.length <= NOTES_MAX, "La observación no puede pasar de 500 caracteres.")
+    .transform((v) => (v === "" ? null : v)),
 });
 
 export type TripInput = z.infer<typeof tripSchema>;

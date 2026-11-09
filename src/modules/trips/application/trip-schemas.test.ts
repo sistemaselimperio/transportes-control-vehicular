@@ -54,6 +54,19 @@ describe("tripSchema", () => {
     expect(tripSchema.safeParse({ ...valid, area: "" }).success).toBe(false);
   });
 
+  it("keeps the notes trimmed and turns blank into null", () => {
+    expect(tripSchema.parse({ ...valid, notes: "  Cargue en patio  " }).notes).toBe("Cargue en patio");
+    expect(tripSchema.parse({ ...valid, notes: "   " }).notes).toBeNull();
+    expect(tripSchema.parse({ ...valid, notes: "" }).notes).toBeNull();
+    expect(tripSchema.parse(valid).notes).toBeNull();
+  });
+
+  it("limits the notes to 500 characters", () => {
+    expect(tripSchema.safeParse({ ...valid, notes: "a".repeat(500) }).success).toBe(true);
+    const r = tripSchema.safeParse({ ...valid, notes: "a".repeat(501) });
+    expect(!r.success && r.error.issues[0]?.message).toBe("La observación no puede pasar de 500 caracteres.");
+  });
+
   it("only accepts known statuses", () => {
     expect(tripSchema.safeParse({ ...valid, status: "cancelado" }).success).toBe(false);
   });

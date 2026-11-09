@@ -6,6 +6,8 @@ import { ActionForm, Field } from "@/components/app/action-form";
 import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import { NOTES_MAX } from "../application/trip-schemas";
 import { createTripAction, updateTripAction } from "../application/trip-actions";
 import { TRIP_AREAS } from "../domain/trip-areas";
 import { currentLocalInput, toLocalInput } from "../domain/trip-datetime";
@@ -128,6 +130,9 @@ export function TripForm({
             </option>
           ))}
         </NativeSelect>
+      </Field>
+      <Field label="Observación" htmlFor="trip-notes" hint="Opcional">
+        <Textarea id="trip-notes" name="notes" rows={3} maxLength={NOTES_MAX} defaultValue={trip?.notes ?? ""} />
       </Field>
     </ActionForm>
   );

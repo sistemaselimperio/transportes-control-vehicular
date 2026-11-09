@@ -30,6 +30,7 @@ function toTripRow(r: typeof schema.trips.$inferSelect): TripRow {
     vehicleId: r.vehicleId,
     area: r.area,
     status: r.status,
+    notes: r.notes,
   };
 }
 
@@ -41,6 +42,7 @@ const toColumns = (v: TripValues) => ({
   vehicleId: v.vehicleId,
   area: v.area,
   status: v.status,
+  notes: v.notes,
 });
 
 export const tripRepository: TripPorts = {

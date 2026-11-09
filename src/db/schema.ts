@@ -426,6 +426,8 @@ export const trips = transportes.table(
     vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
     area: tripAreaEnum().notNull(),
     status: tripStatusEnum().notNull().default("programado"),
+    /** Free-text remark about the trip. */
+    notes: text(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

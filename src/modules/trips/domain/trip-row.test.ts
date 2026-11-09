@@ -10,6 +10,7 @@ const row = (over: Partial<TripRow>): TripRow => ({
   vehicleId: 1,
   area: "Cemento",
   status: "programado",
+  notes: null,
   ...over,
 });
 
@@ -39,6 +40,11 @@ describe("filterTrips", () => {
 
   it("keeps everything with no filter", () => {
     expect(filterTrips(rows, { status: "ALL", area: "ALL", query: "" })).toHaveLength(3);
+  });
+
+  it("matches the query against the notes", () => {
+    const withNotes = [row({ id: 1, notes: "Entregar en la bodega Sur" }), row({ id: 2 })];
+    expect(filterTrips(withNotes, { status: "ALL", area: "ALL", query: "bodega sur" }).map((r) => r.id)).toEqual([1]);
   });
 
   it("filters by status", () => {
