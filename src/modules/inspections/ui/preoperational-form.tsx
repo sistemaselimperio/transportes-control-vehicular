@@ -21,6 +21,7 @@ import {
   type InspectionErrors,
 } from "../domain/preoperational-inspection";
 import { ChecklistTable, FillingInstructions, LABEL_CELL, LEFT_COLUMN_SECTIONS, RULE, SheetHeader } from "./form-sheet";
+import { DictateButton } from "./dictate-button";
 import { SignaturePad } from "./signature-pad";
 
 type Header = {
@@ -736,6 +737,12 @@ function NovedadRow({
           aria-invalid={error ? true : undefined}
           placeholder="Qué encontré y dónde"
           className="min-h-16 text-base"
+        />
+        <DictateButton
+          value={note}
+          onChange={(value) => onNote(item, value)}
+          maxLength={MAX_NOTE_LENGTH}
+          label={`qué encontré en ${item.label}`}
         />
         {error && <ErrorText>{error}</ErrorText>}
       </td>
