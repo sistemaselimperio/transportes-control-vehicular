@@ -443,7 +443,7 @@ const PLATE_SHAPES = [
   /^[A-Z]{3}-\d{3}$/, // car / truck
   /^[A-Z]{3}-\d{2}[A-Z]$/, // motorcycle
   /^[A-Z]\d{2}-[A-Z]{3}$/, // motocarro
-  /^[A-Z]\d{5}$/, // trailer
+  /^[A-Z]-\d{5}$/, // trailer
 ];
 
 export function isPlateLike(raw: CellValue): boolean {

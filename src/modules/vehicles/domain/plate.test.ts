@@ -12,8 +12,10 @@ describe("normalizePlate", () => {
   it("keeps the hyphenated format as is", () => {
     expect(normalizePlate("XYZ-987")).toBe("XYZ-987");
   });
-  it("leaves trailer plates without hyphen", () => {
-    expect(normalizePlate("s88490")).toBe("S88490");
+  it("inserts the hyphen after the letter of trailer plates (1 letter + 5 digits)", () => {
+    expect(normalizePlate("s88490")).toBe("S-88490");
+    expect(normalizePlate("R 44914")).toBe("R-44914");
+    expect(normalizePlate("S-88490")).toBe("S-88490");
   });
   it("normalizes motorcycle plates (3 letters, 2 digits, 1 letter) with a hyphen", () => {
     expect(normalizePlate("abc12d")).toBe("ABC-12D");

@@ -127,7 +127,7 @@ describe("validateInspection", () => {
 
   it("keeps a trailer plate when given", () => {
     const result = validateInspection(draft({ trailerPlate: " r 12345 " }));
-    expect(result.ok && result.value.trailerPlate).toBe("R12345");
+    expect(result.ok && result.value.trailerPlate).toBe("R-12345");
   });
 
   it("requires every header field except the trailer plate and the odometer", () => {

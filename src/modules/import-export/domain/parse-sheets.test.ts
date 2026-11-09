@@ -491,7 +491,7 @@ describe("parseTrailerSheet", () => {
   const { vehicles } = parseTrailerSheet(trailer, TODAY);
 
   it("creates Remolque vehicles with brand line from the reference", () => {
-    expect(byPlate(vehicles, "S88490")).toMatchObject({
+    expect(byPlate(vehicles, "S-88490")).toMatchObject({
       className: "Remolque",
       brandLine: "TANQUE GASOLINA",
       owner: { kind: "IMPERIO" },
@@ -502,37 +502,37 @@ describe("parseTrailerSheet", () => {
       driver: null,
       status: "ACTIVE",
     });
-    expect(byPlate(vehicles, "S88490").notes).toContain("Observaciones: FERMIN");
+    expect(byPlate(vehicles, "S-88490").notes).toContain("Observaciones: FERMIN");
   });
 
   it("maps Fabián and third-party owners", () => {
-    expect(byPlate(vehicles, "S80720").owner).toEqual({ kind: "FABIAN" });
-    expect(byPlate(vehicles, "S82596").owner).toEqual({
+    expect(byPlate(vehicles, "S-80720").owner).toEqual({ kind: "FABIAN" });
+    expect(byPlate(vehicles, "S-82596").owner).toEqual({
       kind: "THIRD_PARTY",
       name: "BANCOLOMBIA",
     });
   });
 
   it("ignores punctuation-only observations", () => {
-    expect(byPlate(vehicles, "S68424").notes).toEqual([]);
+    expect(byPlate(vehicles, "S-68424").notes).toEqual([]);
   });
 
   it("keeps the old plate as a note", () => {
-    const v = byPlate(vehicles, "S91997");
+    const v = byPlate(vehicles, "S-91997");
     expect(v.notes).toContain("Placa anterior (R29694)");
     expect(v.notes).toContain("Observaciones: SE REMATRICULO ROJO MILTON");
   });
 
   it("handles TRANSPASO, missing owner and sold trailers", () => {
-    const transpaso = byPlate(vehicles, "R18936");
+    const transpaso = byPlate(vehicles, "R-18936");
     expect(transpaso.owner).toEqual({ kind: "UNKNOWN" });
     expect(transpaso.notes).toContain("Propietario: TRANSPASO");
 
-    const noOwner = byPlate(vehicles, "R44914");
+    const noOwner = byPlate(vehicles, "R-44914");
     expect(noOwner.owner).toEqual({ kind: "UNKNOWN" });
     expect(noOwner.issues.some((i) => i.field === "Propietario")).toBe(true);
 
-    expect(byPlate(vehicles, "R18876")).toMatchObject({
+    expect(byPlate(vehicles, "R-18876")).toMatchObject({
       status: "SOLD",
       sale: { buyer: "MIGUEL ANGEL SANTANA" },
     });
