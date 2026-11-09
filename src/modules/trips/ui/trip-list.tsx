@@ -3,8 +3,10 @@
 import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formatTripDateTime } from "../domain/trip-datetime";
 import type { TripRow } from "../domain/trip-row";
+import { TripDateCell } from "./trip-date-cell";
 import { TripStatusBadge } from "./trip-status-badge";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
@@ -103,7 +105,7 @@ export function TripList({
             <thead className="text-left">
               <tr className="border-b">
                 {["Fecha inicio", "Salida", "Destino", "Placa", "Área", "Estado"].map((h) => (
-                  <th key={h} scope="col" className="micro-label px-4 py-3 font-medium">
+                  <th key={h} scope="col" className={cn("micro-label px-4 py-3 font-medium", h === "Fecha inicio" && "text-center")}>
                     {h}
                   </th>
                 ))}
@@ -117,7 +119,9 @@ export function TripList({
             <tbody className="divide-y">
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-muted/50">
-                  <td className="num px-4 py-3 whitespace-nowrap">{formatTripDateTime(r.startAt)}</td>
+                  <td className="num px-4 py-3 text-center whitespace-nowrap">
+                    <TripDateCell startAt={r.startAt} />
+                  </td>
                   <td className="px-4 py-3">{r.origin ?? "—"}</td>
                   <td className="px-4 py-3">
                     <span className="font-medium">{r.destination}</span>

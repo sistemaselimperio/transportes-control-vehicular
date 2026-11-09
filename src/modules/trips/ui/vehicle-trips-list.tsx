@@ -1,4 +1,5 @@
 import { formatTripDateTime } from "../domain/trip-datetime";
+import { TripDateCell } from "./trip-date-cell";
 import type { TripRow } from "../domain/trip-row";
 import { TripStatusBadge } from "./trip-status-badge";
 
@@ -20,7 +21,7 @@ export function VehicleTripsList({ rows }: { rows: readonly TripRow[] }) {
         <table className="w-full text-sm">
           <thead className="text-left">
             <tr className="border-b">
-              <th scope="col" className={TH}>Fecha inicio</th>
+              <th scope="col" className={`${TH} text-center`}>Fecha inicio</th>
               <th scope="col" className={TH}>Salida</th>
               <th scope="col" className={TH}>Destino</th>
               <th scope="col" className={TH}>Área</th>
@@ -30,7 +31,9 @@ export function VehicleTripsList({ rows }: { rows: readonly TripRow[] }) {
           <tbody className="divide-y">
             {rows.map((r) => (
               <tr key={r.id} className="hover:bg-muted/50">
-                <td className={`${TD} num whitespace-nowrap`}>{formatTripDateTime(r.startAt)}</td>
+                <td className={`${TD} num text-center whitespace-nowrap`}>
+                  <TripDateCell startAt={r.startAt} />
+                </td>
                 <td className={TD}>{r.origin ?? "—"}</td>
                 <td className={`${TD} font-medium`}>{r.destination}</td>
                 <td className={`${TD} text-muted-foreground`}>{r.area}</td>
