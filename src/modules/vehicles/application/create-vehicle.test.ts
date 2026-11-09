@@ -19,7 +19,7 @@ const tractor: VehicleSnapshot = {
   assignment: null,
 };
 
-const trailer: VehicleSnapshot = { ...tractor, id: 7, plate: "S88490", isTrailer: true, canTow: false };
+const trailer: VehicleSnapshot = { ...tractor, id: 7, plate: "S-88490", isTrailer: true, canTow: false };
 
 function setup(existing: VehicleSnapshot[] = [tractor]) {
   const created: NewVehicleRecord[] = [];

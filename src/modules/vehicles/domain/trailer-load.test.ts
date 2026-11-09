@@ -44,7 +44,7 @@ describe("planTrailerLoad", () => {
 
   it("skips plates that already exist, whatever their spelling", () => {
     const plan = planTrailerLoad([seed("S88490", "ACME"), seed("S2", null)], ["s 88490"], []);
-    expect(plan.skippedPlates).toEqual(["S88490"]);
+    expect(plan.skippedPlates).toEqual(["S-88490"]);
     expect(plan.trailers.map((t) => t.plate)).toEqual(["S2"]);
     expect(plan.newOwners).toEqual([]);
   });

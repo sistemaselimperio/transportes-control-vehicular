@@ -15,7 +15,7 @@ const base: Omit<VehicleSnapshot, "id" | "plate"> = {
   assignment: null,
 };
 const tractor: VehicleSnapshot = { ...base, id: 5, plate: "TRC-500" };
-const trailer: VehicleSnapshot = { ...base, id: 7, plate: "S88490", isTrailer: true, canTow: false };
+const trailer: VehicleSnapshot = { ...base, id: 7, plate: "S-88490", isTrailer: true, canTow: false };
 
 function setup(existing: VehicleSnapshot[] = [tractor, trailer]) {
   const calls: Array<{ tractorId: number; trailerId: number | null }> = [];
@@ -32,7 +32,7 @@ describe("setTrailer", () => {
     const { commands, calls } = setup();
     const result = await commands.setTrailer("trc500", "s88490");
     expect(calls).toEqual([{ tractorId: 5, trailerId: 7 }]);
-    expect(result.message).toBe("Remolque S88490 anclado a TRC-500.");
+    expect(result.message).toBe("Remolque S-88490 anclado a TRC-500.");
   });
 
   it("clears the trailer when none is given", async () => {
