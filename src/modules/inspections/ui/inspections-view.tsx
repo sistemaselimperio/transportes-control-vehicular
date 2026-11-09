@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, ClipboardCheck, FileText } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { exitStatus } from "../domain/exit-decision";
@@ -7,7 +8,7 @@ import { inspectionsHref, type InspectionFilters } from "../domain/inspection-fi
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
 import { DeleteInspectionButton } from "./delete-inspection-button";
 import { InspectionFiltersForm } from "./inspection-filters-form";
-import { ExitBadge, NotRegisteredBadge, StatusBadge, UncheckedBadge } from "./inspection-badges";
+import { ExitBadge, NotRegisteredBadge, StatusBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 const rowSummary = (r: InspectionListRow) => `${r.plate} · ${formatInspectionDate(r.inspectionDate)} ${r.inspectionTime}`;
@@ -80,8 +81,7 @@ export function InspectionsView({
                   <div className="flex items-start justify-between gap-2">
                     <PlateCell row={r} linked={false} />
                     <span className="flex flex-wrap items-center justify-end gap-1">
-                      <StatusBadge critical={r.hasCriticalFailure} />
-                      <UncheckedBadge count={r.uncheckedCount} />
+                      <StatusBadge critical={r.hasCriticalFailure} unchecked={r.uncheckedCount} />
                       <ExitBadge status={exitStatus(r)} />
                     </span>
                   </div>
@@ -113,7 +113,7 @@ export function InspectionsView({
                 <thead className="text-left">
                   <tr className="border-b">
                     {["Fecha y hora", "Placa", "Conductor", "Ruta", "Estado", "Salida"].map((h) => (
-                      <th key={h} scope="col" className="micro-label px-4 py-3 font-medium">
+                      <th key={h} scope="col" className={cn("micro-label px-4 py-3 font-medium", h === "Fecha y hora" && "text-center")}>
                         {h}
                       </th>
                     ))}
@@ -125,13 +125,9 @@ export function InspectionsView({
                 <tbody className="divide-y">
                   {rows.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/50">
-                      <td className="num px-4 py-3 whitespace-nowrap">
-                        <Link
-                          href={`/preoperacionales/${r.id}`}
-                          className="underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/70"
-                        >
-                          {formatInspectionDate(r.inspectionDate)} {r.inspectionTime}
-                        </Link>
+                      <td className="num px-4 py-3 text-center whitespace-nowrap">
+                        <span className="block">{formatInspectionDate(r.inspectionDate)}</span>
+                        <span className="block text-xs text-muted-foreground">{r.inspectionTime}</span>
                       </td>
                       <td className="px-4 py-3">
                         <PlateCell row={r} linked />
@@ -145,8 +141,7 @@ export function InspectionsView({
                       <td className="px-4 py-3">{r.route}</td>
                       <td className="px-4 py-3">
                         <span className="flex flex-wrap items-center gap-1">
-                          <StatusBadge critical={r.hasCriticalFailure} />
-                          <UncheckedBadge count={r.uncheckedCount} />
+                          <StatusBadge critical={r.hasCriticalFailure} unchecked={r.uncheckedCount} />
                         </span>
                       </td>
                       <td className="px-4 py-3">
