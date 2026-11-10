@@ -99,6 +99,13 @@
       "when": 1794073060737,
       "tag": "0013_trips_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794073061237,
+      "tag": "0014_trips_drop_en_ruta",
+      "breakpoints": true
     }
   ]
 }

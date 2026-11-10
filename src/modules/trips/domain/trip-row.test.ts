@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterTrips, parsePlateParam, sortTrips, type TripRow } from "./trip-row";
+import { filterTrips, parsePlateParam, sortTrips, withEffectiveStatus, type TripRow } from "./trip-row";
 
 const row = (over: Partial<TripRow>): TripRow => ({
   id: 1,
@@ -31,10 +31,23 @@ describe("sortTrips", () => {
   });
 });
 
+describe("withEffectiveStatus", () => {
+  it("turns programado into entregado 12 hours after the start, without mutating", () => {
+    const rows = [
+      row({ id: 1, startAt: "2026-03-10T00:00:00.000Z" }),
+      row({ id: 2, startAt: "2026-03-10T00:00:01.000Z" }),
+      row({ id: 3, startAt: "2026-03-12T00:00:00.000Z" }),
+    ];
+    const out = withEffectiveStatus(rows, new Date("2026-03-10T12:00:00.000Z"));
+    expect(out.map((r) => r.status)).toEqual(["entregado", "programado", "programado"]);
+    expect(rows[0].status).toBe("programado");
+  });
+});
+
 describe("filterTrips", () => {
   const rows = [
     row({ id: 1, destination: "Cúcuta", plate: "ABC-123", area: "Cemento", status: "programado" }),
-    row({ id: 2, destination: "Medellín", plate: "XYZ-987", area: "Abono", status: "en_ruta" }),
+    row({ id: 2, destination: "Medellín", plate: "XYZ-987", area: "Abono", status: "programado" }),
     row({ id: 3, destination: "Cúcuta", plate: "DEF-456", area: "Abono", status: "entregado" }),
   ];
 
@@ -48,7 +61,7 @@ describe("filterTrips", () => {
   });
 
   it("filters by status", () => {
-    expect(filterTrips(rows, { status: "en_ruta", area: "ALL", query: "" }).map((r) => r.id)).toEqual([2]);
+    expect(filterTrips(rows, { status: "entregado", area: "ALL", query: "" }).map((r) => r.id)).toEqual([3]);
   });
 
   it("filters by area", () => {

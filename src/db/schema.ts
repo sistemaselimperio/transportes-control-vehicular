@@ -71,7 +71,7 @@ export const fileCategoryEnum = transportes.enum("file_category", [
   "OWNERSHIP_CARD",
   "OTHER",
 ]);
-export const tripStatusEnum = transportes.enum("trip_status", ["programado", "en_ruta", "entregado"]);
+export const tripStatusEnum = transportes.enum("trip_status", ["programado", "entregado"]);
 export const tripAreaEnum = transportes.enum("trip_area", [
   "Traslados",
   "Cemento",

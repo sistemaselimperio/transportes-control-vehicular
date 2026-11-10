@@ -7,7 +7,7 @@ const valid = {
   destination: "Medellín (Antioquia)",
   plate: "abc 123",
   area: "Cemento",
-  status: "en_ruta",
+  status: "entregado",
 };
 
 describe("tripSchema", () => {
@@ -18,7 +18,7 @@ describe("tripSchema", () => {
     expect(parsed.destination).toBe("Medellín (Antioquia)");
     expect(parsed.plate).toBe("ABC-123");
     expect(parsed.area).toBe("Cemento");
-    expect(parsed.status).toBe("en_ruta");
+    expect(parsed.status).toBe("entregado");
   });
 
   it("defaults the status to programado", () => {
@@ -65,6 +65,10 @@ describe("tripSchema", () => {
     expect(tripSchema.safeParse({ ...valid, notes: "a".repeat(500) }).success).toBe(true);
     const r = tripSchema.safeParse({ ...valid, notes: "a".repeat(501) });
     expect(!r.success && r.error.issues[0]?.message).toBe("La observación no puede pasar de 500 caracteres.");
+  });
+
+  it("rejects the retired en_ruta status", () => {
+    expect(tripSchema.safeParse({ ...valid, status: "en_ruta" }).success).toBe(false);
   });
 
   it("only accepts known statuses", () => {

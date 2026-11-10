@@ -4,6 +4,7 @@ import { canAssignDrivers, canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
 import { listVehicleTrips } from "@/modules/trips/application/trip-queries";
+import { withEffectiveStatus } from "@/modules/trips/domain/trip-row";
 import { getVehicleDetail } from "@/modules/vehicles/application/vehicle-queries";
 import { HISTORY_LIMIT, parseHistoryTab } from "@/modules/vehicles/domain/history-tab";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
@@ -40,7 +41,7 @@ export default async function Page({
       readOnly={!canManageSection(role, "fleet")}
       allowed={canAssignDrivers(role) ? ["driver"] : []}
       inspections={inspections}
-      trips={trips}
+      trips={withEffectiveStatus(trips, new Date())}
       historyTab={parseHistoryTab(query.historial)}
     />
   );

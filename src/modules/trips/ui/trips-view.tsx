@@ -56,7 +56,7 @@ export function TripsView({
     <section className="space-y-5">
       <PageHeader
         title="Viajes"
-        description="Viajes programados, en ruta y entregados de la flota."
+        description="Viajes programados y entregados de la flota."
         actions={
           canManage && (
             <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>

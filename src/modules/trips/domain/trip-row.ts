@@ -1,6 +1,6 @@
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import type { TripArea } from "./trip-areas";
-import type { TripStatus } from "./trip-status";
+import { effectiveStatus, type TripStatus } from "./trip-status";
 
 export interface TripRow {
   id: number;
@@ -14,6 +14,7 @@ export interface TripRow {
   /** Null once the vehicle was deleted. */
   vehicleId: number | null;
   area: TripArea;
+  /** As shown: the stored status, or "entregado" once 12 hours passed since the start (see `withEffectiveStatus`). */
   status: TripStatus;
   /** Free-text remark; null when none. */
   notes: string | null;
@@ -23,6 +24,14 @@ export interface TripFilters {
   status: TripStatus | "ALL";
   area: TripArea | "ALL";
   query: string;
+}
+
+/** Rows with the status as of `now`; call it per request, outside any cached read. */
+export function withEffectiveStatus<T extends Pick<TripRow, "startAt" | "status">>(rows: readonly T[], now: Date): T[] {
+  return rows.map((r) => {
+    const status = effectiveStatus(r.status, r.startAt, now);
+    return status === r.status ? r : { ...r, status };
+  });
 }
 
 /** Newest start first; the newest id breaks ties. */

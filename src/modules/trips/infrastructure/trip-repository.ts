@@ -63,6 +63,7 @@ export const tripRepository: TripPorts = {
         plate: schema.trips.plate,
         vehicleId: schema.trips.vehicleId,
         status: schema.trips.status,
+        startAt: schema.trips.startAt,
       })
       .from(schema.trips)
       .where(eq(schema.trips.id, id))
