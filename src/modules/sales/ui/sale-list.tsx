@@ -9,6 +9,7 @@ import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { deleteSaleAction } from "../application/sale-actions";
 import { formatPrice, type SaleRow } from "../domain/sale-row";
+import { PlateText } from "@/components/app/plate-text";
 
 const PLATE_LINK = "plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70";
 
@@ -111,7 +112,7 @@ export function SaleList({
           <li key={r.id} className="space-y-2 rounded-2xl border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
               <Link href={`/flota/${encodeURIComponent(r.plate)}`} className={PLATE_LINK}>
-                {r.plate}
+                <PlateText plate={r.plate} />
               </Link>
               <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
                 <span className="num text-sm text-muted-foreground">{dateText(r)}</span>
@@ -154,7 +155,7 @@ export function SaleList({
                   <td className="num px-4 py-3 whitespace-nowrap">{dateText(r)}</td>
                   <td className="px-4 py-3">
                     <Link href={`/flota/${encodeURIComponent(r.plate)}`} className={PLATE_LINK}>
-                      {r.plate}
+                      <PlateText plate={r.plate} />
                     </Link>
                   </td>
                   <td className="px-4 py-3">{r.className}</td>

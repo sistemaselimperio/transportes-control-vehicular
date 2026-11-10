@@ -6,6 +6,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import type { ItemKind } from "@/modules/dashboard/domain/dashboard-metrics";
 import type { Urgency } from "../domain/urgency";
 import type { QueueVehicle, VehicleGroup } from "../domain/vehicle-queue";
+import { PlateText } from "@/components/app/plate-text";
 
 const BLOCKS: Record<Urgency, { id: string; title: string; range: string; tone?: "danger" }> = {
   overdue: { id: "vencido", title: "Vencido", range: "ya pasó la fecha", tone: "danger" },
@@ -40,7 +41,7 @@ function VehicleRow({
           focus,
         )}
       >
-        <span className="plate">{vehicle.plate}</span>
+        <span className="plate"><PlateText plate={vehicle.plate} /></span>
       </button>
       <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5" aria-label={`Pendientes de ${vehicle.plate}`}>
         {vehicle.items.map((item) => (

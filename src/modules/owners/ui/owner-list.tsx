@@ -3,6 +3,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { PlateText } from "@/components/app/plate-text";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { GROUP_LABELS } from "@/modules/dashboard/domain/dashboard-metrics";
@@ -20,7 +21,7 @@ function Plates({ plates }: { plates: readonly string[] }) {
           href={`/flota/${encodeURIComponent(p)}`}
           className="plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
         >
-          {p}
+          <PlateText plate={p} />
         </Link>
       ))}
     </span>

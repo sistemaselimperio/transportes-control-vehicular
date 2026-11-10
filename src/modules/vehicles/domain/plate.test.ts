@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePlate } from "./plate";
+import { normalizePlate, splitPlate } from "./plate";
 
 describe("normalizePlate", () => {
   it("uppercases and trims", () => {
@@ -24,5 +24,17 @@ describe("normalizePlate", () => {
   });
   it("throws on empty input", () => {
     expect(() => normalizePlate("   ")).toThrow();
+  });
+});
+
+describe("splitPlate", () => {
+  it("splits a plate at its hyphen", () => {
+    expect(splitPlate("ABC-123")).toEqual(["ABC", "123"]);
+    expect(splitPlate("S-88490")).toEqual(["S", "88490"]);
+  });
+  it("returns null when there is no inner hyphen", () => {
+    expect(splitPlate("XYZ9")).toBeNull();
+    expect(splitPlate("-123")).toBeNull();
+    expect(splitPlate("ABC-")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, ClipboardCheck, FileText } from "lucide-react";
 import Link from "next/link";
+import { PlateText } from "@/components/app/plate-text";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/app/page-header";
 import { buttonVariants } from "@/components/ui/button";
@@ -21,13 +22,13 @@ function PlateCell({ row, linked }: { row: InspectionListRow; linked: boolean })
         href={`/flota/${encodeURIComponent(row.vehiclePlate)}`}
         className="plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
       >
-        {row.plate}
+        <PlateText plate={row.plate} />
       </Link>
     );
   }
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className="plate">{row.plate}</span>
+      <span className="plate"><PlateText plate={row.plate} /></span>
       {!row.vehiclePlate && <NotRegisteredBadge>Placa no registrada</NotRegisteredBadge>}
     </span>
   );

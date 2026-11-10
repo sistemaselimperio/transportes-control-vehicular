@@ -20,3 +20,10 @@ export function normalizePlate(raw: string): string {
 
   return compact;
 }
+
+/** The two sides of a plate's hyphen ("ABC-123" → ["ABC", "123"]), or null when it has none inside. */
+export function splitPlate(plate: string): [string, string] | null {
+  const at = plate.indexOf("-");
+  if (at <= 0 || at === plate.length - 1) return null;
+  return [plate.slice(0, at), plate.slice(at + 1)];
+}

@@ -11,6 +11,7 @@ import {
   type DriverRow,
   type DriverStatus,
 } from "../domain/driver-row";
+import { PlateText } from "@/components/app/plate-text";
 
 const STATUS_TONE: Record<DriverStatus, AlertStatus> = {
   ACTIVE: "ok",
@@ -28,7 +29,7 @@ function Plates({ plates }: { plates: readonly string[] }) {
           href={`/flota/${encodeURIComponent(p)}`}
           className="plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
         >
-          {p}
+          <PlateText plate={p} />
         </Link>
       ))}
     </span>

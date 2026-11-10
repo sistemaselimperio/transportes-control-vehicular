@@ -2,6 +2,7 @@
 
 import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { PlateText } from "@/components/app/plate-text";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTripDateTime } from "../domain/trip-datetime";
@@ -11,13 +12,13 @@ import { TripStatusBadge } from "./trip-status-badge";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
 function Plate({ row }: { row: TripRow }) {
-  if (row.vehicleId === null) return <span className="plate">{row.plate}</span>;
+  if (row.vehicleId === null) return <span className="plate"><PlateText plate={row.plate} /></span>;
   return (
     <Link
       href={`/flota/${encodeURIComponent(row.plate)}`}
       className="plate outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
     >
-      {row.plate}
+      <PlateText plate={row.plate} />
     </Link>
   );
 }

@@ -2,6 +2,7 @@
 
 import type { ColumnDef, RowData } from "@tanstack/react-table";
 import Link from "next/link";
+import { PlateText } from "@/components/app/plate-text";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { COLUMN_GROUPS, type ColumnGroupKey } from "../domain/column-groups";
@@ -57,7 +58,7 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
         href={`/flota/${encodeURIComponent(row.original.plate)}`}
         className="inline-flex rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
       >
-        <span className="plate">{row.original.plate}</span>
+        <span className="plate"><PlateText plate={row.original.plate} /></span>
       </Link>
     ),
   },

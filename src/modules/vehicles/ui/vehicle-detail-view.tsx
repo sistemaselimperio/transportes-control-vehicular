@@ -30,6 +30,7 @@ import {
   StatusSwitch,
   type ActionKey,
 } from "./vehicle-file-actions";
+import { PlateText } from "@/components/app/plate-text";
 
 /** One labelled value of the technical sheet; a missing value reads as a muted dash. */
 function Spec({ label, value }: { label: string; value: string }) {
@@ -139,7 +140,7 @@ function TrailerHeader({ r, towedByPlate }: { r: VehicleGridRow; towedByPlate: s
         Flota
       </Link>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="plate plate-lg">{r.plate}</h1>
+        <h1 className="plate plate-lg"><PlateText plate={r.plate} /></h1>
         <div className="min-w-0 flex-1 basis-56">
           {r.className && <p className="micro-label">{r.className}</p>}
           <p className="mt-0.5 truncate text-lg leading-tight font-semibold tracking-tight">
@@ -154,7 +155,7 @@ function TrailerHeader({ r, towedByPlate }: { r: VehicleGridRow; towedByPlate: s
                 className="plate rounded-[5px] outline-none transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
                 title={`Ver la ficha de ${towedByPlate}`}
               >
-                {towedByPlate}
+                <PlateText plate={towedByPlate} />
               </Link>
             </p>
           ) : (
@@ -188,7 +189,7 @@ function TrailerLink({ trailerPlate }: { trailerPlate: string }) {
         className="plate rounded-[5px] outline-none transition-opacity duration-150 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/70"
         title={`Ver la ficha del remolque ${trailerPlate}`}
       >
-        {trailerPlate}
+        <PlateText plate={trailerPlate} />
       </Link>
       <InlineAction action="trailer">Cambiar</InlineAction>
     </div>
@@ -211,7 +212,7 @@ function FileHeader({ r, trailerPlate }: { r: VehicleGridRow; trailerPlate: stri
         Flota
       </Link>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="plate plate-lg">{r.plate}</h1>
+        <h1 className="plate plate-lg"><PlateText plate={r.plate} /></h1>
         <div className="min-w-0 flex-1 basis-56">
           {r.className && <p className="micro-label">{r.className}</p>}
           <div className="mt-0.5 flex min-w-0 items-center gap-1">

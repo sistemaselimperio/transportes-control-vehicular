@@ -12,6 +12,7 @@ import {
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import type { ItemKind } from "@/modules/dashboard/domain/dashboard-metrics";
 import type { QueueVehicle } from "../domain/vehicle-queue";
+import { PlateText } from "@/components/app/plate-text";
 
 /**
  * One vehicle's pending items and the form that resolves the chosen one.
@@ -38,7 +39,7 @@ export function VehicleDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
-        {showPlate ? <span className="plate">{vehicle.plate}</span> : <span className="micro-label">Pendientes</span>}
+        {showPlate ? <span className="plate"><PlateText plate={vehicle.plate} /></span> : <span className="micro-label">Pendientes</span>}
         <Link
           href={`/flota/${encodeURIComponent(vehicle.plate)}`}
           className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-sm font-medium text-foreground outline-none transition-colors duration-150 hover:text-brand focus-visible:ring-2 focus-visible:ring-ring/70 md:min-h-9"

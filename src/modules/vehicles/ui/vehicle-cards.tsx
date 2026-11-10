@@ -3,6 +3,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { technicalProgress } from "../domain/technical-data";
 import { ProgressBadge } from "./progress-badge";
 import type { VehicleGridRow } from "../domain/vehicle-row";
+import { PlateText } from "@/components/app/plate-text";
 
 /** Mobile list: one tappable card per vehicle (no horizontal scrolling). */
 export function VehicleCards({ rows }: { rows: readonly VehicleGridRow[] }) {
@@ -17,7 +18,7 @@ export function VehicleCards({ rows }: { rows: readonly VehicleGridRow[] }) {
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 space-y-1.5">
-                <span className="plate">{r.plate}</span>
+                <span className="plate"><PlateText plate={r.plate} /></span>
                 <div className="truncate text-sm text-muted-foreground">
                   {[r.className, r.brandLine].filter(Boolean).join(" · ")}
                 </div>

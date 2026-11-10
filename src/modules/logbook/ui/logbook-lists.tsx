@@ -3,6 +3,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { PlateText } from "@/components/app/plate-text";
 import { useState, useTransition, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
@@ -126,7 +127,7 @@ export const FUEL_SPEC: Spec<FuelRow> = {
 function PlateLink({ plate }: { plate: string }) {
   return (
     <Link href={`/flota/${encodeURIComponent(plate)}`} className={PLATE_LINK}>
-      {plate}
+      <PlateText plate={plate} />
     </Link>
   );
 }
