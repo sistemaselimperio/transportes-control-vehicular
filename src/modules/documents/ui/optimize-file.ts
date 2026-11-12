@@ -4,7 +4,15 @@
  * smaller, falls back to the original file. Which files get touched is decided by the
  * pure `planOptimization`; this module only does the canvas / pdf.js work.
  */
-import { fitWithin, MAX_IMAGE_SIDE, planOptimization } from "./optimize-plan";
+import { fitWithin, isScannedPdf, MAX_IMAGE_SIDE, planOptimization } from "./optimize-plan";
+
+/** Pages read to decide whether a PDF is scanned; enough for a first invoice, cheap to extract. */
+const TEXT_SAMPLE_PAGES = 3;
+
+export type OptimizeOptions = {
+  /** Keep digital PDFs (with a text layer) untouched; only scanned ones are rasterized. */
+  keepDigitalPdf?: boolean;
+};
 
 const IMAGE_QUALITY = 0.75;
 const PDF_PAGE_QUALITY = 0.6;
@@ -46,7 +54,7 @@ async function optimizeImage(file: File): Promise<File> {
   });
 }
 
-async function optimizePdf(file: File): Promise<File> {
+async function optimizePdf(file: File, options: OptimizeOptions): Promise<File> {
   // Loaded on demand: pdf.js is heavy and only large PDFs need it.
   const [pdfjs, { PDFDocument }] = await Promise.all([import("pdfjs-dist"), import("pdf-lib")]);
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -54,6 +62,14 @@ async function optimizePdf(file: File): Promise<File> {
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
   const source = await task.promise;
   try {
+    if (options.keepDigitalPdf) {
+      const chars: number[] = [];
+      for (let n = 1; n <= Math.min(source.numPages, TEXT_SAMPLE_PAGES); n++) {
+        const content = await (await source.getPage(n)).getTextContent();
+        chars.push(content.items.reduce((sum, item) => sum + ("str" in item ? item.str.trim().length : 0), 0));
+      }
+      if (!isScannedPdf(chars)) return file;
+    }
     const out = await PDFDocument.create();
     for (let n = 1; n <= source.numPages; n++) {
       const page = await source.getPage(n);
@@ -99,11 +115,11 @@ export async function trimPdfPages(file: File, maxPages: number | null): Promise
   }
 }
 
-export async function optimizeFile(file: File): Promise<File> {
+export async function optimizeFile(file: File, options: OptimizeOptions = {}): Promise<File> {
   const plan = planOptimization({ mimeType: file.type, size: file.size });
   if (plan === "keep") return file;
   try {
-    return plan === "image" ? await optimizeImage(file) : await optimizePdf(file);
+    return plan === "image" ? await optimizeImage(file) : await optimizePdf(file, options);
   } catch (e) {
     console.warn("file optimization failed, uploading the original", e);
     return file;

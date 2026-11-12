@@ -458,6 +458,8 @@ export const user = transportes.table("user", {
   role: text().notNull().default("staff"),
   /** "yellow" (brand default) or "sky": the palette the app shell renders in (see `src/lib/theme.ts`). */
   theme: text().notNull().default("yellow"),
+  /** Only users with this flag see and use the petty-cash ledgers (see `src/modules/petty-cash`). */
+  hasPettyCash: boolean("has_petty_cash").notNull().default(false),
 });
 
 export const session = transportes.table("session", {
@@ -514,4 +516,91 @@ export const verification = transportes.table("verification", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+/* ------------------------- Petty cash (caja menor) ------------------------- */
+
+export const pettyCashResponsibilityEnum = transportes.enum("petty_cash_responsibility", [
+  "none_active",
+  "electronic_invoicer",
+]);
+
+/**
+ * The opening balance of a user's very first ledger, typed by hand. Every later opening balance
+ * is derived on read from the previous closing balance, so nothing else is stored.
+ */
+export const pettyCashAccounts = transportes.table("petty_cash_accounts", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  initialBalance: integer("initial_balance").notNull().default(0),
+});
+
+/** One cut per cash injection ("compense"). Amounts are whole pesos. */
+export const pettyCashLedgers = transportes.table(
+  "petty_cash_ledgers",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** The user's own consecutive number ("Planilla 12"): permanent, never reused or renumbered. */
+    number: integer().notNull(),
+    date: date({ mode: "string" }).notNull(),
+    compenseAmount: integer("compense_amount").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("petty_cash_ledgers_user_date_idx").on(t.userId, t.date),
+    uniqueIndex("petty_cash_ledgers_user_number_uq").on(t.userId, t.number),
+  ],
+);
+
+/**
+ * An expense of a ledger. `nit` and `supplierName` identify the supplier that issued the invoice;
+ * `company` is the party the invoice is billed to (an owner when `ownerId` links one: a soft link
+ * that goes null if the owner is deleted, `company` keeps the text). `vehicleLabel` is the plate of
+ * the fleet vehicle when `vehicleId` links one (also a soft link), else free text.
+ * Expenses read by the AI import start with `needsReview` and may lack the NIT, the vehicle or the
+ * value (a null value counts as zero in the totals) until someone completes them.
+ * The attachment bytes live in Supabase Storage at `attachmentPath`.
+ */
+export const pettyCashExpenses = transportes.table(
+  "petty_cash_expenses",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    ledgerId: integer("ledger_id")
+      .notNull()
+      .references(() => pettyCashLedgers.id, { onDelete: "cascade" }),
+    detail: text().notNull(),
+    invoiceNumber: text("invoice_number"),
+    efk: text(),
+    nit: text(),
+    supplierName: text("supplier_name"),
+    company: text(),
+    ownerId: integer("owner_id").references(() => owners.id, { onDelete: "set null" }),
+    responsibilityType: pettyCashResponsibilityEnum("responsibility_type"),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    vehicleLabel: text("vehicle_label"),
+    value: integer(),
+    needsReview: boolean("needs_review").notNull().default(false),
+    /** Another expense of the same user has the same supplier NIT and invoice number. */
+    possibleDuplicate: boolean("possible_duplicate").notNull().default(false),
+    attachmentPath: text("attachment_path"),
+    attachmentName: text("attachment_name"),
+    attachmentMime: text("attachment_mime"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("petty_cash_expenses_ledger_idx").on(t.ledgerId),
+    check("petty_cash_expenses_value_positive", sql`${t.value} > 0`),
+  ],
+);
+
+/** Issuing suppliers by NIT (digits only), shared by every petty-cash user, to complete new expenses. */
+export const pettyCashSuppliers = transportes.table("petty_cash_suppliers", {
+  nit: text().primaryKey(),
+  supplierName: text("supplier_name"),
+  responsibilityType: pettyCashResponsibilityEnum("responsibility_type"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

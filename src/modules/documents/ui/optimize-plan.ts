@@ -12,6 +12,17 @@ export function planOptimization(file: { mimeType: string; size: number }): Opti
   return "keep";
 }
 
+/** Below this many text characters a page has no real text layer (only stray OCR marks or none). */
+const TEXT_LAYER_MIN_CHARS = 40;
+
+/**
+ * A PDF is scanned when none of the sampled pages has a text layer. Digital PDFs (electronic
+ * invoices) must not be rasterized: their text is what lets the AI read them reliably.
+ */
+export function isScannedPdf(textCharsPerPage: readonly number[]): boolean {
+  return !textCharsPerPage.some((chars) => chars >= TEXT_LAYER_MIN_CHARS);
+}
+
 /** Scales (width, height) down so the longest side is at most `max`; never upscales. */
 export function fitWithin(width: number, height: number, max: number): { width: number; height: number } {
   const longest = Math.max(width, height);

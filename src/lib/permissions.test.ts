@@ -4,6 +4,7 @@ import {
   canManageDrivers,
   canManageSection,
   canManageTrips,
+  canUsePettyCash,
   canViewSection,
   ForbiddenError,
   homePath,
@@ -138,5 +139,19 @@ describe("canManageTrips", () => {
   it("allows only staff to create, edit and delete trips; an admin just reads them", () => {
     expect(canManageTrips("staff")).toBe(true);
     expect(canManageTrips("admin")).toBe(false);
+  });
+});
+
+describe("canUsePettyCash", () => {
+  it("is only for users flagged for it, whatever their role", () => {
+    expect(canUsePettyCash(true)).toBe(true);
+    expect(canUsePettyCash(false)).toBe(false);
+  });
+
+  it("is closed for anything that is not exactly true", () => {
+    expect(canUsePettyCash(undefined)).toBe(false);
+    expect(canUsePettyCash(null)).toBe(false);
+    expect(canUsePettyCash("true")).toBe(false);
+    expect(canUsePettyCash(1)).toBe(false);
   });
 });

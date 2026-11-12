@@ -1,0 +1,1 @@
+ALTER TABLE "transportes"."petty_cash_expenses" ADD COLUMN "efk" text;

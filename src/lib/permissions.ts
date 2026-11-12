@@ -89,6 +89,14 @@ export function canAssignDrivers(role: Role): boolean {
   return canViewSection(role, "fleet") && canManageDrivers(role);
 }
 
+/**
+ * Petty cash (caja) is outside the role matrix: only users flagged with `hasPettyCash`
+ * (a column on the user) see or use it, whatever their role. Closed for anything but `true`.
+ */
+export function canUsePettyCash(flag: unknown): boolean {
+  return flag === true;
+}
+
 /** The first section the role can see: where a redirect from a forbidden page lands. */
 export function homePath(role: Role): string {
   return role === "admin" ? "/" : "/flota";
