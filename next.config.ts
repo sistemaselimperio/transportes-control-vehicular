@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     // The maintenance placeholder became the logbook; keep old links (and their query) working.
-    return [{ source: "/mantenimiento", destination: "/bitacora", permanent: true }];
+    return [
+      { source: "/mantenimiento", destination: "/bitacora", permanent: true },
+      // Petty cash moved from /caja-menor to /caja.
+      { source: "/caja-menor/:path*", destination: "/caja/:path*", permanent: true },
+      { source: "/caja-menor", destination: "/caja", permanent: true },
+    ];
   },
   turbopack: {
     rules: {

@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  Banknote,
   Building2,
   ClipboardCheck,
   Loader2,
@@ -21,7 +22,7 @@ import { useState } from "react";
 import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
 import { authClient } from "@/lib/auth-client";
-import { canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
+import { canUsePettyCash, canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { ExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
@@ -32,7 +33,11 @@ type NavItem = {
   icon: LucideIcon;
   /** Shows the expired-vehicle count after the label. */
   badge?: "expired";
+  /** Outside the role matrix: only users flagged with petty-cash access see it at all. */
+  requiresPettyCash?: boolean;
 };
+
+const PETTY_CASH_PATH = "/caja";
 
 const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
@@ -51,6 +56,7 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
     items: [
       { href: "/propietarios", label: "Propietarios", icon: Building2 },
       { href: "/ventas", label: "Ventas", icon: Receipt },
+      { href: PETTY_CASH_PATH, label: "Caja", icon: Banknote, requiresPettyCash: true },
     ],
   },
 ];
@@ -71,6 +77,7 @@ const GROUPS: ReadonlyArray<{
 interface BodyProps {
   pathname: string;
   role: Role;
+  hasPettyCash: boolean;
   grupo: OwnerGroup | null;
   /** Query string of the current page, kept when only the group changes. */
   currentQuery: string;
@@ -94,7 +101,7 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
   return qs ? `${path}?${qs}` : path;
 }
 
-function SidebarBody({ pathname, role, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
+function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
@@ -118,11 +125,12 @@ function SidebarBody({ pathname, role, grupo, currentQuery, userName, expiredVeh
         {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
-            {section.items.map((item) => {
+            {section.items.filter((item) => !item.requiresPettyCash || canUsePettyCash(hasPettyCash)).map((item) => {
               const target = sectionOfPath(item.href);
               const Icon = item.icon;
               // Every role sees every entry; the ones it cannot open stay in place, disabled.
-              if (target == null || !canViewSection(role, target)) {
+              // Petty cash is not a role section: its entry only renders for users that have access.
+              if (!item.requiresPettyCash && (target == null || !canViewSection(role, target))) {
                 return (
                   <div
                     key={item.href}
@@ -271,10 +279,12 @@ function BrandStacked() {
 export function Sidebar({
   userName,
   role,
+  hasPettyCash,
   expiredCounts,
 }: {
   userName: string;
   role: Role;
+  hasPettyCash: boolean;
   /** Only the roles that can open the alerts page get the counts. */
   expiredCounts: ExpiredVehicleCounts | null;
 }) {
@@ -287,6 +297,7 @@ export function Sidebar({
   const shared = {
     pathname,
     role,
+    hasPettyCash,
     grupo,
     currentQuery,
     userName,

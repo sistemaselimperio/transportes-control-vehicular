@@ -21,6 +21,13 @@ function bucket() {
   return client.storage.from(process.env.SUPABASE_FILES_BUCKET || VEHICLE_FILES_BUCKET);
 }
 
+/** A URL the browser can PUT one file to (multipart, as the Storage API expects), without credentials. */
+export async function createSignedUploadUrl(path: string): Promise<string> {
+  const { data, error } = await bucket().createSignedUploadUrl(path);
+  if (error) throw new Error(`Storage signed upload failed: ${error.message}`, { cause: error });
+  return data.signedUrl;
+}
+
 export const supabaseFileStorage: VehicleFileStorage = {
   async put(path, data, mimeType) {
     const { error } = await bucket().upload(path, data, { contentType: mimeType, upsert: false });

@@ -31,6 +31,8 @@ export const auth = betterAuth({
       role: { type: "string", required: true, defaultValue: "staff", input: false },
       // Same for the theme.
       theme: { type: "string", required: true, defaultValue: "yellow", input: false },
+      // Same for the petty-cash access flag.
+      hasPettyCash: { type: "boolean", required: true, defaultValue: false, input: false },
     },
   },
   plugins: [

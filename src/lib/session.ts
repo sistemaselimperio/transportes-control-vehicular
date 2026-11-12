@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canManageSection, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canManageSection, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 import { parseTheme } from "@/lib/theme";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
@@ -56,4 +56,23 @@ export async function requireSectionAccess(section: Section) {
   if (!role) redirect("/login");
   if (!canViewSection(role, section)) redirect(homePath(role));
   return role;
+}
+
+/**
+ * Petty-cash reads and writes: only users flagged with `hasPettyCash` (not a role). The flag is read
+ * from the stored session user on every call, so it cannot be skipped by calling an action directly.
+ * Throws `ForbiddenError` otherwise.
+ */
+export async function requirePettyCash() {
+  const session = await requireSession();
+  if (!canUsePettyCash(session.user.hasPettyCash)) throw new ForbiddenError();
+  return session;
+}
+
+/** For petty-cash pages: sends a signed-out user to the login and anyone without the flag to its home. */
+export async function requirePettyCashAccess() {
+  const session = await getRequestSession();
+  if (!session) redirect("/login");
+  if (!canUsePettyCash(session.user.hasPettyCash)) redirect(homePath(parseRole(session.user.role)));
+  return session;
 }

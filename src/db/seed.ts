@@ -62,6 +62,8 @@ async function seedUser(user: {
   name: string;
   role: "admin" | "staff";
   theme: Theme;
+  /** Sees the petty-cash ledgers (caja menor). */
+  hasPettyCash?: boolean;
   passwordVar: string;
 }) {
   const password = process.env[user.passwordVar];
@@ -75,6 +77,9 @@ async function seedUser(user: {
     .where(eq(schema.user.username, user.username));
   if (existing) {
     console.log(`User '${user.username}' already exists.`);
+    if (user.hasPettyCash) {
+      await db.update(schema.user).set({ hasPettyCash: true }).where(eq(schema.user.id, existing.id));
+    }
     return;
   }
   const id = crypto.randomUUID();
@@ -87,6 +92,7 @@ async function seedUser(user: {
     displayUsername: user.username,
     role: user.role,
     theme: user.theme,
+    hasPettyCash: user.hasPettyCash ?? false,
   });
   await db.insert(schema.account).values({
     id: crypto.randomUUID(),
@@ -99,7 +105,7 @@ async function seedUser(user: {
 }
 
 const seedAdmin = () =>
-  seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", passwordVar: "SEED_ADMIN_PASSWORD" });
+  seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
   seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", passwordVar: "SEED_LEIDY_PASSWORD" });
 

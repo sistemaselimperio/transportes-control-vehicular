@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { MAX_FILE_BYTES } from "../domain/vehicle-file-rules";
-import { fitWithin, planOptimization } from "./optimize-plan";
+import { fitWithin, isScannedPdf, planOptimization } from "./optimize-plan";
+
+describe("isScannedPdf", () => {
+  it("treats pages with almost no text as scanned", () => {
+    expect(isScannedPdf([0, 0, 3])).toBe(true);
+    expect(isScannedPdf([])).toBe(true);
+  });
+
+  it("treats pages with a text layer as digital", () => {
+    expect(isScannedPdf([850, 1200])).toBe(false);
+  });
+
+  it("is digital when any sampled page carries real text", () => {
+    // A digital invoice may come after a scanned cover page.
+    expect(isScannedPdf([0, 640])).toBe(false);
+  });
+});
 
 const KB = 1024;
 const MB = 1024 * KB;
