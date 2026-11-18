@@ -14,8 +14,8 @@ export type ChecklistSection = {
   title: string;
   /** Extra line under the title, e.g. what the items refer to. */
   hint?: string;
-  /** Only applies to a tractor-trailer (mula); the form can mark it "no aplica". */
-  muleOnly?: boolean;
+  /** Present when the section may not apply to the vehicle: the text of the form's "no aplica" checkbox. */
+  notApplicableLabel?: string;
   items: readonly ChecklistItem[];
 };
 
@@ -115,7 +115,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   {
     id: "mule",
     title: "Solo mula",
-    muleOnly: true,
+    notApplicableLabel: "No aplica (el vehículo no es mula)",
     items: [
       critical("mule.fifth-wheel", "Quinta rueda y pin asegurados"),
       critical("mule.trailer-connections", "Conexiones de aire y luz del remolque"),
@@ -126,6 +126,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   {
     id: "road-kit",
     title: "Equipo de carretera",
+    notApplicableLabel: "No aplica",
     items: [
       regular("road-kit.jack", "Gato"),
       regular("road-kit.wheel-wrench", "Cruceta"),
@@ -140,6 +141,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   {
     id: "ppe",
     title: "Elementos de protección personal",
+    notApplicableLabel: "No aplica",
     items: [
       regular("ppe.helmet", "Casco"),
       regular("ppe.glasses", "Gafas"),
@@ -155,6 +157,11 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
     items: [regular("prohibited.illegal-items", "Sin elementos ilegales a bordo")],
   },
 ];
+
+/** True when the form lets the inspector mark the section "no aplica". */
+export function canBeNotApplicable(section: ChecklistSection): boolean {
+  return section.notApplicableLabel !== undefined;
+}
 
 /** Every item of every section, in form order. */
 export const ALL_CHECKLIST_ITEMS: readonly ChecklistItem[] = PREOPERATIONAL_CHECKLIST.flatMap((s) => s.items);

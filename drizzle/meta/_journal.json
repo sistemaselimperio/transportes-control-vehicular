@@ -134,6 +134,27 @@
       "when": 1794434594747,
       "tag": "0018_petty_cash_ledger_number",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795008866138,
+      "tag": "0019_preoperational_daily_report",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795028982323,
+      "tag": "0020_preoperational_rest_hours_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795031078265,
+      "tag": "0021_preoperational_not_applicable_sections",
+      "breakpoints": true
     }
   ]
 }

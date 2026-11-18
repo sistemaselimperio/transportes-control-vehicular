@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, findChecklistItem } from "./preoperational-checklist";
+import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, canBeNotApplicable, findChecklistItem } from "./preoperational-checklist";
 import {
   applicableItems,
   uncheckedCount,
   type InspectionAnswers,
   bogotaDateTime,
   failedCriticalItems,
+  FUEL_OPTIONS,
+  MAX_LOCATION_LENGTH,
+  MAX_REST_HOURS_LENGTH,
   MAX_SIGNATURE_LENGTH,
   validateInspection,
 } from "./preoperational-inspection";
 
 const SIGNATURE = "data:image/png;base64,iVBORw0KGgo=";
 
-const allBien = (muleNotApplicable = false) =>
-  Object.fromEntries(applicableItems(muleNotApplicable).map((item) => [item.id, { status: "BIEN" }]));
+const allBien = (notApplicable: string[] = []) =>
+  Object.fromEntries(applicableItems(notApplicable).map((item) => [item.id, { status: "BIEN" }]));
 
 const draft = (over: Record<string, unknown> = {}) => ({
   date: "2026-03-14",
@@ -24,7 +27,11 @@ const draft = (over: Record<string, unknown> = {}) => ({
   driverId: "1234567",
   odometer: "150000",
   route: "Bogotá - Cartagena",
-  muleNotApplicable: false,
+  restHours: "8",
+  location: "Peaje Papiros",
+  fuel: "No requiere tanqueo",
+  pendingMaintenance: "Ninguno",
+  notApplicableSections: [],
   answers: allBien(),
   signature: SIGNATURE,
   ...over,
@@ -41,8 +48,8 @@ describe("PREOPERATIONAL_CHECKLIST", () => {
     expect(ALL_CHECKLIST_ITEMS.find((i) => i.id === "prohibited.illegal-items")?.critical).toBe(false);
   });
 
-  it("marks only the mule section as mule-only", () => {
-    expect(PREOPERATIONAL_CHECKLIST.filter((s) => s.muleOnly).map((s) => s.id)).toEqual(["mule"]);
+  it("lets only the mule, road kit and PPE sections be marked not applicable", () => {
+    expect(PREOPERATIONAL_CHECKLIST.filter(canBeNotApplicable).map((s) => s.id)).toEqual(["mule", "road-kit", "ppe"]);
   });
 
   it("flags the critical points", () => {
@@ -53,8 +60,20 @@ describe("PREOPERATIONAL_CHECKLIST", () => {
 
 describe("applicableItems", () => {
   it("includes the mule items unless they do not apply", () => {
-    expect(applicableItems(false).some((i) => i.id === "mule.fifth-wheel")).toBe(true);
-    expect(applicableItems(true).some((i) => i.id === "mule.fifth-wheel")).toBe(false);
+    expect(applicableItems([]).some((i) => i.id === "mule.fifth-wheel")).toBe(true);
+    expect(applicableItems(["mule"]).some((i) => i.id === "mule.fifth-wheel")).toBe(false);
+  });
+
+  it("drops road kit and PPE items independently", () => {
+    const ids = (na: string[]) => applicableItems(na).map((i) => i.id);
+    expect(ids(["road-kit"]).some((id) => id.startsWith("road-kit."))).toBe(false);
+    expect(ids(["road-kit"]).some((id) => id.startsWith("ppe."))).toBe(true);
+    expect(ids(["ppe"]).some((id) => id.startsWith("ppe."))).toBe(false);
+    expect(ids(["ppe"]).some((id) => id.startsWith("road-kit."))).toBe(true);
+  });
+
+  it("ignores sections that cannot be not applicable, and unknown ids", () => {
+    expect(applicableItems(["cabin", "nope"])).toEqual(applicableItems([]));
   });
 });
 
@@ -109,7 +128,7 @@ describe("validateInspection", () => {
       driverNationalId: "1234567",
       odometer: "150000",
       route: "Bogotá - Cartagena",
-      muleNotApplicable: false,
+      notApplicableSections: [],
       hasCriticalFailure: false,
       signature: SIGNATURE,
     });
@@ -246,13 +265,25 @@ describe("validateInspection", () => {
   });
 
   it("does not require the mule items when they do not apply, and discards them", () => {
-    const answers = { ...allBien(true), "mule.fifth-wheel": { status: "MAL", note: "stale" } };
-    const result = validateInspection(draft({ muleNotApplicable: true, answers }));
+    const answers = { ...allBien(["mule"]), "mule.fifth-wheel": { status: "MAL", note: "stale" } };
+    const result = validateInspection(draft({ notApplicableSections: ["mule"], answers }));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.muleNotApplicable).toBe(true);
+    expect(result.value.notApplicableSections).toEqual(["mule"]);
     expect(result.value.hasCriticalFailure).toBe(false);
     expect(Object.keys(result.value.answers)).not.toContain("mule.fifth-wheel");
+  });
+
+  it("skips road kit and PPE independently, discards their answers and keeps only valid ids", () => {
+    const answers = { ...allBien(["road-kit", "ppe"]), "ppe.helmet": { status: "MAL", note: "stale" } };
+    const result = validateInspection(
+      draft({ notApplicableSections: ["road-kit", "ppe", "cabin", "bogus", "ppe"], answers }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.notApplicableSections).toEqual(["road-kit", "ppe"]);
+    expect(Object.keys(result.value.answers).some((id) => id.startsWith("ppe.") || id.startsWith("road-kit."))).toBe(false);
+    expect(result.value.hasCriticalFailure).toBe(false);
   });
 
   it("requires the mule items when they apply", () => {
@@ -320,19 +351,69 @@ describe("bogotaDateTime", () => {
 
 describe("uncheckedCount", () => {
   it("is zero when everything applicable is answered", () => {
-    expect(uncheckedCount(allBien() as InspectionAnswers, false)).toBe(0);
+    expect(uncheckedCount(allBien() as InspectionAnswers, [])).toBe(0);
   });
 
   it("counts the applicable items without an answer", () => {
     const answers = allBien() as Record<string, { status: "BIEN" | "MAL" }>;
     delete answers["tires.spare"];
     delete answers["cabin.horn"];
-    expect(uncheckedCount(answers, false)).toBe(2);
+    expect(uncheckedCount(answers, [])).toBe(2);
   });
 
   it("ignores the mule items when they do not apply", () => {
-    const answers = allBien(true) as Record<string, { status: "BIEN" | "MAL" }>;
-    expect(uncheckedCount(answers, true)).toBe(0);
-    expect(uncheckedCount(answers, false)).toBe(applicableItems(false).length - applicableItems(true).length);
+    const answers = allBien(["mule"]) as Record<string, { status: "BIEN" | "MAL" }>;
+    expect(uncheckedCount(answers, ["mule"])).toBe(0);
+    expect(uncheckedCount(answers, [])).toBe(applicableItems([]).length - applicableItems(["mule"]).length);
+  });
+
+  it("ignores road kit and PPE items when they do not apply", () => {
+    const na = ["road-kit", "ppe"];
+    expect(uncheckedCount(allBien(na) as InspectionAnswers, na)).toBe(0);
+    expect(uncheckedCount(allBien(na) as InspectionAnswers, [])).toBeGreaterThan(0);
+  });
+});
+
+describe("validateInspection daily report", () => {
+  const errorsOf = (over: Record<string, unknown>) => {
+    const result = validateInspection(draft(over));
+    return result.ok ? null : result.errors;
+  };
+
+  it("accepts the four fields and trims / collapses the texts", () => {
+    const result = validateInspection(
+      draft({ restHours: "  8 horas,  de 9 p. m. a 5 a. m. ", location: "  Peaje   Papiros ", fuel: "Requiere tanqueo", pendingMaintenance: " Ninguno " }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.restHours).toBe("8 horas, de 9 p. m. a 5 a. m.");
+      expect(result.value.location).toBe("Peaje Papiros");
+      expect(result.value.fuel).toBe("Requiere tanqueo");
+      expect(result.value.pendingMaintenance).toBe("Ninguno");
+    }
+  });
+
+  it("requires all four", () => {
+    const errors = errorsOf({ restHours: "", location: " ", fuel: "", pendingMaintenance: "" });
+    expect(errors?.restHours).toBeTruthy();
+    expect(errors?.location).toBeTruthy();
+    expect(errors?.fuel).toBeTruthy();
+    expect(errors?.pendingMaintenance).toBeTruthy();
+  });
+
+  it("takes the rest hours as free text", () => {
+    expect(errorsOf({ restHours: "Ocho" })).toBeNull();
+    expect(errorsOf({ restHours: null })?.restHours).toBeTruthy();
+    expect(errorsOf({ restHours: "x".repeat(MAX_REST_HOURS_LENGTH + 1) })?.restHours).toBeTruthy();
+  });
+
+  it("only accepts one of the two fuel options", () => {
+    expect(FUEL_OPTIONS).toEqual(["Requiere tanqueo", "No requiere tanqueo"]);
+    for (const ok of FUEL_OPTIONS) expect(errorsOf({ fuel: ok })).toBeNull();
+    expect(errorsOf({ fuel: "Full" })?.fuel).toBe("Elija si requiere tanqueo.");
+  });
+
+  it("limits the text lengths", () => {
+    expect(errorsOf({ location: "x".repeat(MAX_LOCATION_LENGTH + 1) })?.location).toBeTruthy();
   });
 });

@@ -377,8 +377,18 @@ export const preoperationalInspections = transportes.table(
     driverNationalId: text("driver_national_id").notNull(),
     odometer: text().notNull(),
     route: text().notNull(),
-    /** The vehicle is not a mule: the mule-only items were not asked. */
+    /**
+     * "Parte diario" tab of the public form. Nullable because rows saved before the tab existed have
+     * none; new submissions must carry all four (the domain validation requires them).
+     */
+    restHours: text("rest_hours"),
+    location: text(),
+    fuel: text(),
+    pendingMaintenance: text("pending_maintenance"),
+    /** Legacy: superseded by `notApplicableSections`; still written (true when "mule" is skipped) for compatibility. */
     muleNotApplicable: boolean("mule_not_applicable").notNull().default(false),
+    /** Ids of the checklist sections marked "no aplica": their items were not asked. */
+    notApplicableSections: jsonb("not_applicable_sections").$type<string[]>().notNull().default([]),
     /** Checklist item id to `{ status: "BIEN" | "MAL", note? }`; ids live in the domain checklist. */
     answers: jsonb().$type<Record<string, { status: "BIEN" | "MAL"; note?: string }>>().notNull(),
     /** Computed server-side: some critical point (★) is MAL. */

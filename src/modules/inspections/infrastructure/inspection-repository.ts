@@ -4,7 +4,8 @@ import { db, schema } from "@/db";
 import type { ClosureInput, ExitDecision, ExitDecisionInput } from "../domain/exit-decision";
 import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, type InspectionFilters } from "../domain/inspection-filters";
 import { applySelectedDriver, resolveInspectionLinks, type InspectionLinks } from "../domain/inspection-links";
-import { uncheckedCount, type InspectionAnswers, type ValidInspection } from "../domain/preoperational-inspection";
+import { latestPerPlate, type DailyReportRow } from "../domain/daily-report";
+import { storedNotApplicable, uncheckedCount, type InspectionAnswers, type ValidInspection } from "../domain/preoperational-inspection";
 
 const t = schema.preoperationalInspections;
 const vehicle = schema.vehicles;
@@ -48,10 +49,16 @@ export type InspectionClosure = {
 
 export type InspectionDetail = Omit<InspectionListRow, "uncheckedCount"> & {
   createdAt: Date;
+  /** "Parte diario" fields; null on inspections saved before that tab existed. */
+  restHours: string | null;
+  location: string | null;
+  fuel: string | null;
+  pendingMaintenance: string | null;
   trailerPlate: string | null;
   driverNationalId: string;
   odometer: string;
-  muleNotApplicable: boolean;
+  /** Ids of the checklist sections marked "no aplica". */
+  notApplicableSections: string[];
   answers: InspectionAnswers;
   signature: string;
   trailerVehicleId: number | null;
@@ -121,7 +128,12 @@ export async function insertInspection(value: ValidInspection): Promise<{ ok: tr
     driverNationalId: identity.driverNationalId,
     odometer: value.odometer,
     route: value.route,
-    muleNotApplicable: value.muleNotApplicable,
+    restHours: value.restHours,
+    location: value.location,
+    fuel: value.fuel,
+    pendingMaintenance: value.pendingMaintenance,
+    muleNotApplicable: value.notApplicableSections.includes("mule"),
+    notApplicableSections: value.notApplicableSections,
     answers: value.answers,
     hasCriticalFailure: value.hasCriticalFailure,
     signature: value.signature,
@@ -159,6 +171,7 @@ export async function listInspections(
       exitDecision: t.exitDecision,
       // Needed only to count the unanswered items; not returned. The page is a handful of rows.
       answers: t.answers,
+      notApplicableSections: t.notApplicableSections,
       muleNotApplicable: t.muleNotApplicable,
     })
     .from(t)
@@ -169,9 +182,9 @@ export async function listInspections(
     .offset((filters.page - 1) * INSPECTIONS_PAGE_SIZE);
 
   return {
-    rows: rows.slice(0, INSPECTIONS_PAGE_SIZE).map(({ answers, muleNotApplicable, ...row }) => ({
+    rows: rows.slice(0, INSPECTIONS_PAGE_SIZE).map(({ answers, notApplicableSections, muleNotApplicable, ...row }) => ({
       ...row,
-      uncheckedCount: uncheckedCount(answers, muleNotApplicable),
+      uncheckedCount: uncheckedCount(answers, storedNotApplicable(notApplicableSections, muleNotApplicable)),
     })),
     hasNext: rows.length > INSPECTIONS_PAGE_SIZE,
   };
@@ -193,6 +206,11 @@ export async function findInspection(id: string): Promise<InspectionDetail | nul
       driverNationalId: t.driverNationalId,
       odometer: t.odometer,
       route: t.route,
+      restHours: t.restHours,
+      location: t.location,
+      fuel: t.fuel,
+      pendingMaintenance: t.pendingMaintenance,
+      notApplicableSections: t.notApplicableSections,
       muleNotApplicable: t.muleNotApplicable,
       answers: t.answers,
       hasCriticalFailure: t.hasCriticalFailure,
@@ -233,10 +251,13 @@ export async function findInspection(id: string): Promise<InspectionDetail | nul
     closureResponsible,
     closureRecordedAt,
     closureRecordedByName,
+    notApplicableSections,
+    muleNotApplicable,
     ...rest
   } = row;
   return {
     ...rest,
+    notApplicableSections: storedNotApplicable(notApplicableSections, muleNotApplicable),
     exit: row.exitDecision
       ? { authorizedTime: exitAuthorizedTime, decidedAt: exitDecidedAt, decidedByName: exitDecidedByName }
       : null,
@@ -326,4 +347,25 @@ export async function listVehicleInspections(vehicleId: number, limit: number): 
 export async function deleteInspection(id: string): Promise<boolean> {
   const deleted = await db.delete(t).where(eq(t.id, id)).returning({ id: t.id });
   return deleted.length > 0;
+}
+
+/** One row per plate with its latest inspection of `date` (Colombia calendar date), ordered by plate. */
+export async function listDailyReports(date: string): Promise<DailyReportRow[]> {
+  const rows = await db
+    .select({
+      id: t.id,
+      createdAt: t.createdAt,
+      plate: t.plate,
+      trailerPlate: t.trailerPlate,
+      driverName: t.driverName,
+      odometer: t.odometer,
+      restHours: t.restHours,
+      route: t.route,
+      location: t.location,
+      fuel: t.fuel,
+      pendingMaintenance: t.pendingMaintenance,
+    })
+    .from(t)
+    .where(eq(t.inspectionDate, date));
+  return latestPerPlate(rows);
 }

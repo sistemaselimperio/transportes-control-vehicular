@@ -99,6 +99,7 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/bitacora")).toBe("logbook");
     expect(sectionOfPath("/preoperacionales")).toBe("inspections");
     expect(sectionOfPath("/preoperacionales/0b9d2c1e")).toBe("inspections");
+    expect(sectionOfPath("/parte-diario")).toBe("inspections");
     expect(sectionOfPath("/viajes")).toBe("trips");
     expect(sectionOfPath("/propietarios")).toBe("owners");
     expect(sectionOfPath("/ventas")).toBe("sales");

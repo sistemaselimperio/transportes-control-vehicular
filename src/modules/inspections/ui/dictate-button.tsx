@@ -49,13 +49,17 @@ export function DictateButton({
   onChange,
   maxLength,
   label,
+  size = "default",
 }: {
   value: string;
   onChange: (value: string) => void;
   maxLength: number;
   /** What is being dictated, for screen readers. */
   label: string;
+  /** `large`: full-width 56px button with a longer label, for the daily report. */
+  size?: "default" | "large";
 }) {
+  const large = size === "large";
   const supported = useSpeechSupported();
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
@@ -129,13 +133,20 @@ export function DictateButton({
         aria-label={listening ? `Dejar de dictar: ${label}` : `Dictar: ${label}`}
         className={cn(
           "inline-flex h-11 items-center gap-2 rounded-lg border-2 px-3 text-base font-semibold outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/70",
+          large && "h-14 w-full justify-center rounded-xl text-lg",
           listening
             ? "animate-pulse border-destructive bg-destructive text-white motion-reduce:animate-none"
-            : "border-input bg-background hover:bg-muted",
+            : large
+              ? "border-foreground/60 bg-card text-foreground hover:bg-muted"
+              : "border-input bg-background hover:bg-muted",
         )}
       >
-        {listening ? <MicOff className="size-5" aria-hidden /> : <Mic className="size-5" aria-hidden />}
-        {listening ? "Escuchando… toque para parar" : "Dictar"}
+        {listening ? (
+          <MicOff className={large ? "size-6" : "size-5"} aria-hidden />
+        ) : (
+          <Mic className={large ? "size-6" : "size-5"} aria-hidden />
+        )}
+        {listening ? "Escuchando… toque para parar" : large ? "Dictar con la voz" : "Dictar"}
       </button>
       {interim && (
         <p className="text-sm text-muted-foreground italic" aria-live="polite">

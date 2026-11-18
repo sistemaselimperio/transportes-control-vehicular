@@ -1,13 +1,29 @@
 "use client";
 
-import { CircleCheck } from "lucide-react";
+import {
+  BedDouble,
+  CircleAlert,
+  CircleCheck,
+  Fuel,
+  Gauge,
+  IdCard,
+  Lock,
+  MapPin,
+  RectangleHorizontal,
+  Route,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { submitInspectionAction, type SubmitInspectionResult } from "../application/inspection-actions";
 import {
   PREOPERATIONAL_CHECKLIST,
+  canBeNotApplicable,
   itemNumber,
   type ChecklistItem,
   type ChecklistSection,
@@ -15,12 +31,18 @@ import {
 import {
   applicableItems,
   bogotaDateTime,
+  FUEL_OPTIONS,
+  MAX_LOCATION_LENGTH,
   MAX_NOTE_LENGTH,
+  MAX_PENDING_MAINTENANCE_LENGTH,
+  MAX_REST_HOURS_LENGTH,
   validateInspection,
   type AnswerStatus,
   type InspectionErrors,
 } from "../domain/preoperational-inspection";
+import { FormStepTabs, STEP_ICONS, type FormStep } from "./form-step-tabs";
 import { ChecklistTable, FillingInstructions, LABEL_CELL, LEFT_COLUMN_SECTIONS, RULE, SheetHeader } from "./form-sheet";
+import { PlateText } from "@/components/app/plate-text";
 import { DictateButton } from "./dictate-button";
 import { SignaturePad } from "./signature-pad";
 
@@ -36,6 +58,18 @@ type Header = {
 };
 
 type Draft = { status?: AnswerStatus; note: string };
+
+/** The "Parte diario" tab: typed text, validated and parsed by the domain on submit. */
+type DailyFields = { restHours: string; location: string; fuel: string; pendingMaintenance: string };
+
+const EMPTY_DAILY: DailyFields = { restHours: "", location: "", fuel: "", pendingMaintenance: "" };
+
+const DAILY_ORDER = ["restHours", "location", "fuel", "pendingMaintenance"] as const;
+
+type FormTab = "inspection" | "daily";
+
+const TAB_PREFIX = "form-tab";
+const TAB_PANEL = "form-tabpanel";
 
 type HeaderEdits = Omit<Header, "date" | "time"> & {
   date: string | null;
@@ -125,10 +159,13 @@ function InspectionForm({
   // What the user typed; date and time stay null until edited and then follow the clock.
   const [edits, setHeader] = useState<HeaderEdits>(EMPTY_EDITS);
   const defaults = useColombiaNow();
-  const [muleNotApplicable, setMuleNotApplicable] = useState(false);
+  // Ids of the sections the inspector marked "no aplica".
+  const [notApplicable, setNotApplicable] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Record<string, Draft>>({});
   const [signature, setSignature] = useState<string | null>(null);
   const [website, setWebsite] = useState("");
+  const [tab, setTab] = useState<FormTab>("inspection");
+  const [daily, setDailyState] = useState<DailyFields>(EMPTY_DAILY);
   const [errors, setErrors] = useState<InspectionErrors>({});
   const [pending, startTransition] = useTransition();
 
@@ -137,14 +174,14 @@ function InspectionForm({
   const pickedDriver = header.driverOther ? undefined : drivers.find((d) => d.id === header.selectedDriverId);
   const registeredHint = pickedDriver?.nationalHint ?? null;
 
-  const items = applicableItems(muleNotApplicable);
+  const items = applicableItems(notApplicable);
   const criticalItems = items.filter((item) => item.critical);
   const answeredCritical = criticalItems.filter((item) => answers[item.id]?.status).length;
   const answeredTotal = items.filter((item) => answers[item.id]?.status).length;
 
   // The MAL items, in sheet order, are the rows of the Novedades table.
   const failures = PREOPERATIONAL_CHECKLIST.flatMap((section, si) =>
-    section.muleOnly && muleNotApplicable
+    notApplicable.includes(section.id)
       ? []
       : section.items.flatMap((item, ii) =>
           answers[item.id]?.status === "MAL" ? [{ item, number: itemNumber(si, ii) }] : [],
@@ -184,6 +221,11 @@ function InspectionForm({
     clearError("driverName");
   };
 
+  const setDaily = (key: keyof DailyFields, value: string) => {
+    setDailyState((d) => ({ ...d, [key]: value }));
+    clearError(key);
+  };
+
   const setStatus = (item: ChecklistItem, status: AnswerStatus) => {
     setAnswers((a) => ({ ...a, [item.id]: { note: a[item.id]?.note ?? "", status } }));
     clearError(item.id);
@@ -195,9 +237,14 @@ function InspectionForm({
   };
 
   const showErrors = (found: InspectionErrors) => {
-    setErrors(found);
-    const order = [...HEADER_ORDER, ...items.map((i) => i.id), "signature"];
-    const first = order.find((key) => key in found);
+    // The first tab with an error wins; within a tab, the first field in form order.
+    const inspectionFirst = [...HEADER_ORDER, ...items.map((i) => i.id), "signature"].find((key) => key in found);
+    const first = inspectionFirst ?? DAILY_ORDER.find((key) => key in found);
+    // The target must be visible to take focus, so the tab switch is committed first.
+    flushSync(() => {
+      setErrors(found);
+      if (first) setTab(inspectionFirst ? "inspection" : "daily");
+    });
     if (!first) return;
     // A MAL item's error is its missing description, which lives in the Novedades table.
     const target = document.getElementById(answers[first]?.status === "MAL" ? noteId(first) : fieldId(first));
@@ -207,11 +254,25 @@ function InspectionForm({
     }
   };
 
+  // The "other" flags only drive the pickers; the server gets the header values.
+  const payload = {
+    ...Object.fromEntries(HEADER_ORDER.map((key) => [key, header[key]])),
+    ...daily,
+    selectedDriverId: header.selectedDriverId,
+    notApplicableSections: notApplicable,
+    answers,
+    signature: signature ?? "",
+    website,
+  };
+  // Validated on every render so "Enviar" stays locked until both steps are really complete.
+  const check = validateInspection(payload);
+  const dailyKeys: readonly string[] = DAILY_ORDER;
+  const pendingKeys = check.ok ? [] : Object.keys(check.errors).filter((key) => key !== "form");
+  const inspectionReady = !pendingKeys.some((key) => !dailyKeys.includes(key));
+  const dailyReady = !pendingKeys.some((key) => dailyKeys.includes(key));
+  const ready = check.ok;
+
   const submit = () => {
-    // The "other" flags only drive the pickers; the server gets the header values.
-    const sent = Object.fromEntries(HEADER_ORDER.map((key) => [key, header[key]]));
-    const payload = { ...sent, selectedDriverId: header.selectedDriverId, muleNotApplicable, answers, signature: signature ?? "", website };
-    const check = validateInspection(payload);
     if (!check.ok) {
       showErrors(check.errors);
       return;
@@ -228,27 +289,57 @@ function InspectionForm({
     });
   };
 
-  const hasErrors = Object.keys(errors).length > 0;
+  const dailyFilled = DAILY_ORDER.filter((key) => daily[key].trim()).length;
+  const steps: ReadonlyArray<FormStep<FormTab>> = [
+    {
+      key: "inspection",
+      title: "Preoperacional",
+      hint: "Revisión del vehículo y firma",
+      icon: STEP_ICONS.inspection,
+      progress: `${answeredTotal} de ${items.length} puntos`,
+      complete: inspectionReady,
+      hasError: Object.keys(errors).some((key) => key !== "form" && !dailyKeys.includes(key)),
+    },
+    {
+      key: "daily",
+      title: "Parte diario",
+      hint: "Descanso, ubicación, combustible",
+      icon: STEP_ICONS.daily,
+      progress: `${dailyFilled} de ${DAILY_ORDER.length} datos`,
+      complete: dailyReady,
+      hasError: DAILY_ORDER.some((key) => key in errors),
+    },
+  ];
+
+  const goToStep = (key: FormTab) => {
+    flushSync(() => setTab(key));
+    document.getElementById(`${TAB_PREFIX}-${key}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
+  const toggleNotApplicable = (section: ChecklistSection, checked: boolean) => {
+    setNotApplicable((current) => (checked ? [...current.filter((id) => id !== section.id), section.id] : current.filter((id) => id !== section.id)));
+    for (const item of section.items) clearError(item.id);
+  };
 
   const checklistTable = (sections: readonly ChecklistSection[], offset: number) => (
     <ChecklistTable
       sections={sections}
       offset={offset}
       sectionExtra={(section) =>
-        section.muleOnly && (
-          <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-3 font-medium normal-case">
+        canBeNotApplicable(section) && (
+          <label className="mt-2 flex min-h-12 cursor-pointer items-center gap-3 text-lg font-semibold normal-case">
             <input
               type="checkbox"
-              className="size-6 shrink-0"
-              checked={muleNotApplicable}
-              onChange={(e) => setMuleNotApplicable(e.target.checked)}
+              className="size-7 shrink-0"
+              checked={notApplicable.includes(section.id)}
+              onChange={(e) => toggleNotApplicable(section, e.target.checked)}
             />
-            No aplica (el vehículo no es mula)
+            {section.notApplicableLabel}
           </label>
         )
       }
       renderBody={(section, sectionIndex) =>
-        section.muleOnly && muleNotApplicable ? (
+        notApplicable.includes(section.id) ? (
           <tr>
             <td colSpan={3} className={cn("border px-3 py-2 text-sm text-muted-foreground line-through", RULE)}>
               No aplica
@@ -282,6 +373,23 @@ function InspectionForm({
           submit();
         }}
       >
+        <FormStepTabs
+          label="Pasos del formulario"
+          steps={steps}
+          active={tab}
+          onSelect={setTab}
+          idPrefix={TAB_PREFIX}
+          panelId={TAB_PANEL}
+        />
+
+        <div id={TAB_PANEL} className="space-y-6">
+          <div
+            role="tabpanel"
+            id={`${TAB_PANEL}-inspection`}
+            aria-labelledby={`${TAB_PREFIX}-inspection`}
+            hidden={tab !== "inspection"}
+            className="space-y-6"
+          >
         <section aria-label="Datos de la inspección" className={cn("grid border-2 sm:grid-cols-2", RULE)}>
           <DataCell label="Fecha" name="date" type="date" value={header.date} error={errors.date} onChange={setField} />
           <DataCell label="Hora" name="time" type="time" value={header.time} error={errors.time} onChange={setField} />
@@ -434,6 +542,44 @@ function InspectionForm({
           {errors.signature && <ErrorText>{errors.signature}</ErrorText>}
         </section>
 
+            <Button
+              type="button"
+              variant="outline"
+              className="mx-auto flex h-16 w-full max-w-2xl border-2 border-foreground bg-primary text-lg font-bold text-primary-foreground hover:bg-accent"
+              onClick={() => goToStep("daily")}
+            >
+              Siguiente: 2. Parte diario →
+            </Button>
+          </div>
+
+          <div
+            role="tabpanel"
+            id={`${TAB_PANEL}-daily`}
+            aria-labelledby={`${TAB_PREFIX}-daily`}
+            hidden={tab !== "daily"}
+          >
+            <DailyReportPanel
+              summary={{
+                driverName: header.driverName,
+                plate: header.plate,
+                odometer: header.odometer,
+                route: header.route,
+              }}
+              values={daily}
+              errors={errors}
+              onChange={setDaily}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              className="mx-auto mt-4 flex h-14 w-full max-w-2xl text-lg"
+              onClick={() => goToStep("inspection")}
+            >
+              ← Volver a 1. Preoperacional
+            </Button>
+          </div>
+        </div>
+
         {/* Honeypot: invisible to people, tempting to bots. */}
         <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
           <label>
@@ -453,17 +599,296 @@ function InspectionForm({
           <p className="text-center text-sm text-muted-foreground" aria-live="polite">
             {answeredCritical} de {criticalItems.length} críticos marcados · {answeredTotal} de {items.length} puntos en total
           </p>
-          {hasErrors && (
+          {/* Only real send failures (e.g. no connection); missing fields are listed in the lock box. */}
+          {errors.form && (
             <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-base font-medium text-destructive">
-              {errors.form ?? "Faltan datos. Revisa los campos marcados en rojo."}
+              {errors.form}
             </p>
           )}
-          <Button type="submit" className="h-14 w-full text-lg" disabled={pending} aria-busy={pending}>
-            {pending ? "Enviando…" : "Enviar inspección"}
+          <Button
+            type="submit"
+            className="h-14 w-full text-lg disabled:opacity-50"
+            disabled={pending || !ready}
+            aria-busy={pending}
+          >
+            {pending ? "Enviando…" : ready ? "Enviar inspección" : (
+              <>
+                <Lock aria-hidden className="size-5" />
+                Enviar inspección
+              </>
+            )}
           </Button>
         </div>
       </form>
     </main>
+  );
+}
+
+const dash = (value: string) => value.trim() || "—";
+
+const NONE = "Ninguno";
+
+/** Daily-report inputs: a dark 2px edge so the empty box reads on white (the default input edge is too pale). */
+const DRIVER_CONTROL =
+  "border-2 border-foreground/45 bg-card text-foreground hover:border-foreground/70 focus-visible:border-foreground focus-visible:ring-brand/40";
+
+/**
+ * The "Parte diario" tab, built for older drivers on a phone: real icons (emoji render as boxes on
+ * some Androids), large type, 56px controls, visible helper text instead of placeholders, dictation
+ * on the free-text fields and two big buttons for the fuel so nobody has to fight the keyboard.
+ */
+function DailyReportPanel({
+  summary,
+  values,
+  errors,
+  onChange,
+}: {
+  summary: { driverName: string; plate: string; odometer: string; route: string };
+  values: DailyFields;
+  errors: InspectionErrors;
+  onChange: (key: keyof DailyFields, value: string) => void;
+}) {
+  const describedBy = (key: keyof DailyFields) =>
+    [`${fieldId(key)}-hint`, errors[key] ? `${fieldId(key)}-error` : null].filter(Boolean).join(" ");
+  const noPending = values.pendingMaintenance.trim() === NONE;
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-4">
+      <section aria-labelledby="daily-summary-heading" className="rounded-2xl border-2 border-foreground/15 bg-muted p-4">
+        <h2 id="daily-summary-heading" className="text-base font-bold text-foreground">
+          Datos del paso 1
+        </h2>
+        <dl className="mt-3 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+          <SummaryItem icon={IdCard} label="Conductor" value={dash(summary.driverName)} />
+          <SummaryItem
+            icon={RectangleHorizontal}
+            label="Placa"
+            value={summary.plate.trim() ? <PlateText plate={summary.plate} /> : "—"}
+          />
+          <SummaryItem icon={Gauge} label="Kilometraje" value={dash(summary.odometer)} />
+          <SummaryItem icon={Route} label="Ruta asignada" value={dash(summary.route)} />
+        </dl>
+      </section>
+
+      <DailyField
+        step={1}
+        icon={BedDouble}
+        label="Horas de descanso"
+        hint="¿Cuánto descansó antes de salir? Ejemplo: 8 horas, de 9 p. m. a 5 a. m."
+        name="restHours"
+        done={Boolean(values.restHours.trim())}
+        error={errors.restHours}
+      >
+        <Input
+          id={fieldId("restHours")}
+          value={values.restHours}
+          onChange={(e) => onChange("restHours", e.target.value)}
+          maxLength={MAX_REST_HOURS_LENGTH}
+          aria-invalid={errors.restHours ? true : undefined}
+          aria-describedby={describedBy("restHours")}
+          autoComplete="off"
+          enterKeyHint="next"
+          className={cn("h-14 text-lg", DRIVER_CONTROL)}
+        />
+        <DictateButton
+          size="large"
+          value={values.restHours}
+          onChange={(value) => onChange("restHours", value)}
+          maxLength={MAX_REST_HOURS_LENGTH}
+          label="horas de descanso"
+        />
+      </DailyField>
+
+      <DailyField
+        step={2}
+        icon={MapPin}
+        label="Ubicación"
+        hint="Ciudad o sitio donde está ahora."
+        name="location"
+        done={Boolean(values.location.trim())}
+        error={errors.location}
+      >
+        <Input
+          id={fieldId("location")}
+          value={values.location}
+          onChange={(e) => onChange("location", e.target.value)}
+          maxLength={MAX_LOCATION_LENGTH}
+          aria-invalid={errors.location ? true : undefined}
+          aria-describedby={describedBy("location")}
+          autoComplete="off"
+          enterKeyHint="next"
+          className={cn("h-14 text-lg", DRIVER_CONTROL)}
+        />
+        <DictateButton
+          size="large"
+          value={values.location}
+          onChange={(value) => onChange("location", value)}
+          maxLength={MAX_LOCATION_LENGTH}
+          label="ubicación"
+        />
+      </DailyField>
+
+      <DailyField
+        step={3}
+        icon={Fuel}
+        label="Combustible"
+        hint="¿Hay que tanquear?"
+        name="fuel"
+        done={FUEL_OPTIONS.some((option) => option === values.fuel)}
+        error={errors.fuel}
+      >
+        <div role="radiogroup" aria-labelledby={`${fieldId("fuel")}-label`} aria-describedby={describedBy("fuel")} className="space-y-3">
+          {FUEL_OPTIONS.map((option, index) => {
+            const selected = values.fuel === option;
+            return (
+              <label
+                key={option}
+                className={cn(
+                  "flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 px-3 text-lg font-bold select-none transition-colors duration-150 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/70",
+                  selected
+                    ? index === 0
+                      ? "border-warn-foreground bg-warn text-warn-foreground"
+                      : "border-ok-foreground bg-ok text-ok-foreground"
+                    : "border-foreground/60 bg-card text-foreground hover:bg-muted",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="fuel"
+                  id={index === 0 ? fieldId("fuel") : undefined}
+                  value={option}
+                  checked={selected}
+                  onChange={() => onChange("fuel", option)}
+                  className="sr-only"
+                />
+                {selected && <CircleCheck aria-hidden className="size-6" />}
+                {option}
+              </label>
+            );
+          })}
+        </div>
+      </DailyField>
+
+      <DailyField
+        step={4}
+        icon={Wrench}
+        label="Mantenimiento pendiente"
+        hint="¿Hay algo por arreglar? Si no, toque «No hay pendientes»."
+        name="pendingMaintenance"
+        done={Boolean(values.pendingMaintenance.trim())}
+        error={errors.pendingMaintenance}
+      >
+        <button
+          type="button"
+          aria-pressed={noPending}
+          onClick={() => onChange("pendingMaintenance", noPending ? "" : NONE)}
+          className={cn(
+            "flex h-14 w-full items-center justify-center gap-2 rounded-xl border-4 text-lg font-bold outline-none select-none transition-colors duration-150 focus-visible:ring-3 focus-visible:ring-ring/70 active:scale-[0.98] motion-reduce:active:scale-100",
+            noPending ? "border-ok-foreground bg-ok text-ok-foreground" : "border-foreground/60 bg-card text-foreground hover:bg-muted",
+          )}
+        >
+          <CircleCheck aria-hidden className="size-6" />
+          No hay pendientes
+        </button>
+        {!noPending && (
+          <>
+            <p className="text-center text-base font-medium text-foreground/80">o escriba qué falta:</p>
+            <Textarea
+              id={fieldId("pendingMaintenance")}
+              value={values.pendingMaintenance}
+              onChange={(e) => onChange("pendingMaintenance", e.target.value)}
+              maxLength={MAX_PENDING_MAINTENANCE_LENGTH}
+              rows={3}
+              aria-invalid={errors.pendingMaintenance ? true : undefined}
+              aria-describedby={describedBy("pendingMaintenance")}
+              className={cn("min-h-24 text-lg", DRIVER_CONTROL)}
+            />
+            <DictateButton
+              size="large"
+              value={values.pendingMaintenance}
+              onChange={(value) => onChange("pendingMaintenance", value)}
+              maxLength={MAX_PENDING_MAINTENANCE_LENGTH}
+              label="mantenimiento pendiente"
+            />
+          </>
+        )}
+      </DailyField>
+    </div>
+  );
+}
+
+function SummaryItem({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-start gap-3">
+      <Icon aria-hidden className="mt-1 size-6 shrink-0 text-foreground" />
+      <div className="min-w-0">
+        <dt className="text-base text-foreground/75">{label}</dt>
+        <dd className="text-lg leading-snug font-bold break-words">{value}</dd>
+      </div>
+    </div>
+  );
+}
+
+/** One numbered card of the daily report: icon, big label, visible hint, the control(s) and its error. */
+function DailyField({
+  step,
+  icon: Icon,
+  label,
+  hint,
+  name,
+  done,
+  error,
+  children,
+}: {
+  step: number;
+  icon: LucideIcon;
+  label: string;
+  hint: string;
+  name: keyof DailyFields;
+  done: boolean;
+  error?: string;
+  children: ReactNode;
+}) {
+  const id = fieldId(name);
+  const ok = done && !error;
+  return (
+    <div
+      role="group"
+      aria-labelledby={`${id}-label`}
+      className={cn(
+        "space-y-3 rounded-2xl border-2 border-foreground/20 bg-card p-4 shadow-soft",
+        error ? "border-destructive bg-destructive/5" : ok && "border-ok-foreground/60 bg-ok/30",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-full",
+            ok ? "bg-ok text-ok-foreground ring-2 ring-ok-foreground/40" : "bg-primary text-primary-foreground ring-2 ring-foreground/80",
+          )}
+        >
+          {ok ? <CircleCheck className="size-6" /> : <Icon className="size-6" />}
+        </span>
+        <label id={`${id}-label`} htmlFor={id} className="min-w-0 text-xl leading-tight font-bold">
+          <span className="sr-only">Dato {step} de 4: </span>
+          {label}
+          <span aria-hidden className="ml-1 text-destructive">
+            *
+          </span>
+        </label>
+      </div>
+      <p id={`${id}-hint`} className="text-base text-foreground/80">
+        {hint}
+      </p>
+      {children}
+      {error && (
+        <p id={`${id}-error`} role="alert" className="flex items-start gap-2 text-base font-semibold text-destructive">
+          <CircleAlert aria-hidden className="mt-0.5 size-5 shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -754,7 +1179,7 @@ function NovedadRow({
 function ResultScreen({ onAnother }: { onAnother: () => void }) {
   return (
     <main className="flex min-h-dvh flex-1 flex-col items-center justify-center gap-6 px-5 py-10 text-center">
-      <CircleCheck className="size-20 text-primary" aria-hidden />
+      <CircleCheck className="size-20 text-ok-foreground" aria-hidden />
       <div role="status" className="max-w-md space-y-3">
         <h1 className="text-3xl leading-tight font-bold tracking-tight">Formulario enviado</h1>
         <p className="text-lg text-muted-foreground">La inspección preoperacional quedó registrada correctamente.</p>

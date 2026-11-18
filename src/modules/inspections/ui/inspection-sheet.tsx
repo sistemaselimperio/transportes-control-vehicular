@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PREOPERATIONAL_CHECKLIST, itemNumber, type ChecklistItem } from "../domain/preoperational-checklist";
+import { PREOPERATIONAL_CHECKLIST, canBeNotApplicable, itemNumber, type ChecklistItem } from "../domain/preoperational-checklist";
 import { hasFailedItems } from "../domain/exit-decision";
 import { uncheckedCount } from "../domain/preoperational-inspection";
 import type { InspectionDetail } from "../infrastructure/inspection-repository";
@@ -13,6 +13,7 @@ import { DeleteInspectionButton } from "./delete-inspection-button";
 import { ExitPanel, ExitSummary, type ExitPanelProps } from "./exit-panel";
 import { formatInspectionDate, formatSheetDate, formatSheetTime, formatSignoff } from "./inspection-format";
 import { PrintButton } from "./print-button";
+import { FuelValue } from "./fuel-value";
 
 const LINK = "underline underline-offset-2 outline-none hover:no-underline focus-visible:ring-2 focus-visible:ring-ring/70";
 
@@ -53,6 +54,38 @@ function RegisteredLinks({ inspection }: { inspection: InspectionDetail }) {
         )}
       </li>
     </ul>
+  );
+}
+
+/** The "Parte diario" answers, screen only: the printed sheet is the paper form. "—" on older inspections. */
+function DailyReportBlock({ inspection }: { inspection: InspectionDetail }) {
+  const text = (value: string | null) => value?.trim() || "—";
+  return (
+    <section aria-labelledby="daily-report-heading" className="space-y-3 rounded-2xl border bg-card p-4 print:hidden">
+      <h2 id="daily-report-heading" className="text-base font-semibold">
+        Parte diario
+      </h2>
+      <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-sm text-muted-foreground">🕰️ Horas de descanso</dt>
+          <dd className="font-medium break-words">{text(inspection.restHours)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted-foreground">📍 Ubicación</dt>
+          <dd className="font-medium break-words">{text(inspection.location)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted-foreground">⛽ Combustible</dt>
+          <dd className="font-medium break-words">
+            <FuelValue fuel={inspection.fuel} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted-foreground">🛠️ Mantenimiento pendiente</dt>
+          <dd className="font-medium break-words">{text(inspection.pendingMaintenance)}</dd>
+        </div>
+      </dl>
+    </section>
   );
 }
 
@@ -188,7 +221,7 @@ export function InspectionSheet({
   };
   const [authorizedHours = "", authorizedMinutes = ""] = (decision?.authorizedTime ?? "").split(":");
   const [closureYear = "", closureMonth = "", closureDay = ""] = (closure?.date ?? "").split("-");
-  const unchecked = uncheckedCount(answers, inspection.muleNotApplicable);
+  const unchecked = uncheckedCount(answers, inspection.notApplicableSections);
   const failures: { number: string; item: ChecklistItem; note: string }[] = [];
   PREOPERATIONAL_CHECKLIST.forEach((section, si) =>
     section.items.forEach((item, ii) => {
@@ -201,7 +234,7 @@ export function InspectionSheet({
     <ChecklistTable
       sections={PREOPERATIONAL_CHECKLIST.slice(from, to)}
       offset={from}
-      sectionHint={(section) => (section.muleOnly ? "si no aplica, raye" : section.hint)}
+      sectionHint={(section) => (canBeNotApplicable(section) ? "si no aplica, raye" : section.hint)}
       renderBody={(section, sectionIndex) =>
         section.items.map((item, ii) => (
           <SheetRow
@@ -209,7 +242,7 @@ export function InspectionSheet({
             item={item}
             number={itemNumber(sectionIndex, ii)}
             status={answers[item.id]?.status}
-            struck={Boolean(section.muleOnly && inspection.muleNotApplicable)}
+            struck={inspection.notApplicableSections.includes(section.id)}
           />
         ))
       }
@@ -253,6 +286,8 @@ export function InspectionSheet({
           {unchecked} {unchecked === 1 ? "punto sin revisar" : "puntos sin revisar"}
         </p>
       )}
+
+      <DailyReportBlock inspection={inspection} />
 
       <div className="space-y-6 print:space-y-0">
         <Page>

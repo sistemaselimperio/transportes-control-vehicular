@@ -5,13 +5,13 @@
  * values are free text on purpose, they are not checked against the fleet or the drivers.
  */
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
-import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, type ChecklistItem } from "./preoperational-checklist";
+import { ALL_CHECKLIST_ITEMS, PREOPERATIONAL_CHECKLIST, canBeNotApplicable, type ChecklistItem } from "./preoperational-checklist";
 
 export type AnswerStatus = "BIEN" | "MAL";
 
 export type InspectionAnswer = { status: AnswerStatus; note?: string };
 
-/** Checklist item id to its answer; a mule-only item is absent when the mule section does not apply. */
+/** Checklist item id to its answer; an item is absent when its section was marked "no aplica". */
 export type InspectionAnswers = Record<string, InspectionAnswer>;
 
 export type ValidInspection = {
@@ -27,7 +27,14 @@ export type ValidInspection = {
   selectedDriverId: number | null;
   odometer: string;
   route: string;
-  muleNotApplicable: boolean;
+  /** "Parte diario" tab: free text, e.g. "8 horas, de 9 p. m. a 5 a. m.". */
+  restHours: string;
+  location: string;
+  /** One of FUEL_OPTIONS on new submissions (older rows may hold free text). */
+  fuel: FuelOption;
+  pendingMaintenance: string;
+  /** Ids of the sections marked "no aplica" (only sections that allow it). */
+  notApplicableSections: string[];
   answers: InspectionAnswers;
   hasCriticalFailure: boolean;
   /** PNG data URL of the drawn signature. */
@@ -45,6 +52,11 @@ export const MAX_NATIONAL_ID_LENGTH = 20;
 export const MAX_ODOMETER_LENGTH = 20;
 export const MAX_ROUTE_LENGTH = 200;
 export const MAX_NOTE_LENGTH = 500;
+export const MAX_LOCATION_LENGTH = 200;
+export const MAX_PENDING_MAINTENANCE_LENGTH = 500;
+export const MAX_REST_HOURS_LENGTH = 120;
+export const FUEL_OPTIONS = ["Requiere tanqueo", "No requiere tanqueo"] as const;
+export type FuelOption = (typeof FUEL_OPTIONS)[number];
 /** Characters of the whole data URL: a drawn signature is a few tens of KB. */
 export const MAX_SIGNATURE_LENGTH = 400_000;
 
@@ -68,16 +80,30 @@ export function isIsoDate(value: string): boolean {
 
 const isTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
-/** The items the inspector has to answer: all of them, minus the mule ones when those do not apply. */
-export function applicableItems(muleNotApplicable: boolean): readonly ChecklistItem[] {
-  return PREOPERATIONAL_CHECKLIST.filter((section) => !(muleNotApplicable && section.muleOnly)).flatMap(
-    (section) => section.items,
+/** Keeps the ids of sections that allow "no aplica", once each and in form order; unknown ids are ignored. */
+export function normalizeNotApplicable(ids: readonly string[]): string[] {
+  return PREOPERATIONAL_CHECKLIST.filter((section) => canBeNotApplicable(section) && ids.includes(section.id)).map(
+    (section) => section.id,
   );
 }
 
+/**
+ * The sections marked "no aplica" on a stored row. Rows saved before `not_applicable_sections` existed only
+ * carry the legacy mule flag, so it counts as "mule" when the new column does not already say so.
+ */
+export function storedNotApplicable(sections: readonly string[], legacyMuleNotApplicable: boolean): string[] {
+  return normalizeNotApplicable(legacyMuleNotApplicable ? [...sections, "mule"] : sections);
+}
+
+/** The items the inspector has to answer: all of them, minus the sections marked "no aplica". */
+export function applicableItems(notApplicable: readonly string[]): readonly ChecklistItem[] {
+  const skipped = new Set(normalizeNotApplicable(notApplicable));
+  return PREOPERATIONAL_CHECKLIST.filter((section) => !skipped.has(section.id)).flatMap((section) => section.items);
+}
+
 /** Applicable items without a BIEN/MAL answer. Only critical ones are required, so this can be above zero. */
-export function uncheckedCount(answers: InspectionAnswers, muleNotApplicable: boolean): number {
-  return applicableItems(muleNotApplicable).filter((item) => !answers[item.id]).length;
+export function uncheckedCount(answers: InspectionAnswers, notApplicable: readonly string[]): number {
+  return applicableItems(notApplicable).filter((item) => !answers[item.id]).length;
 }
 
 /** The critical points marked MAL, in form order: when any exists the vehicle does not leave. */
@@ -128,11 +154,29 @@ export function validateInspection(input: unknown): InspectionValidation {
   if (odometer.length > MAX_ODOMETER_LENGTH) errors.odometer = `Máximo ${MAX_ODOMETER_LENGTH} caracteres.`;
   const route = required("route", collapseSpaces(asText(raw.route)), MAX_ROUTE_LENGTH, "Escribe la ruta o el destino.");
 
-  const muleNotApplicable = raw.muleNotApplicable === true;
+  // "Parte diario" tab: required on new submissions (older rows keep them null).
+  const restHours = required("restHours", collapseSpaces(asText(raw.restHours)), MAX_REST_HOURS_LENGTH, "Indica las horas de descanso.");
+  const location = required("location", collapseSpaces(asText(raw.location)), MAX_LOCATION_LENGTH, "Escribe tu ubicación.");
+  const fuelText = collapseSpaces(asText(raw.fuel));
+  const fuelOption = FUEL_OPTIONS.find((option) => option === fuelText);
+  if (!fuelOption) errors.fuel = "Elija si requiere tanqueo.";
+  const fuel = fuelOption ?? FUEL_OPTIONS[1];
+  const pendingMaintenance = required(
+    "pendingMaintenance",
+    collapseSpaces(asText(raw.pendingMaintenance)),
+    MAX_PENDING_MAINTENANCE_LENGTH,
+    "Escribe el mantenimiento pendiente o \"Ninguno\".",
+  );
+
+  const notApplicableSections = normalizeNotApplicable(
+    Array.isArray(raw.notApplicableSections)
+      ? raw.notApplicableSections.filter((id): id is string => typeof id === "string")
+      : [],
+  );
   const rawAnswers = asRecord(raw.answers) ?? {};
   const answers: InspectionAnswers = {};
 
-  for (const item of applicableItems(muleNotApplicable)) {
+  for (const item of applicableItems(notApplicableSections)) {
     const answer = asRecord(rawAnswers[item.id]);
     const status = answer?.status;
     if (status !== "BIEN" && status !== "MAL") {
@@ -170,7 +214,11 @@ export function validateInspection(input: unknown): InspectionValidation {
       selectedDriverId,
       odometer,
       route,
-      muleNotApplicable,
+      restHours,
+      location,
+      fuel,
+      pendingMaintenance,
+      notApplicableSections,
       answers,
       hasCriticalFailure: failedCriticalItems(answers).length > 0,
       signature,

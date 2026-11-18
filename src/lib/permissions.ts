@@ -48,6 +48,7 @@ const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
   ["fleet", "/flota"],
   ["drivers", "/conductores"],
   ["inspections", "/preoperacionales"],
+  ["inspections", "/parte-diario"],
   ["trips", "/viajes"],
   ["logbook", "/bitacora"],
   ["owners", "/propietarios"],
