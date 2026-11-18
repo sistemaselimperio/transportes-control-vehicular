@@ -1,10 +1,11 @@
 import type { TabItem } from "@/components/app/tab-bar";
 
-export type HistoryTab = "preoperacionales" | "viajes" | "bitacora";
+export type HistoryTab = "preoperacionales" | "parte-diario" | "viajes" | "bitacora";
 
 /** Top-level tabs of the vehicle file's Historial section, in display order. */
 export const HISTORY_TABS: ReadonlyArray<TabItem<HistoryTab>> = [
   { key: "preoperacionales", label: "Preoperacionales" },
+  { key: "parte-diario", label: "Parte diario" },
   { key: "viajes", label: "Viajes" },
   { key: "bitacora", label: "Bitácora" },
 ];

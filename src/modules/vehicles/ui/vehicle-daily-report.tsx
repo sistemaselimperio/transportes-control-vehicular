@@ -1,55 +1,77 @@
-import { ClipboardList } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import type { DailyReportRow } from "@/modules/inspections/domain/daily-report";
 import { FuelValue } from "@/modules/inspections/ui/fuel-value";
 import { formatBogotaDateTime } from "@/modules/inspections/ui/inspection-format";
 
 const dash = (value: string | null) => value?.trim() || "—";
 
-function Item({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0 border-b py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
-    </div>
-  );
-}
+const TH = "micro-label px-4 py-3 font-medium";
+const TD = "px-4 py-3";
 
-/** The vehicle's latest daily report, linked to its inspection; a muted note when it has none. */
-export function VehicleDailyReport({ report }: { report: (DailyReportRow & { createdAt: Date }) | null }) {
-  if (!report) {
-    return (
-      <p className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-        <ClipboardList className="size-4" aria-hidden />
-        Sin partes diarios registrados.
-      </p>
-    );
+type Report = DailyReportRow & { createdAt: Date };
+
+/**
+ * Latest daily reports of one vehicle for the Historial tab, newest first. Same layout as the
+ * Preoperacionales tab: from `md` a table whose date links to the inspection with a hit area over
+ * the whole row; ruled links on phones.
+ */
+export function VehicleDailyReports({ reports }: { reports: readonly Report[] }) {
+  if (reports.length === 0) {
+    return <p className="border-b py-2.5 text-sm text-muted-foreground">Sin partes diarios registrados.</p>;
   }
   return (
-    <div>
-      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2.5 text-sm">
-        <span className="num font-medium">{formatBogotaDateTime(report.createdAt)}</span>
-        <span className="text-muted-foreground">{report.driverName}</span>
-        <Link
-          href={`/preoperacionales/${report.id}`}
-          className="ml-auto inline-flex min-h-11 items-center text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 transition-colors duration-150 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/70 md:min-h-7"
-        >
-          Ver preoperacional
-        </Link>
-      </p>
-      <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
-        <Item label="🏁 Km">
-          <span className="num">{dash(report.odometer)}</span>
-        </Item>
-        <Item label="🕰️ Descanso">{dash(report.restHours)}</Item>
-        <Item label="⛽ Combustible">
-          <FuelValue fuel={report.fuel} />
-        </Item>
-        <Item label="🚏 Ruta">{dash(report.route)}</Item>
-        <Item label="📍 Ubicación">{dash(report.location)}</Item>
-        <Item label="🛠️ Mantenimiento">{dash(report.pendingMaintenance)}</Item>
-      </dl>
-    </div>
+    <>
+      <div className="hidden overflow-x-auto border-b md:block">
+        <table className="w-full text-sm">
+          <thead className="text-left">
+            <tr className="border-b">
+              {["Fecha", "Conductor", "Km", "Descanso", "Ruta", "Ubicación", "Combustible", "Mantenimiento"].map((h) => (
+                <th key={h} scope="col" className={TH}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {reports.map((r) => (
+              <tr
+                key={r.id}
+                className="relative hover:bg-muted/50 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/70 has-[a:focus-visible]:ring-inset"
+              >
+                <td className={`${TD} num whitespace-nowrap`}>
+                  <Link href={`/preoperacionales/${r.id}`} className="outline-none after:absolute after:inset-0">
+                    {formatBogotaDateTime(r.createdAt)}
+                  </Link>
+                </td>
+                <td className={`${TD} font-medium`}>{r.driverName}</td>
+                <td className={`${TD} num whitespace-nowrap`}>{dash(r.odometer)}</td>
+                <td className={TD}>{dash(r.restHours)}</td>
+                <td className={TD}>{dash(r.route)}</td>
+                <td className={TD}>{dash(r.location)}</td>
+                <td className={`${TD} whitespace-nowrap`}>
+                  <FuelValue fuel={r.fuel} />
+                </td>
+                <td className={TD}>{dash(r.pendingMaintenance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ul className="md:hidden">
+        {reports.map((r) => (
+          <li key={r.id} className="border-b">
+            <Link
+              href={`/preoperacionales/${r.id}`}
+              className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/70"
+            >
+              <span className="num whitespace-nowrap">{formatBogotaDateTime(r.createdAt)}</span>
+              <span className="min-w-0 flex-1 basis-40 truncate font-medium">{r.driverName}</span>
+              <span className="text-muted-foreground">📍 {dash(r.location)}</span>
+              <FuelValue fuel={r.fuel} />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

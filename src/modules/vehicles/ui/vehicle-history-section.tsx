@@ -1,13 +1,13 @@
 "use client";
 
-import { ArrowUpRight, BookOpen, ClipboardCheck, Route } from "lucide-react";
+import { ArrowUpRight, BookOpen, ClipboardCheck, Route, Sun } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { TabBar } from "@/components/app/tab-bar";
 import { HISTORY_TABS, type HistoryTab } from "../domain/history-tab";
 import { Section } from "./file-section";
 
-const ICONS = { preoperacionales: ClipboardCheck, viajes: Route, bitacora: BookOpen } as const;
+const ICONS = { preoperacionales: ClipboardCheck, "parte-diario": Sun, viajes: Route, bitacora: BookOpen } as const;
 const TABS = HISTORY_TABS.map((t) => ({ ...t, icon: ICONS[t.key] }));
 
 export interface HistoryLink {
@@ -16,7 +16,7 @@ export interface HistoryLink {
 }
 
 /**
- * "Historial" of the vehicle file: Preoperacionales, Viajes and Bitácora as read-only lists of the
+ * "Historial" of the vehicle file: Preoperacionales, Parte diario, Viajes and Bitácora as read-only lists of the
  * latest records. The tab lives in the `historial` search param so a link opens on it; switching
  * rewrites the URL with `history.replaceState` (no server round trip, as in the fleet tabs).
  * Each panel is rendered by the server and passed in; only the active one is mounted. Beside the

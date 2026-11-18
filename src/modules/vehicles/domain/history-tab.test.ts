@@ -3,11 +3,12 @@ import { HISTORY_TABS, parseHistoryTab } from "./history-tab";
 
 describe("parseHistoryTab", () => {
   it("lists the tabs in display order", () => {
-    expect(HISTORY_TABS.map((t) => t.key)).toEqual(["preoperacionales", "viajes", "bitacora"]);
+    expect(HISTORY_TABS.map((t) => t.key)).toEqual(["preoperacionales", "parte-diario", "viajes", "bitacora"]);
   });
 
   it("accepts each known value", () => {
     expect(parseHistoryTab("preoperacionales")).toBe("preoperacionales");
+    expect(parseHistoryTab("parte-diario")).toBe("parte-diario");
     expect(parseHistoryTab("viajes")).toBe("viajes");
     expect(parseHistoryTab("bitacora")).toBe("bitacora");
   });

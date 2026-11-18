@@ -18,7 +18,7 @@ import type { HistoryTab } from "../domain/history-tab";
 import { technicalGroups } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
-import { VehicleDailyReport } from "./vehicle-daily-report";
+import { VehicleDailyReports } from "./vehicle-daily-report";
 import { VehicleHistorySection } from "./vehicle-history-section";
 import { PeoplePopover } from "./people-popover";
 import { TabParamScroll } from "./tab-param-scroll";
@@ -248,15 +248,15 @@ export function VehicleDetailView({
   readOnly = false,
   allowed,
   inspections = [],
-  dailyReport = null,
+  dailyReports = [],
   trips = [],
   historyTab = "bitacora",
 }: {
   detail: VehicleDetail;
   /** Latest pre-operational inspections of this vehicle, newest first; read per request, not cached. */
   inspections?: readonly VehicleInspectionRow[];
-  /** Latest daily report of this vehicle, if any. */
-  dailyReport?: (DailyReportRow & { createdAt: Date }) | null;
+  /** Latest daily reports of this vehicle, newest first. */
+  dailyReports?: readonly (DailyReportRow & { createdAt: Date })[];
   /** Latest trips of this vehicle, newest start first. */
   trips?: readonly TripRow[];
   /** Tab of the Historial section the page opens on. */
@@ -365,19 +365,18 @@ export function VehicleDetailView({
           </div>
         </div>
 
-        <Section id="parte-diario" title="Parte diario">
-          <VehicleDailyReport report={dailyReport} />
-        </Section>
-
         <VehicleHistorySection
           initialTab={historyTab}
           panels={{
             preoperacionales: <VehicleInspectionsList rows={inspections} />,
+            "parte-diario": <VehicleDailyReports reports={dailyReports} />,
             viajes: <VehicleTripsList rows={trips} />,
             bitacora: <VehicleLogbookPanel logbook={detail.logbook} />,
           }}
           links={{
             preoperacionales: { href: `/preoperacionales?vehiculo=${r.id}`, label: "Ver preoperacionales" },
+            // The Parte diario page lists one date for every vehicle, not one vehicle's history.
+            "parte-diario": null,
             viajes: { href: `/viajes?${new URLSearchParams({ placa: r.plate })}`, label: "Ver viajes" },
             // Staff cannot open the Bitácora page, so they get no link to it.
             bitacora: readOnly ? null : { href: logbookHref(r.plate, "servicios"), label: "Ver bitácora" },
