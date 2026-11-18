@@ -12,6 +12,8 @@ export type ChecklistItem = {
 export type ChecklistSection = {
   id: string;
   title: string;
+  /** A MAL anywhere in this section makes the inspection "prioridad alta" (starred or not). */
+  highPriority?: true;
   /** Extra line under the title, e.g. what the items refer to. */
   hint?: string;
   /** Present when the section may not apply to the vehicle: the text of the form's "no aplica" checkbox. */
@@ -49,6 +51,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   },
   {
     id: "brakes",
+    highPriority: true,
     title: "Frenos",
     items: [
       critical("brakes.pedal", "Freno de pedal"),
@@ -58,6 +61,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   },
   {
     id: "tires",
+    highPriority: true,
     title: "Llantas",
     items: [
       critical("tires.front", "Llantas delanteras sin cortes ni bombas"),
@@ -68,11 +72,13 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   },
   {
     id: "steering",
+    highPriority: true,
     title: "Dirección",
     items: [critical("steering.play", "Sin juego ni ruidos al girar")],
   },
   {
     id: "lights",
+    highPriority: true,
     title: "Luces",
     items: [
       critical("lights.high-low", "Luces altas y bajas"),
@@ -93,6 +99,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   },
   {
     id: "engine",
+    highPriority: true,
     title: "Motor y líquidos",
     items: [
       regular("engine.oil-level", "Nivel de aceite"),
@@ -105,6 +112,7 @@ export const PREOPERATIONAL_CHECKLIST: readonly ChecklistSection[] = [
   },
   {
     id: "cabin",
+    highPriority: true,
     title: "Cabina",
     items: [
       critical("cabin.seat-belt", "Cinturón de seguridad"),

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { VehicleInspectionRow } from "../infrastructure/inspection-repository";
 import { exitStatus } from "../domain/exit-decision";
-import { ExitBadge, StatusBadge } from "./inspection-badges";
+import { ExitBadge, HighPriorityBadge, StatusBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 const TH = "micro-label px-4 py-3 font-medium";
@@ -42,7 +42,10 @@ export function VehicleInspectionsList({ rows }: { rows: readonly VehicleInspect
                   {r.asTrailer && <span className="ml-2 text-xs font-normal text-muted-foreground">Como remolque</span>}
                 </td>
                 <td className={TD}>
-                  <StatusBadge critical={r.hasCriticalFailure} />
+                  <span className="flex flex-wrap items-center gap-1">
+                    <StatusBadge critical={r.hasCriticalFailure} />
+                    <HighPriorityBadge sections={r.highPrioritySections} />
+                  </span>
                 </td>
                 <td className={TD}>
                   <ExitBadge status={exitStatus(r)} />
@@ -65,6 +68,7 @@ export function VehicleInspectionsList({ rows }: { rows: readonly VehicleInspect
               <span className="min-w-0 flex-1 basis-40 truncate font-medium">{r.driverName}</span>
               {r.asTrailer && <span className="text-xs text-muted-foreground">Como remolque</span>}
               <StatusBadge critical={r.hasCriticalFailure} />
+              <HighPriorityBadge sections={r.highPrioritySections} />
               <ExitBadge status={exitStatus(r)} />
             </Link>
           </li>

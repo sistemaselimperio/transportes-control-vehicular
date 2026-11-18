@@ -5,6 +5,7 @@ import type { ClosureInput, ExitDecision, ExitDecisionInput } from "../domain/ex
 import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, type InspectionFilters } from "../domain/inspection-filters";
 import { applySelectedDriver, resolveInspectionLinks, type InspectionLinks } from "../domain/inspection-links";
 import { latestPerPlate, type DailyReportRow } from "../domain/daily-report";
+import { HIGH_PRIORITY_ITEM_IDS, highPriorityFailures } from "../domain/high-priority";
 import { storedNotApplicable, uncheckedCount, type InspectionAnswers, type ValidInspection } from "../domain/preoperational-inspection";
 
 const t = schema.preoperationalInspections;
@@ -27,6 +28,8 @@ export type InspectionListRow = {
   driverId: number | null;
   /** Applicable checklist items nobody answered (only critical ones are required). */
   uncheckedCount: number;
+  /** Titles of the high-priority sections with a MAL, in form order; empty when none. */
+  highPrioritySections: string[];
   /** The maintenance chief's decision; null while pending. */
   exitDecision: ExitDecision | null;
 };
@@ -47,7 +50,7 @@ export type InspectionClosure = {
   recordedByName: string | null;
 };
 
-export type InspectionDetail = Omit<InspectionListRow, "uncheckedCount"> & {
+export type InspectionDetail = Omit<InspectionListRow, "uncheckedCount" | "highPrioritySections"> & {
   createdAt: Date;
   /** "Parte diario" fields; null on inspections saved before that tab existed. */
   restHours: string | null;
@@ -75,6 +78,8 @@ export type VehicleInspectionRow = {
   inspectionTime: string;
   driverName: string;
   hasCriticalFailure: boolean;
+  /** Titles of the high-priority sections with a MAL, in form order; empty when none. */
+  highPrioritySections: string[];
   exitDecision: ExitDecision | null;
   asTrailer: boolean;
 };
@@ -141,6 +146,15 @@ export async function insertInspection(value: ValidInspection): Promise<{ ok: tr
   return { ok: true };
 }
 
+/**
+ * True when `answers` holds a MAL for any item of a high-priority section. Item ids are bound as
+ * parameters, taken from the checklist so they cannot drift from the domain rule.
+ */
+function hasHighPriorityFailure(): SQL {
+  const ids = sql.join(HIGH_PRIORITY_ITEM_IDS.map((id) => sql`${id}`), sql`, `);
+  return sql`exists (select 1 from jsonb_each(${t.answers}) as a where a.value->>'status' = 'MAL' and a.key in (${ids}))`;
+}
+
 /** One page of inspections, newest first; `hasNext` tells whether another page follows. */
 export async function listInspections(
   filters: InspectionFilters,
@@ -155,7 +169,8 @@ export async function listInspections(
   if (filters.vehicleId) conditions.push(or(eq(t.vehicleId, filters.vehicleId), eq(t.trailerVehicleId, filters.vehicleId))!);
   if (filters.exit === "PENDING") conditions.push(isNull(t.exitDecision));
   else if (filters.exit !== "ALL") conditions.push(eq(t.exitDecision, filters.exit));
-  if (filters.state !== "ALL") conditions.push(eq(t.hasCriticalFailure, filters.state === "CRITICAL"));
+  if (filters.state === "HIGH_PRIORITY") conditions.push(hasHighPriorityFailure());
+  else if (filters.state !== "ALL") conditions.push(eq(t.hasCriticalFailure, filters.state === "CRITICAL"));
 
   const rows = await db
     .select({
@@ -186,6 +201,7 @@ export async function listInspections(
     rows: rows.slice(0, INSPECTIONS_PAGE_SIZE).map(({ answers, notApplicableSections, muleNotApplicable, ...row }) => ({
       ...row,
       uncheckedCount: uncheckedCount(answers, storedNotApplicable(notApplicableSections, muleNotApplicable)),
+      highPrioritySections: highPriorityFailures(answers).map((section) => section.title),
     })),
     hasNext: rows.length > INSPECTIONS_PAGE_SIZE,
   };
@@ -336,12 +352,18 @@ export async function listVehicleInspections(vehicleId: number, limit: number): 
       hasCriticalFailure: t.hasCriticalFailure,
       exitDecision: t.exitDecision,
       vehicleId: t.vehicleId,
+      // Needed only to derive the high-priority sections; not returned.
+      answers: t.answers,
     })
     .from(t)
     .where(or(eq(t.vehicleId, vehicleId), eq(t.trailerVehicleId, vehicleId)))
     .orderBy(desc(t.inspectionDate), desc(t.inspectionTime), desc(t.createdAt))
     .limit(limit);
-  return rows.map(({ vehicleId: tractorId, ...row }) => ({ ...row, asTrailer: tractorId !== vehicleId }));
+  return rows.map(({ vehicleId: tractorId, answers, ...row }) => ({
+    ...row,
+    highPrioritySections: highPriorityFailures(answers).map((section) => section.title),
+    asTrailer: tractorId !== vehicleId,
+  }));
 }
 
 /** Deletes an inspection for good; false when it did not exist. */

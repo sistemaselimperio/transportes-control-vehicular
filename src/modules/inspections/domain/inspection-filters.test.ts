@@ -5,6 +5,7 @@ import {
   INSPECTIONS_PAGE_SIZE,
   inspectionsHref,
   parseInspectionFilters,
+  STATE_FILTER_OPTIONS,
   stateFilterParam,
 } from "./inspection-filters";
 
@@ -90,6 +91,11 @@ describe("parseInspectionFilters checklist state", () => {
   it("maps the estado parameter to a state filter", () => {
     expect(parseInspectionFilters({ estado: "ok" }).state).toBe("OK");
     expect(parseInspectionFilters({ estado: "critico" }).state).toBe("CRITICAL");
+    expect(parseInspectionFilters({ estado: "prioridad-alta" }).state).toBe("HIGH_PRIORITY");
+  });
+
+  it("offers the high priority option", () => {
+    expect(STATE_FILTER_OPTIONS).toContainEqual({ value: "HIGH_PRIORITY", label: "Prioridad alta" });
   });
 
   it("falls back to all for anything else", () => {
@@ -99,7 +105,7 @@ describe("parseInspectionFilters checklist state", () => {
 
   it("round-trips through stateFilterParam", () => {
     expect(stateFilterParam("ALL")).toBeNull();
-    for (const state of ["OK", "CRITICAL"] as const) {
+    for (const state of ["OK", "CRITICAL", "HIGH_PRIORITY"] as const) {
       expect(parseInspectionFilters({ estado: stateFilterParam(state)! }).state).toBe(state);
     }
   });
@@ -131,6 +137,7 @@ describe("inspectionsHref", () => {
       "/preoperacionales?desde=2026-03-01&salida=no-apto",
     );
     expect(inspectionsHref({ ...none, state: "CRITICAL" })).toBe("/preoperacionales?estado=critico");
+    expect(inspectionsHref({ ...none, state: "HIGH_PRIORITY" })).toBe("/preoperacionales?estado=prioridad-alta");
   });
 
   it("keeps the driver and vehicle links and adds the page after the first", () => {

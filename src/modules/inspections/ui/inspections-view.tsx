@@ -9,7 +9,7 @@ import { inspectionsHref, type InspectionFilters } from "../domain/inspection-fi
 import type { InspectionListRow } from "../infrastructure/inspection-repository";
 import { DeleteInspectionButton } from "./delete-inspection-button";
 import { InspectionFiltersForm } from "./inspection-filters-form";
-import { ExitBadge, NotRegisteredBadge, StatusBadge } from "./inspection-badges";
+import { ExitBadge, HighPriorityBadge, NotRegisteredBadge, StatusBadge } from "./inspection-badges";
 import { formatInspectionDate } from "./inspection-format";
 
 const rowSummary = (r: InspectionListRow) => `${r.plate} · ${formatInspectionDate(r.inspectionDate)} ${r.inspectionTime}`;
@@ -83,6 +83,7 @@ export function InspectionsView({
                     <PlateCell row={r} linked={false} />
                     <span className="flex flex-wrap items-center justify-end gap-1">
                       <StatusBadge critical={r.hasCriticalFailure} unchecked={r.uncheckedCount} />
+                      <HighPriorityBadge sections={r.highPrioritySections} />
                       <ExitBadge status={exitStatus(r)} />
                     </span>
                   </div>
@@ -143,6 +144,7 @@ export function InspectionsView({
                       <td className="px-4 py-3">
                         <span className="flex flex-wrap items-center gap-1">
                           <StatusBadge critical={r.hasCriticalFailure} unchecked={r.uncheckedCount} />
+                          <HighPriorityBadge sections={r.highPrioritySections} />
                         </span>
                       </td>
                       <td className="px-4 py-3">

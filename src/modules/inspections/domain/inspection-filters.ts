@@ -27,15 +27,20 @@ function parseExitFilter(value: string): ExitFilter {
   return (Object.keys(EXIT_PARAMS) as ExitStatus[]).find((status) => EXIT_PARAMS[status] === text) ?? "ALL";
 }
 
-export type StateFilter = "ALL" | "OK" | "CRITICAL";
+export type StateFilter = "ALL" | "OK" | "CRITICAL" | "HIGH_PRIORITY";
 
 /** The `estado` query values (checklist result); `ALL` has none because it is the default. */
-const STATE_PARAMS: Record<Exclude<StateFilter, "ALL">, string> = { OK: "ok", CRITICAL: "critico" };
+const STATE_PARAMS: Record<Exclude<StateFilter, "ALL">, string> = {
+  OK: "ok",
+  CRITICAL: "critico",
+  HIGH_PRIORITY: "prioridad-alta",
+};
 
 export const STATE_FILTER_OPTIONS: readonly { value: StateFilter; label: string }[] = [
   { value: "ALL", label: "Todos" },
   { value: "OK", label: "OK" },
   { value: "CRITICAL", label: "Crítico" },
+  { value: "HIGH_PRIORITY", label: "Prioridad alta" },
 ];
 
 /** The `estado` value for a filter, null for the default (no filter). */

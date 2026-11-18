@@ -1,4 +1,4 @@
-import { Ban, CircleAlert, CircleCheck, Clock, Unlink } from "lucide-react";
+import { Ban, CircleAlert, CircleCheck, Clock, TriangleAlert, Unlink } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { ExitStatus } from "../domain/exit-decision";
@@ -34,6 +34,20 @@ export function StatusBadge({ critical, unchecked = 0 }: { critical: boolean; un
           <span className="sr-only"> sin revisar</span>
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * "Prioridad alta": a MAL in a mechanical section. Separate from the red "Crítico" (the ★ flag that
+ * stops the vehicle); the warn tokens and a triangle keep it distinct. Nothing when no section failed.
+ */
+export function HighPriorityBadge({ sections }: { sections: readonly string[] }) {
+  if (sections.length === 0) return null;
+  return (
+    <span className={cn(BADGE, "bg-warn/60 text-warn-foreground ring-warn-foreground/30")}>
+      <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
+      Prioridad alta · {sections.join(", ")}
     </span>
   );
 }
