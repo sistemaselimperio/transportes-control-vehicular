@@ -41,7 +41,7 @@ export function StatusBadge({ critical, unchecked = 0 }: { critical: boolean; un
 
 /**
  * "Prioridad alta": a MAL in a mechanical section. Separate from the red "Crítico" (the ★ flag that
- * stops the vehicle); a light neutral badge with a triangle keeps it distinct. The failed items show on
+ * stops the vehicle); a solid dark red badge with a triangle keeps it distinct. The failed items show on
  * hover. Nothing when no section failed.
  */
 export function HighPriorityBadge({ sections }: { sections: readonly HighPrioritySection[] }) {
@@ -49,7 +49,7 @@ export function HighPriorityBadge({ sections }: { sections: readonly HighPriorit
   // One line per section in the hover tooltip; the same text is read out by screen readers.
   const lines = sections.map((s) => `${s.title}: ${s.items.join(", ")}`);
   return (
-    <span title={lines.join("\n")} className={cn(BADGE, "cursor-help bg-muted text-muted-foreground ring-foreground/15")}>
+    <span title={lines.join("\n")} className={cn(BADGE, "cursor-help bg-danger-foreground text-white ring-danger-foreground")}>
       <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
       Prioridad alta
       <span className="sr-only">. {lines.join(". ")}</span>

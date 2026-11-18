@@ -75,7 +75,7 @@ export function FormStepTabs<K extends string>({
             className={cn(
               "flex min-h-20 w-full min-w-0 cursor-pointer flex-col items-start gap-1.5 rounded-2xl border-4 p-3 text-left outline-none transition-colors duration-150 focus-visible:ring-4 focus-visible:ring-ring/70 active:scale-[0.98] motion-reduce:active:scale-100 sm:p-4",
               selected
-                ? "border-foreground bg-primary text-primary-foreground shadow-soft"
+                ? "border-foreground bg-foreground text-background shadow-soft"
                 : "border-foreground/25 bg-card text-foreground hover:border-foreground/60",
               s.hasError && !selected && "border-destructive",
             )}
@@ -87,7 +87,7 @@ export function FormStepTabs<K extends string>({
                   aria-hidden
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-full text-lg font-bold",
-                    selected ? "bg-foreground text-primary" : "bg-foreground/10 text-foreground",
+                    selected ? "bg-background text-foreground" : "bg-foreground/10 text-foreground",
                   )}
                 >
                   {i + 1}
@@ -99,7 +99,7 @@ export function FormStepTabs<K extends string>({
                 {s.title}
               </span>
             </span>
-            <span className={cn("text-sm leading-snug break-words sm:text-base", selected ? "text-foreground" : "text-muted-foreground")}>
+            <span className={cn("text-sm leading-snug break-words sm:text-base", selected ? "text-background/80" : "text-muted-foreground")}>
               {s.hint}
             </span>
             <span
@@ -110,7 +110,7 @@ export function FormStepTabs<K extends string>({
                   : s.complete
                     ? "bg-ok text-ok-foreground"
                     : selected
-                      ? "bg-foreground/10"
+                      ? "bg-background/15"
                       : "bg-muted",
               )}
             >
