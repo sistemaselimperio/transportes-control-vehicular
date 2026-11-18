@@ -2,6 +2,15 @@
 import { normalizePlateKey } from "./inspection-links";
 import { isIsoDate } from "./preoperational-inspection";
 
+/**
+ * The page only shows reports registered from this moment on (18 Nov 2026, 3 p.m. Bogotá): the
+ * daily-report data saved before it is incomplete.
+ */
+export const DAILY_REPORT_STARTS_AT = new Date("2026-11-18T15:00:00-05:00");
+
+/** The first date the page can show, in YYYY-MM-DD (Bogotá). */
+export const DAILY_REPORT_FIRST_DATE = "2026-11-18";
+
 /** An inspection of the date with what the page needs, plus `createdAt` to pick the latest one. */
 export type DailyReportCandidate = {
   id: string;

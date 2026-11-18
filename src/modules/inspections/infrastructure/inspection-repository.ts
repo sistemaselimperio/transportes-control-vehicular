@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import type { ClosureInput, ExitDecision, ExitDecisionInput } from "../domain/exit-decision";
 import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, type InspectionFilters } from "../domain/inspection-filters";
 import { applySelectedDriver, resolveInspectionLinks, type InspectionLinks } from "../domain/inspection-links";
-import { latestPerPlate, type DailyReportRow } from "../domain/daily-report";
+import { DAILY_REPORT_STARTS_AT, latestPerPlate, type DailyReportRow } from "../domain/daily-report";
 import { HIGH_PRIORITY_ITEM_IDS, highPriorityFailures } from "../domain/high-priority";
 import { storedNotApplicable, uncheckedCount, type InspectionAnswers, type ValidInspection } from "../domain/preoperational-inspection";
 
@@ -389,6 +389,6 @@ export async function listDailyReports(date: string): Promise<DailyReportRow[]> 
       pendingMaintenance: t.pendingMaintenance,
     })
     .from(t)
-    .where(eq(t.inspectionDate, date));
+    .where(and(eq(t.inspectionDate, date), gte(t.createdAt, DAILY_REPORT_STARTS_AT)));
   return latestPerPlate(rows);
 }

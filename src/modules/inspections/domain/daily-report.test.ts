@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { latestPerPlate, parseDailyReportDate, type DailyReportCandidate } from "./daily-report";
+import {
+  DAILY_REPORT_STARTS_AT,
+  latestPerPlate,
+  parseDailyReportDate,
+  type DailyReportCandidate,
+} from "./daily-report";
 
 const row = (over: Partial<DailyReportCandidate> = {}): DailyReportCandidate => ({
   id: "a",
@@ -49,6 +54,12 @@ describe("latestPerPlate", () => {
 
   it("returns an empty list for no rows", () => {
     expect(latestPerPlate([])).toEqual([]);
+  });
+});
+
+describe("DAILY_REPORT_STARTS_AT", () => {
+  it("is 18 Nov 2026 at 3 p.m. in Bogotá (UTC-5)", () => {
+    expect(DAILY_REPORT_STARTS_AT.toISOString()).toBe("2026-11-18T20:00:00.000Z");
   });
 });
 

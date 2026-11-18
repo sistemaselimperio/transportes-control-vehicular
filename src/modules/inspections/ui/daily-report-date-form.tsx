@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DAILY_REPORT_FIRST_DATE } from "../domain/daily-report";
 import { isIsoDate } from "../domain/preoperational-inspection";
 
 /**
@@ -31,6 +32,7 @@ export function DailyReportDateForm({ date }: { date: string }) {
         type="date"
         name="fecha"
         value={value}
+        min={DAILY_REPORT_FIRST_DATE}
         onChange={(e) => {
           setValue(e.target.value);
           if (isIsoDate(e.target.value)) {

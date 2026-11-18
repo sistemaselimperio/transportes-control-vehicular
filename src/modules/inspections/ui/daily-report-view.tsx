@@ -19,7 +19,7 @@ export function DailyReportView({ rows, date }: { rows: readonly DailyReportRow[
     <section className="space-y-5">
       <PageHeader
         title="Parte diario"
-        description="Último parte de cada vehículo que reportó en la fecha elegida."
+        description="Último parte de cada vehículo que reportó en la fecha elegida. Se muestran los registrados desde el 18/11/2026 a las 3:00 p. m."
         actions={<DailyReportDateForm date={date} />}
       />
 
