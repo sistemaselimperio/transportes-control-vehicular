@@ -5,7 +5,7 @@ import type { ClosureInput, ExitDecision, ExitDecisionInput } from "../domain/ex
 import { escapeLikePattern, INSPECTIONS_PAGE_SIZE, type InspectionFilters } from "../domain/inspection-filters";
 import { applySelectedDriver, resolveInspectionLinks, type InspectionLinks } from "../domain/inspection-links";
 import { DAILY_REPORT_STARTS_AT, latestPerPlate, type DailyReportRow } from "../domain/daily-report";
-import { HIGH_PRIORITY_ITEM_IDS, highPriorityFailures } from "../domain/high-priority";
+import { HIGH_PRIORITY_ITEM_IDS, highPriorityFailures, type HighPrioritySection } from "../domain/high-priority";
 import { storedNotApplicable, uncheckedCount, type InspectionAnswers, type ValidInspection } from "../domain/preoperational-inspection";
 
 const t = schema.preoperationalInspections;
@@ -29,7 +29,7 @@ export type InspectionListRow = {
   /** Applicable checklist items nobody answered (only critical ones are required). */
   uncheckedCount: number;
   /** Titles of the high-priority sections with a MAL, in form order; empty when none. */
-  highPrioritySections: string[];
+  highPrioritySections: HighPrioritySection[];
   /** The maintenance chief's decision; null while pending. */
   exitDecision: ExitDecision | null;
 };
@@ -79,7 +79,7 @@ export type VehicleInspectionRow = {
   driverName: string;
   hasCriticalFailure: boolean;
   /** Titles of the high-priority sections with a MAL, in form order; empty when none. */
-  highPrioritySections: string[];
+  highPrioritySections: HighPrioritySection[];
   exitDecision: ExitDecision | null;
   asTrailer: boolean;
 };
@@ -201,7 +201,7 @@ export async function listInspections(
     rows: rows.slice(0, INSPECTIONS_PAGE_SIZE).map(({ answers, notApplicableSections, muleNotApplicable, ...row }) => ({
       ...row,
       uncheckedCount: uncheckedCount(answers, storedNotApplicable(notApplicableSections, muleNotApplicable)),
-      highPrioritySections: highPriorityFailures(answers).map((section) => section.title),
+      highPrioritySections: highPriorityFailures(answers),
     })),
     hasNext: rows.length > INSPECTIONS_PAGE_SIZE,
   };
@@ -361,7 +361,7 @@ export async function listVehicleInspections(vehicleId: number, limit: number): 
     .limit(limit);
   return rows.map(({ vehicleId: tractorId, answers, ...row }) => ({
     ...row,
-    highPrioritySections: highPriorityFailures(answers).map((section) => section.title),
+    highPrioritySections: highPriorityFailures(answers),
     asTrailer: tractorId !== vehicleId,
   }));
 }

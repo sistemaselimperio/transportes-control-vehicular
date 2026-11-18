@@ -2,6 +2,7 @@ import { Ban, CircleAlert, CircleCheck, Clock, TriangleAlert, Unlink } from "luc
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { ExitStatus } from "../domain/exit-decision";
+import type { HighPrioritySection } from "../domain/high-priority";
 
 const BADGE =
   "inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-xs leading-none font-medium whitespace-nowrap ring-1 ring-inset";
@@ -40,14 +41,18 @@ export function StatusBadge({ critical, unchecked = 0 }: { critical: boolean; un
 
 /**
  * "Prioridad alta": a MAL in a mechanical section. Separate from the red "Crítico" (the ★ flag that
- * stops the vehicle); the warn tokens and a triangle keep it distinct. Nothing when no section failed.
+ * stops the vehicle); a light neutral badge with a triangle keeps it distinct. The failed items show on
+ * hover. Nothing when no section failed.
  */
-export function HighPriorityBadge({ sections }: { sections: readonly string[] }) {
+export function HighPriorityBadge({ sections }: { sections: readonly HighPrioritySection[] }) {
   if (sections.length === 0) return null;
+  // One line per section in the hover tooltip; the same text is read out by screen readers.
+  const lines = sections.map((s) => `${s.title}: ${s.items.join(", ")}`);
   return (
-    <span className={cn(BADGE, "bg-warn/60 text-warn-foreground ring-warn-foreground/30")}>
+    <span title={lines.join("\n")} className={cn(BADGE, "cursor-help bg-muted text-muted-foreground ring-foreground/15")}>
       <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-      Prioridad alta · {sections.join(", ")}
+      Prioridad alta
+      <span className="sr-only">. {lines.join(". ")}</span>
     </span>
   );
 }

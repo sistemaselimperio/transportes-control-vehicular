@@ -42,7 +42,7 @@ export function VehicleInspectionsList({ rows }: { rows: readonly VehicleInspect
                   {r.asTrailer && <span className="ml-2 text-xs font-normal text-muted-foreground">Como remolque</span>}
                 </td>
                 <td className={TD}>
-                  <span className="flex flex-wrap items-center gap-1">
+                  <span className="flex flex-col items-start gap-1">
                     <StatusBadge critical={r.hasCriticalFailure} />
                     <HighPriorityBadge sections={r.highPrioritySections} />
                   </span>

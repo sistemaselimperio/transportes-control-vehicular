@@ -28,7 +28,7 @@ describe("highPriorityFailures", () => {
   });
 
   it("counts a non-critical item of a high-priority section", () => {
-    expect(highPriorityFailures({ "cabin.horn": mal })).toEqual([{ id: "cabin", title: "Cabina" }]);
+    expect(highPriorityFailures({ "cabin.horn": mal })).toEqual([{ id: "cabin", title: "Cabina", items: ["Pito"] }]);
   });
 
   it("ignores failures in documents, driver and other sections", () => {
@@ -41,13 +41,13 @@ describe("highPriorityFailures", () => {
     expect(highPriorityFailures({ "brakes.pedal": bien, "brakes.parking": bien })).toEqual([]);
   });
 
-  it("lists each failed section once, in form order", () => {
+  it("lists each failed section once, in form order, with its failed items in form order", () => {
     expect(
       highPriorityFailures({ "lights.brake": mal, "brakes.parking": mal, "brakes.pedal": mal, "engine.oil-level": mal }),
     ).toEqual([
-      { id: "brakes", title: "Frenos" },
-      { id: "lights", title: "Luces" },
-      { id: "engine", title: "Motor y líquidos" },
+      { id: "brakes", title: "Frenos", items: ["Freno de pedal", "Freno de parqueo / emergencia"] },
+      { id: "lights", title: "Luces", items: ["Stop"] },
+      { id: "engine", title: "Motor y líquidos", items: ["Nivel de aceite"] },
     ]);
   });
 

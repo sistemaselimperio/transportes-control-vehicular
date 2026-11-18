@@ -16,11 +16,16 @@ export const HIGH_PRIORITY_ITEM_IDS: readonly string[] = HIGH_PRIORITY_SECTIONS.
   section.items.map((item) => item.id),
 );
 
-export type HighPrioritySection = { id: string; title: string };
+export type HighPrioritySection = { id: string; title: string; items: string[] };
 
-/** The high-priority sections with at least one item answered MAL, once each, in form order. */
+/**
+ * The high-priority sections with at least one item answered MAL, once each, in form order, each
+ * with the labels of its failed items (also in form order).
+ */
 export function highPriorityFailures(answers: InspectionAnswers): HighPrioritySection[] {
-  return HIGH_PRIORITY_SECTIONS.filter((section) => section.items.some((item) => answers[item.id]?.status === "MAL")).map(
-    ({ id, title }) => ({ id, title }),
-  );
+  return HIGH_PRIORITY_SECTIONS.map(({ id, title, items }) => ({
+    id,
+    title,
+    items: items.filter((item) => answers[item.id]?.status === "MAL").map((item) => item.label),
+  })).filter((section) => section.items.length > 0);
 }

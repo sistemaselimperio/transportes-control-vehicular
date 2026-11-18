@@ -142,7 +142,7 @@ export function InspectionsView({
                       </td>
                       <td className="px-4 py-3">{r.route}</td>
                       <td className="px-4 py-3">
-                        <span className="flex flex-wrap items-center gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge critical={r.hasCriticalFailure} unchecked={r.uncheckedCount} />
                           <HighPriorityBadge sections={r.highPrioritySections} />
                         </span>
