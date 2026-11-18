@@ -366,6 +366,33 @@ export async function listVehicleInspections(vehicleId: number, limit: number): 
   }));
 }
 
+/** The latest daily report of one vehicle, as tractor or as trailer; null when it has none. */
+export async function getLatestDailyReport(
+  vehicleId: number,
+): Promise<(DailyReportRow & { createdAt: Date }) | null> {
+  const [row] = await db
+    .select({
+      id: t.id,
+      createdAt: t.createdAt,
+      plate: t.plate,
+      trailerPlate: t.trailerPlate,
+      driverName: t.driverName,
+      odometer: t.odometer,
+      restHours: t.restHours,
+      route: t.route,
+      location: t.location,
+      fuel: t.fuel,
+      pendingMaintenance: t.pendingMaintenance,
+    })
+    .from(t)
+    .where(
+      and(or(eq(t.vehicleId, vehicleId), eq(t.trailerVehicleId, vehicleId)), gte(t.createdAt, DAILY_REPORT_STARTS_AT)),
+    )
+    .orderBy(desc(t.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Deletes an inspection for good; false when it did not exist. */
 export async function deleteInspection(id: string): Promise<boolean> {
   const deleted = await db.delete(t).where(eq(t.id, id)).returning({ id: t.id });

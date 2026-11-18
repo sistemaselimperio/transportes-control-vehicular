@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { currentDay } from "@/lib/current-day";
 import { canAssignDrivers, canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
-import { listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
+import { getLatestDailyReport, listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
 import { listVehicleTrips } from "@/modules/trips/application/trip-queries";
 import { withEffectiveStatus } from "@/modules/trips/domain/trip-row";
 import { getVehicleDetail } from "@/modules/vehicles/application/vehicle-queries";
@@ -31,9 +31,10 @@ export default async function Page({
   const detail = await getVehicleDetail(canonicalPlate(decodeURIComponent(placa)), await currentDay());
   if (!detail) notFound();
   // Inspections arrive from a public form, so no write path of the app expires them: read per request.
-  const [inspections, trips] = await Promise.all([
+  const [inspections, trips, dailyReport] = await Promise.all([
     listVehicleInspections(detail.row.id, HISTORY_LIMIT),
     listVehicleTrips(detail.row.id, HISTORY_LIMIT),
+    getLatestDailyReport(detail.row.id),
   ]);
   return (
     <VehicleDetailView
@@ -41,6 +42,7 @@ export default async function Page({
       readOnly={!canManageSection(role, "fleet")}
       allowed={canAssignDrivers(role) ? ["driver"] : []}
       inspections={inspections}
+      dailyReport={dailyReport}
       trips={withEffectiveStatus(trips, new Date())}
       historyTab={parseHistoryTab(query.historial)}
     />

@@ -7,6 +7,7 @@ import { VehicleLogbookPanel } from "@/modules/logbook/ui/vehicle-logbook";
 import { VehicleTripsList } from "@/modules/trips/ui/vehicle-trips-list";
 import type { TripRow } from "@/modules/trips/domain/trip-row";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
+import type { DailyReportRow } from "@/modules/inspections/domain/daily-report";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
@@ -17,6 +18,7 @@ import type { HistoryTab } from "../domain/history-tab";
 import { technicalGroups } from "../domain/technical-data";
 import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
+import { VehicleDailyReport } from "./vehicle-daily-report";
 import { VehicleHistorySection } from "./vehicle-history-section";
 import { PeoplePopover } from "./people-popover";
 import { TabParamScroll } from "./tab-param-scroll";
@@ -246,12 +248,15 @@ export function VehicleDetailView({
   readOnly = false,
   allowed,
   inspections = [],
+  dailyReport = null,
   trips = [],
   historyTab = "bitacora",
 }: {
   detail: VehicleDetail;
   /** Latest pre-operational inspections of this vehicle, newest first; read per request, not cached. */
   inspections?: readonly VehicleInspectionRow[];
+  /** Latest daily report of this vehicle, if any. */
+  dailyReport?: (DailyReportRow & { createdAt: Date }) | null;
   /** Latest trips of this vehicle, newest start first. */
   trips?: readonly TripRow[];
   /** Tab of the Historial section the page opens on. */
@@ -359,6 +364,10 @@ export function VehicleDetailView({
             </Section>
           </div>
         </div>
+
+        <Section id="parte-diario" title="Parte diario">
+          <VehicleDailyReport report={dailyReport} />
+        </Section>
 
         <VehicleHistorySection
           initialTab={historyTab}
