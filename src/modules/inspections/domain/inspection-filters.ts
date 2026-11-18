@@ -27,6 +27,27 @@ function parseExitFilter(value: string): ExitFilter {
   return (Object.keys(EXIT_PARAMS) as ExitStatus[]).find((status) => EXIT_PARAMS[status] === text) ?? "ALL";
 }
 
+export type StateFilter = "ALL" | "OK" | "CRITICAL";
+
+/** The `estado` query values (checklist result); `ALL` has none because it is the default. */
+const STATE_PARAMS: Record<Exclude<StateFilter, "ALL">, string> = { OK: "ok", CRITICAL: "critico" };
+
+export const STATE_FILTER_OPTIONS: readonly { value: StateFilter; label: string }[] = [
+  { value: "ALL", label: "Todos" },
+  { value: "OK", label: "OK" },
+  { value: "CRITICAL", label: "Crítico" },
+];
+
+/** The `estado` value for a filter, null for the default (no filter). */
+export function stateFilterParam(state: StateFilter): string | null {
+  return state === "ALL" ? null : STATE_PARAMS[state];
+}
+
+function parseStateFilter(value: string): StateFilter {
+  const text = value.trim();
+  return (Object.keys(STATE_PARAMS) as Exclude<StateFilter, "ALL">[]).find((state) => STATE_PARAMS[state] === text) ?? "ALL";
+}
+
 export type InspectionFilters = {
   /** Normalized plate fragment, empty for no filter. */
   plate: string;
@@ -38,6 +59,8 @@ export type InspectionFilters = {
   vehicleId: number | null;
   /** Exit decision filter: `ALL` for no filter. */
   exit: ExitFilter;
+  /** Checklist result filter (critical failure or not): `ALL` for no filter. */
+  state: StateFilter;
   page: number;
 };
 
@@ -71,6 +94,7 @@ export function parseInspectionFilters(params: Params): InspectionFilters {
     driverId: parseId(first(params.conductor)),
     vehicleId: parseId(first(params.vehiculo)),
     exit: parseExitFilter(first(params.salida)),
+    state: parseStateFilter(first(params.estado)),
     page: page >= 1 ? page : 1,
   };
 }
@@ -85,6 +109,8 @@ export function inspectionsHref(filters: InspectionFilters, page = 1): string {
   if (filters.vehicleId) params.set("vehiculo", String(filters.vehicleId));
   const exit = exitFilterParam(filters.exit);
   if (exit) params.set("salida", exit);
+  const state = stateFilterParam(filters.state);
+  if (state) params.set("estado", state);
   if (page > 1) params.set("pagina", String(page));
   const qs = params.toString();
   return qs ? `/preoperacionales?${qs}` : "/preoperacionales";

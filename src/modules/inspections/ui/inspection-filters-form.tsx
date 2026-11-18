@@ -12,16 +12,19 @@ import {
   EXIT_FILTER_OPTIONS,
   exitFilterParam,
   inspectionsHref,
+  STATE_FILTER_OPTIONS,
+  stateFilterParam,
   type ExitFilter,
   type InspectionFilters,
+  type StateFilter,
 } from "../domain/inspection-filters";
 
 /** Typing pauses this long before the plate filter is applied. */
 const PLATE_DELAY_MS = 350;
 
-type Fields = { plate: string; from: string; to: string; exit: ExitFilter };
+type Fields = { plate: string; from: string; to: string; exit: ExitFilter; state: StateFilter };
 
-const fieldsOf = (f: InspectionFilters): Fields => ({ plate: f.plate, from: f.from ?? "", to: f.to ?? "", exit: f.exit });
+const fieldsOf = (f: InspectionFilters): Fields => ({ plate: f.plate, from: f.from ?? "", to: f.to ?? "", exit: f.exit, state: f.state });
 
 /**
  * Filters for the inspections list. Each change updates the URL right away (the plate after a short
@@ -43,7 +46,7 @@ export function InspectionFiltersForm({ filters }: { filters: InspectionFilters 
   );
 
   const hasFilter = Boolean(
-    fields.plate || fields.from || fields.to || fields.exit !== "ALL" || filters.driverId || filters.vehicleId,
+    fields.plate || fields.from || fields.to || fields.exit !== "ALL" || fields.state !== "ALL" || filters.driverId || filters.vehicleId,
   );
 
   function apply(next: Fields, keepLinks = true) {
@@ -55,6 +58,7 @@ export function InspectionFiltersForm({ filters }: { filters: InspectionFilters 
       driverId: keepLinks ? filters.driverId : null,
       vehicleId: keepLinks ? filters.vehicleId : null,
       exit: next.exit,
+      state: next.state,
       page: 1,
     });
     startTransition(() => router.replace(href, { scroll: false }));
@@ -69,7 +73,7 @@ export function InspectionFiltersForm({ filters }: { filters: InspectionFilters 
   }
 
   function clear() {
-    const empty: Fields = { plate: "", from: "", to: "", exit: "ALL" };
+    const empty: Fields = { plate: "", from: "", to: "", exit: "ALL", state: "ALL" };
     setFields(empty);
     apply(empty, false);
   }
@@ -135,6 +139,28 @@ export function InspectionFiltersForm({ filters }: { filters: InspectionFilters 
           onChange={(e) => change({ to: e.target.value })}
           className="h-11 md:h-9"
         />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="insp-state" className="text-sm text-foreground">
+          Estado
+        </Label>
+        <NativeSelect
+          id="insp-state"
+          name="estado"
+          value={stateFilterParam(fields.state) ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            const option = STATE_FILTER_OPTIONS.find((o) => (stateFilterParam(o.value) ?? "") === value);
+            change({ state: option?.value ?? "ALL" });
+          }}
+          className="h-11 w-40 md:h-9"
+        >
+          {STATE_FILTER_OPTIONS.map((o) => (
+            <option key={o.value} value={stateFilterParam(o.value) ?? ""}>
+              {o.label}
+            </option>
+          ))}
+        </NativeSelect>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="insp-exit" className="text-sm text-foreground">

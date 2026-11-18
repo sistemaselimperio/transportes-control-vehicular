@@ -155,6 +155,7 @@ export async function listInspections(
   if (filters.vehicleId) conditions.push(or(eq(t.vehicleId, filters.vehicleId), eq(t.trailerVehicleId, filters.vehicleId))!);
   if (filters.exit === "PENDING") conditions.push(isNull(t.exitDecision));
   else if (filters.exit !== "ALL") conditions.push(eq(t.exitDecision, filters.exit));
+  if (filters.state !== "ALL") conditions.push(eq(t.hasCriticalFailure, filters.state === "CRITICAL"));
 
   const rows = await db
     .select({

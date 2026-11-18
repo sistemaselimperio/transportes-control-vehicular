@@ -49,7 +49,7 @@ export function InspectionsView({
   hasNext: boolean;
   canDelete: boolean;
 }) {
-  const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId || filters.exit !== "ALL");
+  const filtered = Boolean(filters.plate || filters.from || filters.to || filters.driverId || filters.vehicleId || filters.exit !== "ALL" || filters.state !== "ALL");
   return (
     <section className="space-y-5">
       <PageHeader

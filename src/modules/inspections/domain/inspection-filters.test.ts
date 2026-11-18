@@ -5,11 +5,21 @@ import {
   INSPECTIONS_PAGE_SIZE,
   inspectionsHref,
   parseInspectionFilters,
+  stateFilterParam,
 } from "./inspection-filters";
 
 describe("parseInspectionFilters", () => {
   it("defaults to no filters on the first page", () => {
-    expect(parseInspectionFilters({})).toEqual({ plate: "", from: null, to: null, driverId: null, vehicleId: null, exit: "ALL", page: 1 });
+    expect(parseInspectionFilters({})).toEqual({
+      plate: "",
+      from: null,
+      to: null,
+      driverId: null,
+      vehicleId: null,
+      exit: "ALL",
+      state: "ALL",
+      page: 1,
+    });
   });
 
   it("normalizes the plate like the form does", () => {
@@ -76,6 +86,25 @@ describe("parseInspectionFilters exit status", () => {
   });
 });
 
+describe("parseInspectionFilters checklist state", () => {
+  it("maps the estado parameter to a state filter", () => {
+    expect(parseInspectionFilters({ estado: "ok" }).state).toBe("OK");
+    expect(parseInspectionFilters({ estado: "critico" }).state).toBe("CRITICAL");
+  });
+
+  it("falls back to all for anything else", () => {
+    for (const bad of ["", "todos", "OK", "crítico", "x"]) expect(parseInspectionFilters({ estado: bad }).state).toBe("ALL");
+    expect(parseInspectionFilters({}).state).toBe("ALL");
+  });
+
+  it("round-trips through stateFilterParam", () => {
+    expect(stateFilterParam("ALL")).toBeNull();
+    for (const state of ["OK", "CRITICAL"] as const) {
+      expect(parseInspectionFilters({ estado: stateFilterParam(state)! }).state).toBe(state);
+    }
+  });
+});
+
 describe("escapeLikePattern", () => {
   it("escapes the LIKE wildcards so the plate is matched literally", () => {
     expect(escapeLikePattern("A%B_C\\")).toBe("A\\%B\\_C\\\\");
@@ -101,6 +130,7 @@ describe("inspectionsHref", () => {
     expect(inspectionsHref({ ...none, from: "2026-03-01", exit: "NO_APTO" })).toBe(
       "/preoperacionales?desde=2026-03-01&salida=no-apto",
     );
+    expect(inspectionsHref({ ...none, state: "CRITICAL" })).toBe("/preoperacionales?estado=critico");
   });
 
   it("keeps the driver and vehicle links and adds the page after the first", () => {
@@ -110,7 +140,7 @@ describe("inspectionsHref", () => {
   });
 
   it("round-trips through parseInspectionFilters", () => {
-    const filters = { ...none, plate: "SWA123", from: "2026-01-01", to: "2026-02-01", exit: "PENDING" as const };
+    const filters = { ...none, plate: "SWA123", from: "2026-01-01", to: "2026-02-01", exit: "PENDING" as const, state: "OK" as const };
     const params = Object.fromEntries(new URL(inspectionsHref(filters), "http://x").searchParams);
     expect(parseInspectionFilters(params)).toEqual(filters);
   });
