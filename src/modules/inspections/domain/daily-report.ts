@@ -8,6 +8,11 @@ import { isIsoDate } from "./preoperational-inspection";
  */
 export const DAILY_REPORT_STARTS_AT = new Date("2026-11-18T15:00:00-05:00");
 
+/** Whether an inspection saved at `createdAt` carries a usable daily report. */
+export function countsForDailyReport(createdAt: Date): boolean {
+  return createdAt.getTime() >= DAILY_REPORT_STARTS_AT.getTime();
+}
+
 /** The first date the page can show, in YYYY-MM-DD (Bogotá). */
 export const DAILY_REPORT_FIRST_DATE = "2026-11-18";
 
@@ -16,6 +21,8 @@ export type DailyReportCandidate = {
   id: string;
   createdAt: Date;
   plate: string;
+  /** Plate of the registered vehicle the inspection is linked to, null when the typed plate matched none. */
+  vehiclePlate: string | null;
   trailerPlate: string | null;
   driverName: string;
   odometer: string;
@@ -39,9 +46,10 @@ export function latestPerPlate(rows: readonly DailyReportCandidate[]): DailyRepo
   }
   return [...latest.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([, { id, plate, trailerPlate, driverName, odometer, restHours, route, location, fuel, pendingMaintenance }]) => ({
+    .map(([, { id, plate, vehiclePlate, trailerPlate, driverName, odometer, restHours, route, location, fuel, pendingMaintenance }]) => ({
       id,
       plate,
+      vehiclePlate,
       trailerPlate,
       driverName,
       odometer,

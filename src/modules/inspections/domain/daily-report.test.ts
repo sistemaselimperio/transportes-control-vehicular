@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DAILY_REPORT_STARTS_AT,
+  countsForDailyReport,
   latestPerPlate,
   parseDailyReportDate,
   type DailyReportCandidate,
@@ -10,6 +11,7 @@ const row = (over: Partial<DailyReportCandidate> = {}): DailyReportCandidate => 
   id: "a",
   createdAt: new Date("2026-03-14T12:00:00Z"),
   plate: "ABC-123",
+  vehiclePlate: "ABC-123",
   trailerPlate: null,
   driverName: "Juan",
   odometer: "100",
@@ -52,6 +54,13 @@ describe("latestPerPlate", () => {
     expect(only.location).toBeNull();
   });
 
+  it("keeps the registered vehicle plate, null when the typed plate matched none", () => {
+    const [registered] = latestPerPlate([row({ plate: "abc123", vehiclePlate: "ABC-123" })]);
+    expect(registered.vehiclePlate).toBe("ABC-123");
+    const [unknown] = latestPerPlate([row({ vehiclePlate: null })]);
+    expect(unknown.vehiclePlate).toBeNull();
+  });
+
   it("returns an empty list for no rows", () => {
     expect(latestPerPlate([])).toEqual([]);
   });
@@ -73,5 +82,13 @@ describe("parseDailyReportDate", () => {
     expect(parseDailyReportDate("2026-02-30", "2026-05-01")).toBe("2026-05-01");
     expect(parseDailyReportDate(["2026-03-14", "x"], "2026-05-01")).toBe("2026-03-14");
     expect(parseDailyReportDate("hoy", "2026-05-01")).toBe("2026-05-01");
+  });
+});
+
+describe("countsForDailyReport", () => {
+  it("counts from the start moment on, not before", () => {
+    expect(countsForDailyReport(DAILY_REPORT_STARTS_AT)).toBe(true);
+    expect(countsForDailyReport(new Date(DAILY_REPORT_STARTS_AT.getTime() + 1))).toBe(true);
+    expect(countsForDailyReport(new Date(DAILY_REPORT_STARTS_AT.getTime() - 1))).toBe(false);
   });
 });

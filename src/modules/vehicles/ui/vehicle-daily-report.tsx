@@ -12,7 +12,7 @@ type Report = DailyReportRow & { createdAt: Date };
 
 /**
  * Latest daily reports of one vehicle for the Historial tab, newest first. Same layout as the
- * Preoperacionales tab: from `md` a table whose date links to the inspection with a hit area over
+ * Preoperacionales tab: from `md` a table whose date links to the report with a hit area over
  * the whole row; ruled links on phones.
  */
 export function VehicleDailyReports({ reports }: { reports: readonly Report[] }) {
@@ -39,7 +39,7 @@ export function VehicleDailyReports({ reports }: { reports: readonly Report[] })
                 className="relative hover:bg-muted/50 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/70 has-[a:focus-visible]:ring-inset"
               >
                 <td className={`${TD} num whitespace-nowrap`}>
-                  <Link href={`/preoperacionales/${r.id}`} className="outline-none after:absolute after:inset-0">
+                  <Link href={`/parte-diario/${r.id}`} className="outline-none after:absolute after:inset-0">
                     {formatBogotaDateTime(r.createdAt)}
                   </Link>
                 </td>
@@ -61,7 +61,7 @@ export function VehicleDailyReports({ reports }: { reports: readonly Report[] })
         {reports.map((r) => (
           <li key={r.id} className="border-b">
             <Link
-              href={`/preoperacionales/${r.id}`}
+              href={`/parte-diario/${r.id}`}
               className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/70"
             >
               <span className="num whitespace-nowrap">{formatBogotaDateTime(r.createdAt)}</span>

@@ -376,6 +376,7 @@ export async function listVehicleDailyReports(
       id: t.id,
       createdAt: t.createdAt,
       plate: t.plate,
+      vehiclePlate: vehicle.plate,
       trailerPlate: t.trailerPlate,
       driverName: t.driverName,
       odometer: t.odometer,
@@ -386,11 +387,37 @@ export async function listVehicleDailyReports(
       pendingMaintenance: t.pendingMaintenance,
     })
     .from(t)
+    .leftJoin(vehicle, eq(t.vehicleId, vehicle.id))
     .where(
       and(or(eq(t.vehicleId, vehicleId), eq(t.trailerVehicleId, vehicleId)), gte(t.createdAt, DAILY_REPORT_STARTS_AT)),
     )
     .orderBy(desc(t.createdAt))
     .limit(limit);
+}
+
+/** One daily report by inspection id, with its Colombia date; null when missing or saved before the reports counted. */
+export async function getDailyReport(id: string): Promise<(DailyReportRow & { createdAt: Date; inspectionDate: string }) | null> {
+  const [row] = await db
+    .select({
+      id: t.id,
+      createdAt: t.createdAt,
+      inspectionDate: t.inspectionDate,
+      plate: t.plate,
+      vehiclePlate: vehicle.plate,
+      trailerPlate: t.trailerPlate,
+      driverName: t.driverName,
+      odometer: t.odometer,
+      restHours: t.restHours,
+      route: t.route,
+      location: t.location,
+      fuel: t.fuel,
+      pendingMaintenance: t.pendingMaintenance,
+    })
+    .from(t)
+    .leftJoin(vehicle, eq(t.vehicleId, vehicle.id))
+    .where(and(eq(t.id, id), gte(t.createdAt, DAILY_REPORT_STARTS_AT)))
+    .limit(1);
+  return row ?? null;
 }
 
 /** Deletes an inspection for good; false when it did not exist. */
@@ -406,6 +433,7 @@ export async function listDailyReports(date: string): Promise<DailyReportRow[]> 
       id: t.id,
       createdAt: t.createdAt,
       plate: t.plate,
+      vehiclePlate: vehicle.plate,
       trailerPlate: t.trailerPlate,
       driverName: t.driverName,
       odometer: t.odometer,
@@ -416,6 +444,7 @@ export async function listDailyReports(date: string): Promise<DailyReportRow[]> 
       pendingMaintenance: t.pendingMaintenance,
     })
     .from(t)
+    .leftJoin(vehicle, eq(t.vehicleId, vehicle.id))
     .where(and(eq(t.inspectionDate, date), gte(t.createdAt, DAILY_REPORT_STARTS_AT)));
   return latestPerPlate(rows);
 }
