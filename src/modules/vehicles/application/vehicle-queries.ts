@@ -16,6 +16,7 @@ import {
   loadTowingLinks,
   loadVehicleEditValues,
   loadVehicleFormLists,
+  loadDispatchPlates,
   loadFleetPlates,
   loadLastOilItems,
   loadVehicleHistory,
@@ -39,6 +40,15 @@ export async function listFleetPlates(): Promise<string[]> {
   cacheTag(...readTags("fleetPlates"));
 
   return loadFleetPlates();
+}
+
+/** Plates for the trip, delivery and load pickers: the fleet without its internal classes. */
+export async function listDispatchPlates(): Promise<string[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(...readTags("fleetPlates"));
+
+  return loadDispatchPlates();
 }
 
 export interface HistoryItem {

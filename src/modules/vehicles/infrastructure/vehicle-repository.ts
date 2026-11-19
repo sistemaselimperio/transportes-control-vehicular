@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import type { FileCategory } from "@/modules/documents/domain/vehicle-file-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import { isInternalClass } from "../domain/internal-classes";
 import { canAnchorTrailerStatus, isTrailerClass } from "../domain/trailer";
 import type { DocumentData, VehicleRowInput } from "../domain/vehicle-row";
 
@@ -231,6 +232,17 @@ export async function loadFleetPlates(): Promise<string[]> {
     .where(ne(schema.vehicles.status, "SOLD"))
     .orderBy(asc(schema.vehicles.plate));
   return rows.map((r) => r.plate);
+}
+
+/** Plates that can be dispatched (not sold, not of an internal class): trips, deliveries and loads. */
+export async function loadDispatchPlates(): Promise<string[]> {
+  const rows = await db
+    .select({ plate: schema.vehicles.plate, className: schema.vehicleClasses.name })
+    .from(schema.vehicles)
+    .innerJoin(schema.vehicleClasses, eq(schema.vehicles.classId, schema.vehicleClasses.id))
+    .where(ne(schema.vehicles.status, "SOLD"))
+    .orderBy(asc(schema.vehicles.plate));
+  return rows.filter((r) => !isInternalClass(r.className)).map((r) => r.plate);
 }
 
 /**
