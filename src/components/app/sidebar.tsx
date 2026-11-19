@@ -6,11 +6,14 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  Container,
+  Contact,
   Loader2,
   Lock,
   LogOut,
   Menu,
   NotebookText,
+  PackageCheck,
   Receipt,
   Route,
   Truck,
@@ -40,7 +43,10 @@ type NavItem = {
 
 const PETTY_CASH_PATH = "/caja";
 
-const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
+/** A group only renders for a role that can open at least one of its entries. */
+type NavGroup = { label: string; items: ReadonlyArray<NavItem> };
+
+const SECTIONS: ReadonlyArray<NavGroup> = [
   {
     label: "Operación",
     items: [
@@ -61,7 +67,27 @@ const SECTIONS: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> 
       { href: PETTY_CASH_PATH, label: "Caja", icon: Banknote, requiresPettyCash: true },
     ],
   },
+  {
+    label: "Comercial",
+    items: [
+      { href: "/clientes", label: "Clientes", icon: Contact },
+      { href: "/entregas", label: "Entregas", icon: PackageCheck },
+      { href: "/cargues", label: "Cargues", icon: Container },
+    ],
+  },
 ];
+
+/**
+ * Whether the user can open at least one entry of the group. A group with no open entry is hidden
+ * whole, so a role never sees a block of locked items from another domain.
+ */
+function groupVisible(group: NavGroup, role: Role, hasPettyCash: boolean): boolean {
+  return group.items.some((item) => {
+    if (item.requiresPettyCash) return canUsePettyCash(hasPettyCash);
+    const target = sectionOfPath(item.href);
+    return target !== null && canViewSection(role, target);
+  });
+}
 
 const GROUPS: ReadonlyArray<{
   value: OwnerGroup | null;
@@ -124,13 +150,13 @@ function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userNa
   return (
     <>
       <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
-        {SECTIONS.map((section) => (
+        {SECTIONS.filter((section) => groupVisible(section, role, hasPettyCash)).map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
             {section.items.filter((item) => !item.requiresPettyCash || canUsePettyCash(hasPettyCash)).map((item) => {
               const target = sectionOfPath(item.href);
               const Icon = item.icon;
-              // Every role sees every entry; the ones it cannot open stay in place, disabled.
+              // Inside a visible group, the entries the role cannot open stay in place, disabled.
               // Petty cash is not a role section: its entry only renders for users that have access.
               if (!item.requiresPettyCash && (target == null || !canViewSection(role, target))) {
                 return (
@@ -183,6 +209,8 @@ function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userNa
         ))}
       </nav>
 
+      {/* The owner group only filters fleet data: roles without the fleet never see it. */}
+      {canViewSection(role, "fleet") && (
       <nav aria-label="Filtrar por propietario" className="border-t p-3 md:py-2">
         <span className="micro-label block px-2 pb-2 md:pb-1.5">Propietario</span>
         <div className="grid grid-cols-2 gap-1">
@@ -215,6 +243,7 @@ function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userNa
           })}
         </div>
       </nav>
+      )}
 
       {/* Account: a tone-step field at the foot, the name set as text and one flat, square sign-out bar. */}
       <div className="mt-auto flex flex-col gap-3 bg-muted px-4 pt-4 pb-4 md:pb-3">

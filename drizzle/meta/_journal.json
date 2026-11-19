@@ -162,6 +162,13 @@
       "when": 1795103373831,
       "tag": "0022_trailer_tire_events",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795108172598,
+      "tag": "0023_comercial_schema",
+      "breakpoints": true
     }
   ]
 }

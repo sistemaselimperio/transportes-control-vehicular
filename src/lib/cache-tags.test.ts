@@ -18,6 +18,10 @@ const CHANGES: Change[] = [
   { kind: "logbook" },
   { kind: "logbook-with-oil" },
   { kind: "inspection" },
+  { kind: "client" },
+  { kind: "delivery" },
+  { kind: "destination" },
+  { kind: "load" },
   { kind: "vehicle-file", plate: "ABC-123" },
 ];
 
@@ -89,6 +93,24 @@ describe("changeTags", () => {
     expect(changeTags({ kind: "trip" })).toEqual([CACHE_TAGS.trips]);
   });
 
+  it("commercial writes only expire their own entity", () => {
+    expect(changeTags({ kind: "client" })).toEqual([CACHE_TAGS.clients]);
+    expect(changeTags({ kind: "delivery" })).toEqual([CACHE_TAGS.deliveries]);
+    expect(changeTags({ kind: "destination" })).toEqual([CACHE_TAGS.destinations]);
+    expect(changeTags({ kind: "load" })).toEqual([CACHE_TAGS.loads]);
+  });
+
+  it("the delivery list shows client and destination names and unlinks deleted vehicles", () => {
+    expect(readTags("deliveryRows")).toEqual(
+      expect.arrayContaining([CACHE_TAGS.deliveries, CACHE_TAGS.clients, CACHE_TAGS.destinations, CACHE_TAGS.fleet]),
+    );
+  });
+
+  it("the client and destination lists show how many deliveries each has", () => {
+    expect(readTags("clientRows")).toEqual(expect.arrayContaining([CACHE_TAGS.clients, CACHE_TAGS.deliveries]));
+    expect(readTags("destinationRows")).toEqual(expect.arrayContaining([CACHE_TAGS.destinations, CACHE_TAGS.deliveries]));
+  });
+
   it("a plain logbook write leaves the fleet alone", () => {
     expect(changeTags({ kind: "logbook" })).toEqual([CACHE_TAGS.logbook]);
   });
@@ -124,6 +146,10 @@ describe("read / change consistency", () => {
     logbook: [CACHE_TAGS.logbook],
     "logbook-with-oil": [CACHE_TAGS.logbook, CACHE_TAGS.fleet],
     inspection: [CACHE_TAGS.inspections],
+    client: [CACHE_TAGS.clients],
+    delivery: [CACHE_TAGS.deliveries],
+    destination: [CACHE_TAGS.destinations],
+    load: [CACHE_TAGS.loads],
     "vehicle-file": [CACHE_TAGS.files],
   };
 

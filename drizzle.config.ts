@@ -15,6 +15,6 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: { url },
   // The Supabase project is shared: never introspect or touch other apps' schemas.
-  schemaFilter: ["transportes"],
+  schemaFilter: ["transportes", "comercial"],
   migrations: { schema: "transportes", table: "__drizzle_migrations" },
 });

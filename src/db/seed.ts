@@ -1,7 +1,10 @@
 /**
- * Idempotent seed: owners, vehicle classes and the users (rocio: admin, yellow theme; leidy: staff, sky theme; gabriella: assistant, yellow theme).
+ * Idempotent seed: owners, vehicle classes, the delivery destinations of the commercial area and the
+ * users (rocio: admin, yellow theme; leidy: staff, sky theme; gabriella: assistant, yellow theme;
+ * superadmin: superadmin, yellow theme; sandra and esperanza: commercial, sky theme).
  * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD,
- * SEED_LEIDY_PASSWORD or SEED_GABRIELLA_PASSWORD; a user without one is skipped).
+ * SEED_LEIDY_PASSWORD, SEED_GABRIELLA_PASSWORD, SEED_SUPERADMIN_PASSWORD, SEED_SANDRA_PASSWORD or
+ * SEED_ESPERANZA_PASSWORD; a user without one is skipped).
  */
 import "./load-env";
 
@@ -39,6 +42,34 @@ const CLASSES = [
   { name: "Equipo", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
 ] as const;
 
+/** Delivery destinations of the commercial area, in the stored title case. Existing ones are never touched. */
+const DESTINATIONS = [
+  "Simijaca",
+  "Saboyá",
+  "San Miguel",
+  "Córdoba",
+  "Chiquinquirá",
+  "Ubaté",
+  "Varela",
+  "Sasa",
+  "Fúquene",
+  "Capellanía",
+  "Fical",
+  "Buenavista",
+  "Neusa",
+  "Puente de Tierra",
+  "Molino",
+  "Susa",
+  "Palestina",
+  "Albania",
+] as const;
+
+async function seedDestinations() {
+  for (const name of DESTINATIONS) {
+    await db.insert(schema.destinations).values({ name }).onConflictDoNothing({ target: schema.destinations.name });
+  }
+}
+
 async function seedOwners() {
   const existing = await db.select().from(schema.owners);
   for (const owner of OWNERS) {
@@ -60,7 +91,7 @@ async function seedClasses() {
 async function seedUser(user: {
   username: string;
   name: string;
-  role: "admin" | "staff" | "assistant";
+  role: "admin" | "staff" | "assistant" | "superadmin" | "commercial";
   theme: Theme;
   /** Sees the petty-cash ledgers (caja menor). */
   hasPettyCash?: boolean;
@@ -111,12 +142,23 @@ const seedLeidy = () =>
 const seedGabriella = () =>
   seedUser({ username: "gabriella", name: "Gabriella", role: "assistant", theme: "yellow", passwordVar: "SEED_GABRIELLA_PASSWORD" });
 
+const seedSuperadmin = () =>
+  seedUser({ username: "superadmin", name: "Administrador", role: "superadmin", theme: "yellow", passwordVar: "SEED_SUPERADMIN_PASSWORD" });
+const seedSandra = () =>
+  seedUser({ username: "sandra", name: "Sandra", role: "commercial", theme: "sky", passwordVar: "SEED_SANDRA_PASSWORD" });
+const seedEsperanza = () =>
+  seedUser({ username: "esperanza", name: "Esperanza", role: "commercial", theme: "sky", passwordVar: "SEED_ESPERANZA_PASSWORD" });
+
 async function main() {
   await seedOwners();
   await seedClasses();
+  await seedDestinations();
   await seedAdmin();
   await seedLeidy();
   await seedGabriella();
+  await seedSuperadmin();
+  await seedSandra();
+  await seedEsperanza();
   console.log("Seed complete.");
   process.exit(0);
 }

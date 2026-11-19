@@ -23,14 +23,45 @@ export const CACHE_TAGS = {
   expiredCounts: "expired-counts",
   /** Which file categories each vehicle has (the fleet list's documents indicator). */
   files: "fleet-files",
+  /** Commercial area (schema `comercial`). */
+  clients: "clients",
+  deliveries: "deliveries",
+  destinations: "destinations",
+  loads: "loads",
 } as const;
 
-type EntityTag = typeof CACHE_TAGS.fleet | typeof CACHE_TAGS.owners | typeof CACHE_TAGS.drivers | typeof CACHE_TAGS.sales | typeof CACHE_TAGS.trips | typeof CACHE_TAGS.logbook | typeof CACHE_TAGS.inspections;
+type EntityTag =
+  | typeof CACHE_TAGS.fleet
+  | typeof CACHE_TAGS.owners
+  | typeof CACHE_TAGS.drivers
+  | typeof CACHE_TAGS.sales
+  | typeof CACHE_TAGS.trips
+  | typeof CACHE_TAGS.logbook
+  | typeof CACHE_TAGS.inspections
+  | typeof CACHE_TAGS.clients
+  | typeof CACHE_TAGS.deliveries
+  | typeof CACHE_TAGS.destinations
+  | typeof CACHE_TAGS.loads;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
 
-const { fleet, owners, drivers, sales, trips, logbook, inspections, dashboard, expiredCounts, files } = CACHE_TAGS;
+const {
+  fleet,
+  owners,
+  drivers,
+  sales,
+  trips,
+  logbook,
+  inspections,
+  dashboard,
+  expiredCounts,
+  files,
+  clients,
+  deliveries,
+  destinations,
+  loads,
+} = CACHE_TAGS;
 
 export type ReadName =
   | "fleetRows"
@@ -45,7 +76,11 @@ export type ReadName =
   | "ownerRows"
   | "saleRows"
   | "tripRows"
-  | "vehicleTrips";
+  | "vehicleTrips"
+  | "clientRows"
+  | "deliveryRows"
+  | "destinationRows"
+  | "loadRows";
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
@@ -65,6 +100,13 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   tripRows: [trips, fleet],
   /** Latest trips of one vehicle; same dependencies as `tripRows`. */
   vehicleTrips: [trips, fleet],
+  /** Each client row carries its number of deliveries. */
+  clientRows: [clients, deliveries],
+  /** Rows show the client and destination names; deleting a vehicle unlinks its deliveries. */
+  deliveryRows: [deliveries, clients, destinations, fleet],
+  destinationRows: [destinations, deliveries],
+  /** Deleting a vehicle unlinks its loads. */
+  loadRows: [loads, fleet],
 };
 
 /** The tags to hand to `cacheTag` for a read. The vehicle detail also needs its plate. */
@@ -87,6 +129,10 @@ export type Change =
   | { kind: "logbook-with-oil" }
   /** An inspection submitted or deleted. */
   | { kind: "inspection" }
+  | { kind: "client" }
+  | { kind: "delivery" }
+  | { kind: "destination" }
+  | { kind: "load" }
   | { kind: "vehicle-file"; plate: string };
 
 const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTag[]> = {
@@ -98,6 +144,10 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   logbook: [logbook],
   "logbook-with-oil": [logbook, fleet],
   inspection: [inspections],
+  client: [clients],
+  delivery: [deliveries],
+  destination: [destinations],
+  load: [loads],
 };
 
 /** The tags a write must expire so every read that shows what it changed is recomputed. */

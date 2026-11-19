@@ -23,6 +23,8 @@ describe("parseRole", () => {
     expect(parseRole("admin")).toBe("admin");
     expect(parseRole("staff")).toBe("staff");
     expect(parseRole("assistant")).toBe("assistant");
+    expect(parseRole("superadmin")).toBe("superadmin");
+    expect(parseRole("commercial")).toBe("commercial");
   });
 
   it("falls back to the least privileged role", () => {
@@ -35,7 +37,19 @@ describe("parseRole", () => {
   });
 });
 
-const SECTIONS: ReadonlyArray<Section> = ["today", "fleet", "drivers", "inspections", "trips", "logbook", "owners", "sales"];
+const SECTIONS: ReadonlyArray<Section> = [
+  "today",
+  "fleet",
+  "drivers",
+  "inspections",
+  "trips",
+  "logbook",
+  "owners",
+  "sales",
+  "clients",
+  "deliveries",
+  "loads",
+];
 
 /** The agreed matrix: "manage" = every write, "read" = view only, "locked" = not even the page. */
 const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
@@ -48,6 +62,9 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     logbook: "manage",
     owners: "manage",
     sales: "manage",
+    clients: "locked",
+    deliveries: "locked",
+    loads: "locked",
   },
   staff: {
     today: "locked",
@@ -58,6 +75,9 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     logbook: "locked",
     owners: "read",
     sales: "locked",
+    clients: "locked",
+    deliveries: "locked",
+    loads: "locked",
   },
   assistant: {
     today: "read",
@@ -68,10 +88,39 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     logbook: "locked",
     owners: "locked",
     sales: "locked",
+    clients: "locked",
+    deliveries: "locked",
+    loads: "locked",
+  },
+  superadmin: {
+    today: "manage",
+    fleet: "manage",
+    drivers: "manage",
+    inspections: "manage",
+    trips: "manage",
+    logbook: "manage",
+    owners: "manage",
+    sales: "manage",
+    clients: "manage",
+    deliveries: "manage",
+    loads: "manage",
+  },
+  commercial: {
+    today: "locked",
+    fleet: "locked",
+    drivers: "locked",
+    inspections: "locked",
+    trips: "locked",
+    logbook: "locked",
+    owners: "locked",
+    sales: "locked",
+    clients: "manage",
+    deliveries: "manage",
+    loads: "manage",
   },
 };
 
-const ROLES = ["admin", "staff", "assistant"] as const;
+const ROLES = ["admin", "staff", "assistant", "superadmin", "commercial"] as const;
 
 describe("access matrix", () => {
   for (const role of ROLES) {
@@ -110,6 +159,8 @@ describe("homePath", () => {
     expect(homePath("admin")).toBe("/");
     expect(homePath("staff")).toBe("/flota");
     expect(homePath("assistant")).toBe("/");
+    expect(homePath("superadmin")).toBe("/");
+    expect(homePath("commercial")).toBe("/entregas");
   });
 });
 
@@ -118,6 +169,24 @@ describe("vehicle capabilities", () => {
     expect(canTransferVehicles("admin")).toBe(true);
     expect(canTransferVehicles("assistant")).toBe(false);
     expect(canTransferVehicles("staff")).toBe(false);
+  });
+
+  it("lets the superadmin do every fleet write", () => {
+    expect(canTransferVehicles("superadmin")).toBe(true);
+    expect(canEditVehicles("superadmin")).toBe(true);
+    expect(canDeleteVehicles("superadmin")).toBe(true);
+    expect(canManageVehicleFiles("superadmin")).toBe(true);
+    expect(canAssignDrivers("superadmin")).toBe(true);
+    expect(canManageDrivers("superadmin")).toBe(true);
+    expect(canManageTrips("superadmin")).toBe(true);
+  });
+
+  it("gives the commercial role no fleet capability", () => {
+    expect(canTransferVehicles("commercial")).toBe(false);
+    expect(canEditVehicles("commercial")).toBe(false);
+    expect(canDeleteVehicles("commercial")).toBe(false);
+    expect(canManageVehicleFiles("commercial")).toBe(false);
+    expect(canAssignDrivers("commercial")).toBe(false);
   });
 
   it("lets admins and assistants create and edit vehicles, but not staff", () => {
@@ -152,6 +221,9 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/viajes")).toBe("trips");
     expect(sectionOfPath("/propietarios")).toBe("owners");
     expect(sectionOfPath("/ventas")).toBe("sales");
+    expect(sectionOfPath("/clientes")).toBe("clients");
+    expect(sectionOfPath("/entregas")).toBe("deliveries");
+    expect(sectionOfPath("/cargues")).toBe("loads");
   });
 
   it("does not match a path that merely starts with a section name", () => {
@@ -204,5 +276,19 @@ describe("canUsePettyCash", () => {
     expect(canUsePettyCash(null)).toBe(false);
     expect(canUsePettyCash("true")).toBe(false);
     expect(canUsePettyCash(1)).toBe(false);
+  });
+});
+
+describe("commercial sections", () => {
+  const COMMERCIAL: ReadonlyArray<Section> = ["clients", "deliveries", "loads"];
+
+  it("are managed only by the superadmin and the commercial role", () => {
+    for (const section of COMMERCIAL) {
+      expect(canManageSection("superadmin", section)).toBe(true);
+      expect(canManageSection("commercial", section)).toBe(true);
+      for (const role of ["admin", "staff", "assistant"] as const) {
+        expect(canViewSection(role, section)).toBe(false);
+      }
+    }
   });
 });

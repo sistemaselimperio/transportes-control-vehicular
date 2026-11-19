@@ -22,6 +22,8 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const transportes = pgSchema("transportes");
+/** The commercial area (clients, deliveries, loads) lives in its own schema of the shared project. */
+export const comercial = pgSchema("comercial");
 
 /* ------------------------------ Enums ------------------------------ */
 
@@ -493,6 +495,106 @@ export const trips = transportes.table(
     index("trips_start_at_idx").on(t.startAt),
     index("trips_vehicle_idx").on(t.vehicleId),
     index("trips_status_idx").on(t.status),
+  ],
+);
+
+/* ------------------------ Comercial (commercial area) ------------------------ */
+
+export const deliveryShiftEnum = comercial.enum("delivery_shift", ["1er viaje", "2do viaje", "3er viaje"]);
+export const deliveryPriorityEnum = comercial.enum("delivery_priority", ["urgente", "normal"]);
+export const deliveryStatusEnum = comercial.enum("delivery_status", ["pendiente", "entregado"]);
+export const loadSupplierEnum = comercial.enum("load_supplier", ["Finca", "Italcol", "Contegral"]);
+
+/** Customers of the commercial area. Names are stored in title case. */
+export const clients = comercial.table(
+  "clients",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: text().notNull(),
+    /** Digits only (see `normalizeNit`); unique when present. */
+    nit: text(),
+    phone: text(),
+    address: text(),
+    /** The link as pasted from Google Maps. */
+    mapsUrl: text("maps_url"),
+    /** Parsed from `mapsUrl` when the link carries coordinates; null for short links. */
+    latitude: numeric({ precision: 10, scale: 7, mode: "number" }),
+    longitude: numeric({ precision: 10, scale: 7, mode: "number" }),
+    notes: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("clients_nit_uq").on(t.nit).where(sql`nit is not null`)],
+);
+
+/** Editable list of delivery destinations (title case, unique). */
+export const destinations = comercial.table("destinations", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  name: text().notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A delivery of bags to a client. `weightKg` is typed by hand and never derived from `quantity`;
+ * tons are derived on read (kg / 1000), never stored. `plate` is a snapshot and `vehicleId` a soft
+ * link that goes null when the vehicle is deleted (same as trips).
+ */
+export const deliveries = comercial.table(
+  "deliveries",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** Colombia calendar day. */
+    date: date({ mode: "string" }).notNull(),
+    shift: deliveryShiftEnum().notNull(),
+    priority: deliveryPriorityEnum().notNull().default("normal"),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    destinationId: integer("destination_id")
+      .notNull()
+      .references(() => destinations.id, { onDelete: "restrict" }),
+    /** Bags (bultos). */
+    quantity: integer().notNull(),
+    weightKg: numeric("weight_kg", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    status: deliveryStatusEnum().notNull().default("pendiente"),
+    plate: text(),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    notes: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("deliveries_date_idx").on(t.date),
+    index("deliveries_client_idx").on(t.clientId),
+    index("deliveries_status_idx").on(t.status),
+    check("deliveries_quantity_positive", sql`${t.quantity} > 0`),
+    check("deliveries_weight_positive", sql`${t.weightKg} > 0`),
+  ],
+);
+
+/** Supplier loads received at the yard. Not linked to clients. `plate` is a fleet snapshot, like trips. */
+export const loads = comercial.table(
+  "loads",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    date: date({ mode: "string" }).notNull(),
+    supplier: loadSupplierEnum().notNull(),
+    plate: text().notNull(),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
+    /** Whole pesos (COP). */
+    cost: numeric({ precision: 14, scale: 2, mode: "number" }).notNull(),
+    siesaNumber: text("siesa_number").notNull().unique(),
+    orderNumber: text("order_number").notNull(),
+    notes: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("loads_date_idx").on(t.date),
+    index("loads_supplier_idx").on(t.supplier),
+    check("loads_tons_positive", sql`${t.tons} > 0`),
+    check("loads_cost_non_negative", sql`${t.cost} >= 0`),
   ],
 );
 
