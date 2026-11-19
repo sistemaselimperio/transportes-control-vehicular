@@ -1,7 +1,7 @@
 import { DeleteAllButton } from "@/components/app/delete-all-button";
 import { PageHeader } from "@/components/app/page-header";
 import { currentDay } from "@/lib/current-day";
-import { canManageSection } from "@/lib/permissions";
+import { canDeleteVehicles, canEditVehicles } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { deleteAllVehiclesAction } from "@/modules/vehicles/application/vehicle-actions";
 import { getVehicleFormOptions, listVehicleRows } from "@/modules/vehicles/application/vehicle-queries";
@@ -15,7 +15,8 @@ export default async function Page({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const role = await requireSectionAccess("fleet");
-  const editable = canManageSection(role, "fleet");
+  const editable = canEditVehicles(role);
+  const deletable = canDeleteVehicles(role);
   const [today, params] = await Promise.all([currentDay(), searchParams]);
   const [rows, options] = await Promise.all([
     listVehicleRows(today),
@@ -30,13 +31,15 @@ export default async function Page({
         actions={
           editable && options && (
             <>
-              <DeleteAllButton count={rows.length} title="Eliminar todos los vehículos" action={deleteAllVehiclesAction}>
-                <p className="font-medium">Se eliminarán TODOS los vehículos de la flota, no solo los que ves en pantalla.</p>
-                <p className="text-muted-foreground">
-                  También se borra todo su historial: documentos, mantenimiento, combustible, ventas, archivos y
-                  los vínculos con propietarios y conductores.
-                </p>
-              </DeleteAllButton>
+              {deletable && (
+                <DeleteAllButton count={rows.length} title="Eliminar todos los vehículos" action={deleteAllVehiclesAction}>
+                  <p className="font-medium">Se eliminarán TODOS los vehículos de la flota, no solo los que ves en pantalla.</p>
+                  <p className="text-muted-foreground">
+                    También se borra todo su historial: documentos, mantenimiento, combustible, ventas, archivos y
+                    los vínculos con propietarios y conductores.
+                  </p>
+                </DeleteAllButton>
+              )}
               <NewVehicleButton options={options} />
             </>
           )

@@ -1,7 +1,7 @@
 /**
- * Idempotent seed: owners, vehicle classes and the users (rocio: admin, yellow theme; leidy: staff, sky theme).
- * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD or
- * SEED_LEIDY_PASSWORD; a user without one is skipped).
+ * Idempotent seed: owners, vehicle classes and the users (rocio: admin, yellow theme; leidy: staff, sky theme; gabriella: assistant, yellow theme).
+ * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD,
+ * SEED_LEIDY_PASSWORD or SEED_GABRIELLA_PASSWORD; a user without one is skipped).
  */
 import "./load-env";
 
@@ -60,7 +60,7 @@ async function seedClasses() {
 async function seedUser(user: {
   username: string;
   name: string;
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "assistant";
   theme: Theme;
   /** Sees the petty-cash ledgers (caja menor). */
   hasPettyCash?: boolean;
@@ -108,12 +108,15 @@ const seedAdmin = () =>
   seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
   seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", passwordVar: "SEED_LEIDY_PASSWORD" });
+const seedGabriella = () =>
+  seedUser({ username: "gabriella", name: "Gabriella", role: "assistant", theme: "yellow", passwordVar: "SEED_GABRIELLA_PASSWORD" });
 
 async function main() {
   await seedOwners();
   await seedClasses();
   await seedAdmin();
   await seedLeidy();
+  await seedGabriella();
   console.log("Seed complete.");
   process.exit(0);
 }

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canManageSection, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 import { parseTheme } from "@/lib/theme";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
@@ -31,7 +31,35 @@ export const requireDriverManager = () => requireSectionManager("drivers");
 /** Trip writes. */
 export const requireTripManager = () => requireSectionManager("trips");
 
-/** Changing a vehicle's driver: open to anyone who sees the fleet and manages drivers. Throws `ForbiddenError` otherwise. */
+/** Vehicle create and edit (and everything else on a vehicle's file except deleting it). */
+export async function requireVehicleEditor() {
+  const session = await requireSession();
+  if (!canEditVehicles(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Deleting vehicles, one or all. */
+export async function requireVehicleDeleter() {
+  const session = await requireSession();
+  if (!canDeleteVehicles(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Uploading, replacing and deleting a vehicle's files. */
+export async function requireVehicleFileManager() {
+  const session = await requireSession();
+  if (!canManageVehicleFiles(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Selling or transferring a vehicle. */
+export async function requireVehicleTransferer() {
+  const session = await requireSession();
+  if (!canTransferVehicles(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Changing a vehicle's driver: open to anyone who sees the fleet and manages drivers or edits vehicles. Throws `ForbiddenError` otherwise. */
 export async function requireDriverAssigner() {
   const session = await requireSession();
   if (!canAssignDrivers(parseRole(session.user.role))) throw new ForbiddenError();

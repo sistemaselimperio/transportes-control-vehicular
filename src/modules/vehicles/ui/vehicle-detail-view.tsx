@@ -247,6 +247,9 @@ export function VehicleDetailView({
   detail,
   readOnly = false,
   allowed,
+  denied,
+  filesReadOnly = readOnly,
+  canOpenLogbook = !readOnly,
   inspections = [],
   dailyReports = [],
   trips = [],
@@ -264,6 +267,12 @@ export function VehicleDetailView({
   readOnly?: boolean;
   /** Actions a read-only user may still run (see `FileActions`). */
   allowed?: readonly ActionKey[];
+  /** Actions hidden even when the user can edit (see `FileActions`). */
+  denied?: readonly ActionKey[];
+  /** The files panel hides its upload and delete controls; follows `readOnly` unless told otherwise. */
+  filesReadOnly?: boolean;
+  /** Whether the user can open the Bitácora page, so the links to it show. */
+  canOpenLogbook?: boolean;
 }) {
   const r = detail.row;
   const sold = r.vehicleStatus === "SOLD";
@@ -281,6 +290,7 @@ export function VehicleDetailView({
         current={{ owner: r.ownerName, driver: null }}
         readOnly={readOnly}
         allowed={allowed}
+        denied={denied}
       >
         <div className="space-y-10">
           <div className="space-y-6">
@@ -293,7 +303,7 @@ export function VehicleDetailView({
             title="Bitácora"
             actions={
               // Staff cannot open the Bitácora page, so they get no link to it.
-              !readOnly && (
+              canOpenLogbook && (
                 <Link
                   href={logbookHref(r.plate, "servicios")}
                   className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 transition-colors duration-150 hover:text-foreground md:min-h-7"
@@ -321,6 +331,7 @@ export function VehicleDetailView({
       current={{ owner: r.ownerName, driver: r.driverName }}
       readOnly={readOnly}
       allowed={allowed}
+      denied={denied}
     >
       <TabParamScroll />
       <div className="space-y-10">
@@ -360,7 +371,7 @@ export function VehicleDetailView({
               note={`${detail.files.length} ${detail.files.length === 1 ? "archivo" : "archivos"}`}
               actions={<ActionButtons keys={["document", "tax"]} primary="document" />}
             >
-              <VehicleFilesPanel plate={r.plate} files={detail.files} readOnly={readOnly} />
+              <VehicleFilesPanel plate={r.plate} files={detail.files} readOnly={filesReadOnly} />
             </Section>
           </div>
         </div>
@@ -379,7 +390,7 @@ export function VehicleDetailView({
             "parte-diario": null,
             viajes: { href: `/viajes?${new URLSearchParams({ placa: r.plate })}`, label: "Ver viajes" },
             // Staff cannot open the Bitácora page, so they get no link to it.
-            bitacora: readOnly ? null : { href: logbookHref(r.plate, "servicios"), label: "Ver bitácora" },
+            bitacora: canOpenLogbook ? { href: logbookHref(r.plate, "servicios"), label: "Ver bitácora" } : null,
           }}
         />
 

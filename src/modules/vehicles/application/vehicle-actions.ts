@@ -9,7 +9,7 @@ import type { ZodType } from "zod";
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireDriverAssigner, requireSectionManager } from "@/lib/session";
+import { requireDriverAssigner, requireVehicleDeleter, requireVehicleEditor, requireVehicleTransferer } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { RuleError } from "../domain/vehicle-rules";
 import { vehicleCommandRepository } from "../infrastructure/vehicle-command-repository";
@@ -41,10 +41,8 @@ function parse<T>(schema: ZodType<T>, data: unknown): T {
 
 const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
 
-const requireFleetManager = () => requireSectionManager("fleet");
-
-/** `guard` decides who may run the command; every vehicle write needs fleet management except the driver change. */
-async function run(fn: () => Promise<CommandResult>, guard: () => Promise<unknown> = requireFleetManager): Promise<ActionResult> {
+/** `guard` decides who may run the command; every vehicle write needs a vehicle editor except the driver change and deletion. */
+async function run(fn: () => Promise<CommandResult>, guard: () => Promise<unknown> = requireVehicleEditor): Promise<ActionResult> {
   try {
     await guard();
     const result = await fn();
@@ -70,7 +68,7 @@ async function run(fn: () => Promise<CommandResult>, guard: () => Promise<unknow
  * screens already prefetched (the fleet list) stop showing the old plate.
  */
 export async function expireVehicleViewsAction(): Promise<void> {
-  await requireFleetManager();
+  await requireVehicleEditor();
   expireAfterAction({ kind: "vehicle" });
 }
 
@@ -80,7 +78,7 @@ export async function expireVehicleViewsAction(): Promise<void> {
  */
 export async function loadActionContextAction(plate: string): Promise<VehicleActionContext | null> {
   try {
-    await requireFleetManager();
+    await requireVehicleEditor();
     return await getVehicleActionContext(parse(plateSchema, plate));
   } catch (e) {
     console.error("action context failed", e);
@@ -194,7 +192,7 @@ export async function transferOwnerAction(plate: string, fd: FormData): Promise<
   return run(async () => {
     const v = parse(transferOwnerSchema, formValues(fd));
     return commands.transferOwner(parse(plateSchema, plate), ownerTarget(v), v.date);
-  });
+  }, requireVehicleTransferer);
 }
 
 export async function sellVehicleAction(plate: string, fd: FormData): Promise<ActionResult> {
@@ -206,10 +204,10 @@ export async function sellVehicleAction(plate: string, fd: FormData): Promise<Ac
       price: v.price,
       notes: v.notes,
     });
-  });
+  }, requireVehicleTransferer);
 }
 
 /** Removes every vehicle and, by cascade, all its history (documents, maintenance, fuel, sales, files, links). */
 export async function deleteAllVehiclesAction(): Promise<ActionResult> {
-  return run(async () => commands.deleteAllVehicles());
+  return run(async () => commands.deleteAllVehicles(), requireVehicleDeleter);
 }

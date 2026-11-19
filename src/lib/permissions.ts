@@ -6,19 +6,23 @@
  * hidden and the server rejects the writes) or no entry (locked: the page redirects to `homePath`
  * and the sidebar shows the item disabled).
  *
- *   section        admin (Rocio)   staff (Leidy)
- *   today/Alertas  read            locked
- *   fleet          manage          read (+ changing a vehicle's driver)
- *   drivers        manage          manage
- *   inspections    manage          read
- *   trips          read            manage
- *   logbook        manage          locked
- *   owners         manage          read
- *   sales          manage          locked
+ *   section        admin (Rocio)   staff (Leidy)   assistant (Gabriella)
+ *   today/Alertas  read            locked          read
+ *   fleet          manage          read (+ driver) read (+ create/edit vehicles, driver and files; no delete, sell or transfer)
+ *   drivers        manage          manage          read
+ *   inspections    manage          read            read
+ *   trips          read            manage          read
+ *   logbook        manage          locked          locked
+ *   owners         manage          read            locked
+ *   sales          manage          locked          locked
+ *
+ * Fleet writes are finer than the matrix: `canEditVehicles`, `canDeleteVehicles` and
+ * `canManageVehicleFiles` and `canTransferVehicles` (sell, transfer owner) say who may do each one.
+ * Changing a vehicle's driver (`canAssignDrivers`) is open to whoever manages drivers or edits vehicles.
  *
  * The public pre-operational form (/preoperacional) is outside every section.
  */
-export type Role = "admin" | "staff";
+export type Role = "admin" | "staff" | "assistant";
 
 export type Section = "today" | "fleet" | "drivers" | "inspections" | "trips" | "logbook" | "owners" | "sales";
 
@@ -42,6 +46,13 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     trips: "manage",
     owners: "read",
   },
+  assistant: {
+    today: "read",
+    fleet: "read",
+    drivers: "read",
+    inspections: "read",
+    trips: "read",
+  },
 };
 
 const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
@@ -57,7 +68,7 @@ const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
 
 /** Anything that is not exactly a known role is the least privileged one. */
 export function parseRole(value: unknown): Role {
-  return value === "admin" ? "admin" : "staff";
+  return value === "admin" || value === "assistant" ? value : "staff";
 }
 
 /** The role's level on a section, `null` when the section is locked for it. */
@@ -85,9 +96,29 @@ export function canManageTrips(role: Role): boolean {
   return canManageSection(role, "trips");
 }
 
-/** Change which driver a vehicle has: the one fleet write open to anyone who sees the fleet and manages drivers. */
+/** Sell or transfer the ownership of a vehicle: admin only. */
+export function canTransferVehicles(role: Role): boolean {
+  return canManageSection(role, "fleet");
+}
+
+/** Change which driver a vehicle has: open to anyone who sees the fleet and either manages drivers or edits vehicles. */
 export function canAssignDrivers(role: Role): boolean {
-  return canViewSection(role, "fleet") && canManageDrivers(role);
+  return canViewSection(role, "fleet") && (canManageDrivers(role) || canEditVehicles(role));
+}
+
+/** Create vehicles and edit everything on a vehicle's file. The assistant does it with only read access to the fleet. */
+export function canEditVehicles(role: Role): boolean {
+  return canManageSection(role, "fleet") || role === "assistant";
+}
+
+/** Delete vehicles (one, several or all): only whoever fully manages the fleet. */
+export function canDeleteVehicles(role: Role): boolean {
+  return canManageSection(role, "fleet");
+}
+
+/** Upload, replace and delete a vehicle's files. */
+export function canManageVehicleFiles(role: Role): boolean {
+  return canEditVehicles(role);
 }
 
 /**
@@ -100,7 +131,7 @@ export function canUsePettyCash(flag: unknown): boolean {
 
 /** The first section the role can see: where a redirect from a forbidden page lands. */
 export function homePath(role: Role): string {
-  return role === "admin" ? "/" : "/flota";
+  return canViewSection(role, "today") ? "/" : "/flota";
 }
 
 export function sectionOfPath(pathname: string): Section | null {

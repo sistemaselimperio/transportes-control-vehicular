@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   canAssignDrivers,
+  canDeleteVehicles,
+  canEditVehicles,
+  canManageVehicleFiles,
+  canTransferVehicles,
   canManageDrivers,
   canManageSection,
   canManageTrips,
@@ -18,6 +22,7 @@ describe("parseRole", () => {
   it("keeps the known roles", () => {
     expect(parseRole("admin")).toBe("admin");
     expect(parseRole("staff")).toBe("staff");
+    expect(parseRole("assistant")).toBe("assistant");
   });
 
   it("falls back to the least privileged role", () => {
@@ -26,6 +31,7 @@ describe("parseRole", () => {
     expect(parseRole("")).toBe("staff");
     expect(parseRole("root")).toBe("staff");
     expect(parseRole("ADMIN")).toBe("staff");
+    expect(parseRole("Assistant")).toBe("staff");
   });
 });
 
@@ -53,10 +59,22 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     owners: "read",
     sales: "locked",
   },
+  assistant: {
+    today: "read",
+    fleet: "read",
+    drivers: "read",
+    inspections: "read",
+    trips: "read",
+    logbook: "locked",
+    owners: "locked",
+    sales: "locked",
+  },
 };
 
+const ROLES = ["admin", "staff", "assistant"] as const;
+
 describe("access matrix", () => {
-  for (const role of ["admin", "staff"] as const) {
+  for (const role of ROLES) {
     for (const section of SECTIONS) {
       const level = MATRIX[role][section];
       it(`${role} on ${section} is ${level}`, () => {
@@ -67,7 +85,7 @@ describe("access matrix", () => {
   }
 
   it("never lets a role manage what it cannot view", () => {
-    for (const role of ["admin", "staff"] as const) {
+    for (const role of ROLES) {
       for (const section of SECTIONS) {
         if (canManageSection(role, section)) expect(canViewSection(role, section)).toBe(true);
       }
@@ -81,12 +99,43 @@ describe("canAssignDrivers", () => {
     expect(canAssignDrivers("staff")).toBe(true);
     expect(canManageSection("staff", "fleet")).toBe(false);
   });
+
+  it("lets the assistant change a vehicle's driver because it edits vehicles", () => {
+    expect(canAssignDrivers("assistant")).toBe(true);
+  });
 });
 
 describe("homePath", () => {
   it("sends each role to its first visible section", () => {
     expect(homePath("admin")).toBe("/");
     expect(homePath("staff")).toBe("/flota");
+    expect(homePath("assistant")).toBe("/");
+  });
+});
+
+describe("vehicle capabilities", () => {
+  it("lets only admins sell and transfer vehicles", () => {
+    expect(canTransferVehicles("admin")).toBe(true);
+    expect(canTransferVehicles("assistant")).toBe(false);
+    expect(canTransferVehicles("staff")).toBe(false);
+  });
+
+  it("lets admins and assistants create and edit vehicles, but not staff", () => {
+    expect(canEditVehicles("admin")).toBe(true);
+    expect(canEditVehicles("assistant")).toBe(true);
+    expect(canEditVehicles("staff")).toBe(false);
+  });
+
+  it("lets only admins delete vehicles", () => {
+    expect(canDeleteVehicles("admin")).toBe(true);
+    expect(canDeleteVehicles("assistant")).toBe(false);
+    expect(canDeleteVehicles("staff")).toBe(false);
+  });
+
+  it("lets admins and assistants upload, replace and delete vehicle files", () => {
+    expect(canManageVehicleFiles("admin")).toBe(true);
+    expect(canManageVehicleFiles("assistant")).toBe(true);
+    expect(canManageVehicleFiles("staff")).toBe(false);
   });
 });
 
@@ -130,7 +179,7 @@ describe("canManageDrivers", () => {
   });
 
   it("follows the drivers row of the matrix", () => {
-    for (const role of ["admin", "staff"] as const) {
+    for (const role of ROLES) {
       expect(canManageDrivers(role)).toBe(canManageSection(role, "drivers"));
     }
   });
@@ -140,6 +189,7 @@ describe("canManageTrips", () => {
   it("allows only staff to create, edit and delete trips; an admin just reads them", () => {
     expect(canManageTrips("staff")).toBe(true);
     expect(canManageTrips("admin")).toBe(false);
+    expect(canManageTrips("assistant")).toBe(false);
   });
 });
 

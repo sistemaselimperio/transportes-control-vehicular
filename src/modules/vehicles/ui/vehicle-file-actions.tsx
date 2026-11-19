@@ -105,6 +105,7 @@ export function FileActions({
   current,
   readOnly = false,
   allowed = [],
+  denied = [],
   children,
 }: {
   plate: string;
@@ -121,6 +122,8 @@ export function FileActions({
   readOnly?: boolean;
   /** Actions still open to a read-only user (staff may change the driver). */
   allowed?: readonly ActionKey[];
+  /** Actions hidden even from a user who can edit (the assistant cannot sell or transfer). */
+  denied?: readonly ActionKey[];
   children: ReactNode;
 }) {
   const [active, setActive] = useState<ActionKey | null>(null);
@@ -148,7 +151,7 @@ export function FileActions({
         plate,
         status,
         locked: readOnly || status === "SOLD",
-        canOpen: (key) => status !== "SOLD" && (!readOnly || allowed.includes(key)),
+        canOpen: (key) => status !== "SOLD" && (readOnly ? allowed.includes(key) : !denied.includes(key)),
         open: (key) => {
           setMessage(null);
           setActive(key);
@@ -382,8 +385,8 @@ export function InlineAction({
 
 /** Header button that opens the sale form; icon only, kept apart from daily actions. Hidden once sold. */
 export function SellButton() {
-  const { locked, open } = useFileActions();
-  if (locked) return null;
+  const { canOpen, open } = useFileActions();
+  if (!canOpen("sell")) return null;
   return (
     <button
       type="button"

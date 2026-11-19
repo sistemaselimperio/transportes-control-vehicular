@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { currentDay } from "@/lib/current-day";
-import { canAssignDrivers, canManageSection } from "@/lib/permissions";
+import { canAssignDrivers, canEditVehicles, canManageVehicleFiles, canTransferVehicles, canViewSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listVehicleDailyReports, listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
 import { listVehicleTrips } from "@/modules/trips/application/trip-queries";
@@ -39,8 +39,11 @@ export default async function Page({
   return (
     <VehicleDetailView
       detail={detail}
-      readOnly={!canManageSection(role, "fleet")}
+      readOnly={!canEditVehicles(role)}
+      filesReadOnly={!canManageVehicleFiles(role)}
+      canOpenLogbook={canViewSection(role, "logbook")}
       allowed={canAssignDrivers(role) ? ["driver"] : []}
+      denied={canTransferVehicles(role) ? [] : ["owner", "sell"]}
       inspections={inspections}
       dailyReports={dailyReports}
       trips={withEffectiveStatus(trips, new Date())}
