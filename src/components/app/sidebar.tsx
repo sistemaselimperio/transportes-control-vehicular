@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { brandFor, type Brand } from "@/components/app/brand";
 import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
 import { authClient } from "@/lib/auth-client";
@@ -270,32 +271,28 @@ function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userNa
 }
 
 /** Compact lockup for the phone top bar: logo beside the name. */
-function BrandInline() {
+function BrandInline({ brand }: { brand: Brand }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <BrandMark decorative className="h-10" />
+      <BrandMark decorative variant={brand.variant} className="h-10" />
       <span className="min-w-0 leading-tight">
-        <span className="block truncate text-sm font-bold tracking-tight">
-          Transportes El Imperio
-        </span>
-        <span className="micro-label mt-1 block">Control de Flota</span>
+        <span className="block truncate text-sm font-bold tracking-tight">{brand.name}</span>
+        <span className="micro-label mt-1 block">{brand.slogan}</span>
       </span>
     </div>
   );
 }
 
 /** Stacked lockup for the desktop sidebar: the logo leads, the name sits under it. */
-function BrandStacked() {
+function BrandStacked({ brand }: { brand: Brand }) {
   return (
     <div className="flex flex-col items-center gap-2 border-b px-4 pt-4 pb-3.5 text-center">
-      <BrandMark decorative className="h-24 drop-shadow-sm" />
+      <BrandMark decorative variant={brand.variant} className="h-44 drop-shadow-sm" />
       <span className="leading-tight">
-        <span className="block text-base font-bold tracking-tight text-balance">
-          Transportes El Imperio
-        </span>
+        <span className="block text-base font-bold tracking-tight text-balance">{brand.name}</span>
         <span className="mt-2 flex items-center justify-center gap-2">
           <span aria-hidden className="h-px w-4 bg-brand" />
-          <span className="micro-label">Control de Flota</span>
+          <span className="micro-label">{brand.slogan}</span>
           <span aria-hidden className="h-px w-4 bg-brand" />
         </span>
       </span>
@@ -325,6 +322,7 @@ export function Sidebar({
 
   const grupo = parseGroupParam(searchParams.get("grupo") ?? undefined);
   const currentQuery = searchParams.toString();
+  const brand = brandFor(role);
   const shared = {
     pathname,
     role,
@@ -347,7 +345,7 @@ export function Sidebar({
         >
           <Menu className="size-5" aria-hidden />
         </button>
-        <BrandInline />
+        <BrandInline brand={brand} />
       </div>
 
       <SlideOver
@@ -361,7 +359,7 @@ export function Sidebar({
       </SlideOver>
 
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto border-r bg-sidebar md:flex print:hidden!">
-        <BrandStacked />
+        <BrandStacked brand={brand} />
         <SidebarBody {...shared} />
       </aside>
     </>
