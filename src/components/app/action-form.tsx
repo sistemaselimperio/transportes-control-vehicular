@@ -84,7 +84,7 @@ export function ActionForm({
       */}
       <div className="shrink-0 space-y-3 border-t bg-popover px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {error && (
-          <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
+          <p role="alert" className="rounded-lg bg-destructive-soft p-2 text-sm text-destructive">
             {error}
           </p>
         )}

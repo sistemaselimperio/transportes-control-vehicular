@@ -260,7 +260,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 px-4 hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive md:h-9"
+                className="h-11 px-4 hover:border-destructive/40 hover:bg-destructive-soft hover:text-destructive md:h-9"
                 onClick={() => setDeletingAll(true)}
               >
                 <Trash2 aria-hidden />

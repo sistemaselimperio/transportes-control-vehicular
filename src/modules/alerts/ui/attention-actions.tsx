@@ -122,7 +122,7 @@ function ContextForm({
   if (failed) {
     return (
       <div className="space-y-3 p-4">
-        <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+        <p role="alert" className="rounded-lg bg-destructive-soft p-3 text-sm text-destructive">
           No se pudieron cargar los datos del vehículo.
         </p>
         <Button

@@ -86,7 +86,7 @@ export function OilCreateFlow({
         </Field>
         {pending && <p className="text-sm text-muted-foreground">Cargando datos del vehículo…</p>}
         {error && (
-          <p role="alert" className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
+          <p role="alert" className="rounded-lg bg-destructive-soft p-2 text-sm text-destructive">
             {error}
           </p>
         )}

@@ -34,7 +34,7 @@ export function ActionMenu({ label, items, className }: { label: string; items: 
                 onClick={item.onSelect}
                 className={cn(
                   "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium outline-none select-none data-highlighted:bg-muted md:min-h-9",
-                  item.destructive && "text-destructive data-highlighted:bg-destructive/10",
+                  item.destructive && "text-destructive data-highlighted:bg-destructive-soft",
                 )}
               >
                 <item.icon className="size-4 shrink-0" aria-hidden />

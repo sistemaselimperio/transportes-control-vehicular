@@ -122,7 +122,7 @@ export function VehicleFilesPanel({
           key={f.id}
           role="group"
           aria-label={`Confirmar eliminar ${f.fileName}`}
-          className="flex min-h-11 items-center gap-1 rounded-lg bg-destructive/10 px-2 md:min-h-9"
+          className="flex min-h-11 items-center gap-1 rounded-lg bg-destructive-soft px-2 md:min-h-9"
         >
           <span className="min-w-0 flex-1 truncate text-sm text-destructive">
             ¿Eliminar {f.fileName}?

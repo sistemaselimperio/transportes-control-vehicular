@@ -14,7 +14,7 @@ export type ViewedAttachment = { expenseId: number; name: string; mimeType: stri
 
 type Size = { width: number; height: number };
 
-const TOOL = "size-11 shrink-0 text-background hover:bg-background/15 hover:text-background focus-visible:ring-background/60 disabled:opacity-40";
+const TOOL = "size-11 shrink-0 text-background hover:bg-background-soft hover:text-background focus-visible:ring-background/60 disabled:opacity-40";
 
 /** Watches the size of an element (the stage the image is fitted into). */
 function useElementSize<T extends HTMLElement>() {
@@ -188,7 +188,7 @@ function ImageStage({ src, name }: { src: string; name: string }) {
             No se pudo cargar la imagen.
             <Button
               variant="outline"
-              className="h-11 border-background/40 bg-transparent px-4 text-background hover:bg-background/15 hover:text-background"
+              className="h-11 border-background/40 bg-transparent px-4 text-background hover:bg-background-soft hover:text-background"
               onClick={() => {
                 setFailed(false);
                 setNatural(null);

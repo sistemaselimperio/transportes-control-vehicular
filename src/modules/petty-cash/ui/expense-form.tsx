@@ -468,7 +468,7 @@ export function ExpenseForm({
       {/* Action bar outside the scroll area, so Save is always in view; its error too. */}
       <div className="shrink-0 space-y-3 border-t bg-popover px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {serverError && (
-          <p role="alert" className="rounded-lg bg-destructive/10 p-2.5 text-sm text-destructive">
+          <p role="alert" className="rounded-lg bg-destructive-soft p-2.5 text-sm text-destructive">
             {serverError}
           </p>
         )}

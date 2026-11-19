@@ -28,7 +28,7 @@ function VehicleRow({
   return (
     <li
       data-active={selected ? "true" : undefined}
-      className="relative flex cursor-pointer items-center gap-x-3 px-4 py-1.5 transition-colors duration-150 hover:bg-muted data-[active=true]:bg-brand/12 data-[active=true]:shadow-[inset_3px_0_0_var(--color-brand)] md:gap-x-4 md:px-5"
+      className="relative flex cursor-pointer items-center gap-x-3 px-4 py-1.5 transition-colors duration-150 hover:bg-muted data-[active=true]:bg-brand-soft data-[active=true]:shadow-[inset_3px_0_0_var(--color-brand)] md:gap-x-4 md:px-5"
     >
       <button
         type="button"

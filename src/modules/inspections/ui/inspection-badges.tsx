@@ -19,7 +19,7 @@ export function StatusBadge({ critical, unchecked = 0 }: { critical: boolean; un
         className={cn(
           BADGE,
           critical
-            ? "bg-danger-foreground/15 text-danger-foreground ring-danger-foreground/40"
+            ? "bg-danger text-danger-foreground ring-danger-foreground/40"
             : "bg-ok text-ok-foreground ring-ok-foreground/25",
         )}
       >
@@ -70,7 +70,7 @@ export function NotRegisteredBadge({ children }: { children: ReactNode }) {
 const EXIT_BADGES: Record<ExitStatus, { label: string; icon: typeof Clock; className: string }> = {
   PENDING: { label: "Pendiente", icon: Clock, className: "bg-warn/60 text-warn-foreground ring-warn-foreground/30" },
   APTO: { label: "Apto", icon: CircleCheck, className: "bg-ok text-ok-foreground ring-ok-foreground/25" },
-  NO_APTO: { label: "No apto", icon: Ban, className: "bg-danger-foreground/15 text-danger-foreground ring-danger-foreground/40" },
+  NO_APTO: { label: "No apto", icon: Ban, className: "bg-danger text-danger-foreground ring-danger-foreground/40" },
 };
 
 /** The maintenance chief's exit decision. Icon + text, not colour alone. */

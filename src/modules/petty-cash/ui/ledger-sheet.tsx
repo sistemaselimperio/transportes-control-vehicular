@@ -290,7 +290,7 @@ export function LedgerSheetView({
             type="button"
             aria-label="Cerrar aviso"
             onClick={() => setToast(null)}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring/70"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-foreground-soft focus-visible:ring-2 focus-visible:ring-ring/70"
           >
             <X className="size-4" aria-hidden />
           </button>

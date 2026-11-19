@@ -155,7 +155,7 @@ export function OwnersView({
       {error && (
         <p
           role="alert"
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-danger-foreground/30 bg-danger-foreground/10 px-4 py-3 text-sm text-danger-foreground shadow-soft"
+          className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border border-danger-foreground/30 bg-danger px-4 py-3 text-sm text-danger-foreground shadow-soft"
         >
           <CircleAlert className="size-4 shrink-0" aria-hidden />
           {error}

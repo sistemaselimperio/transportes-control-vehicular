@@ -74,7 +74,7 @@ export function DeleteAllButton({
       <SlideOver open={open} onOpenChange={(next) => !pending && (next ? setOpen(true) : close())} title={title}>
         <div data-slot="action-form" className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5">
-            <div className="flex gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm">
+            <div className="flex gap-3 rounded-xl border border-destructive/20 bg-destructive-faint p-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
               <div className="space-y-1">
                 {children}

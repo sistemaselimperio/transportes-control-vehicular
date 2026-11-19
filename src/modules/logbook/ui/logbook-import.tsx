@@ -173,7 +173,7 @@ export function LogbookImportFlow({
 
       <div className="shrink-0 space-y-3 border-t bg-popover px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {error && (
-          <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-sm text-destructive">
+          <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive-soft p-2 text-sm text-destructive">
             <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
             {error}
           </p>

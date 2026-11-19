@@ -601,7 +601,7 @@ function InspectionForm({
           </p>
           {/* Only real send failures (e.g. no connection); missing fields are listed in the lock box. */}
           {errors.form && (
-            <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-base font-medium text-destructive">
+            <p role="alert" className="rounded-xl bg-destructive-soft p-3 text-base font-medium text-destructive">
               {errors.form}
             </p>
           )}
@@ -857,7 +857,7 @@ function DailyField({
       aria-labelledby={`${id}-label`}
       className={cn(
         "space-y-3 rounded-2xl border-2 border-foreground/20 bg-card p-4 shadow-soft",
-        error ? "border-destructive bg-destructive/5" : ok && "border-ok-foreground/60 bg-ok/30",
+        error ? "border-destructive bg-destructive-faint" : ok && "border-ok-foreground/60 bg-ok/30",
       )}
     >
       <div className="flex items-center gap-3">
@@ -929,7 +929,7 @@ function CellFrame({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("grid grid-cols-[8.5rem_1fr] border", RULE, error && "bg-destructive/10")}>
+    <div className={cn("grid grid-cols-[8.5rem_1fr] border", RULE, error && "bg-destructive-soft")}>
       <label htmlFor={id} className={cn(LABEL_CELL, "flex items-center gap-1 border-0 border-r")}>
         {label}
         {required && (
@@ -1073,7 +1073,7 @@ function ChecklistRow({
     <tr
       id={fieldId(item.id)}
       tabIndex={-1}
-      className={cn("outline-none", missing && "bg-destructive/10")}
+      className={cn("outline-none", missing && "bg-destructive-soft")}
     >
       <td id={labelId} className={cn("border px-3 py-2 leading-snug", RULE)}>
         {item.critical && (
@@ -1146,7 +1146,7 @@ function NovedadRow({
 }) {
   const id = noteId(item.id);
   return (
-    <tr className={cn(error && "bg-destructive/10")}>
+    <tr className={cn(error && "bg-destructive-soft")}>
       <td className={cn("border px-3 py-2 align-top font-bold", RULE)}>{number}</td>
       <td className={cn("space-y-1.5 border px-3 py-2", RULE)}>
         <label htmlFor={id} className="block text-sm text-muted-foreground">

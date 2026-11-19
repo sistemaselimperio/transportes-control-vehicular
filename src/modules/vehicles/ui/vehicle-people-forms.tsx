@@ -214,7 +214,7 @@ export function SellForm({
         </dl>
       </section>
 
-      <label className="flex min-h-11 items-start gap-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+      <label className="flex min-h-11 items-start gap-3 rounded-lg bg-destructive-soft p-3 text-sm text-destructive">
         <input type="checkbox" required className="mt-0.5 size-5 shrink-0 accent-destructive" />
         <span>
           Entiendo que la venta de <span className="num font-semibold">{plate}</span> no se puede

@@ -393,7 +393,7 @@ export function SellButton() {
       aria-label="Vender vehículo"
       title="Vender vehículo"
       onClick={() => open("sell")}
-      className="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-transparent text-muted-foreground outline-none transition-colors duration-150 hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/50 md:size-8"
+      className="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-transparent text-muted-foreground outline-none transition-colors duration-150 hover:border-destructive/30 hover:bg-destructive-soft hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/50 md:size-8"
     >
       <HandCoins className="size-4" aria-hidden />
     </button>

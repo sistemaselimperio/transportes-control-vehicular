@@ -87,7 +87,7 @@ export function FormStepTabs<K extends string>({
                   aria-hidden
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-full text-lg font-bold",
-                    selected ? "bg-background text-foreground" : "bg-foreground/10 text-foreground",
+                    selected ? "bg-background text-foreground" : "bg-foreground-soft text-foreground",
                   )}
                 >
                   {i + 1}
@@ -110,7 +110,7 @@ export function FormStepTabs<K extends string>({
                   : s.complete
                     ? "bg-ok text-ok-foreground"
                     : selected
-                      ? "bg-background/15"
+                      ? "bg-background-soft"
                       : "bg-muted",
               )}
             >

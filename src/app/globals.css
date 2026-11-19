@@ -39,6 +39,12 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-faint: var(--destructive-faint);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-soft-hover: var(--destructive-soft-hover);
+  --color-foreground-soft: var(--foreground-soft);
+  --color-background-soft: var(--background-soft);
+  --color-brand-soft: var(--brand-soft);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -90,6 +96,20 @@
   --accent: #ffff6a;
   --accent-foreground: #1b1d10;
   --destructive: #c81e1e;
+  /*
+   * Solid stand-ins for translucent tints (e.g. destructive at 5%/10%/20% over white). Tailwind
+   * compiles `bg-x/10` to a SOLID `x` fallback where color-mix() is unsupported (Chrome < 111), which
+   * paints same-colored text invisible; these render identically everywhere.
+   */
+  --destructive-faint: #fcf4f4;
+  --destructive-soft: #fae9e9;
+  --destructive-soft-hover: #f4d2d2;
+  /* Foreground at 10% over white: hover wash on light surfaces. */
+  --foreground-soft: #e8e8e7;
+  /* Background at 15% over the dark foreground: hover wash / chips on dark surfaces. */
+  --background-soft: #3c3e32;
+  /* Brand at 12% over white: active timeline row. */
+  --brand-soft: #f1f2e0;
   --border: #dcdccc;
   --input: #c6c6b0;
   --ring: #879200;
@@ -154,6 +174,9 @@ body:has([data-theme="sky"]) {
   --border: #ccdbe2;
   --input: #b0c4cc;
   --ring: #1e6f8c;
+  --foreground-soft: #e7e8e9;
+  --background-soft: #313e44;
+  --brand-soft: #e4eef1;
   --chart-1: #1e6f8c;
   --chart-4: #4fb3d9;
   --sidebar-foreground: #0f1d24;
