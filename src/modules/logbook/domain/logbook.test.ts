@@ -10,6 +10,7 @@ import {
   parseTabParam,
   summarizeCost,
   summarizeFuel,
+  tabForVehicle,
 } from "./logbook";
 
 describe("parseTabParam", () => {
@@ -184,5 +185,17 @@ describe("logbookTabsFor", () => {
 
   it("leaves oil and fuel out for a trailer: it has no engine and is never refueled", () => {
     expect(logbookTabsFor({ isTrailer: true }).map((t) => t.key)).toEqual(["servicios", "llantas"]);
+  });
+});
+
+describe("tabForVehicle", () => {
+  it("keeps the requested tab when the vehicle has it", () => {
+    expect(tabForVehicle("aceite", { isTrailer: false })).toBe("aceite");
+    expect(tabForVehicle("llantas", { isTrailer: true })).toBe("llantas");
+  });
+
+  it("falls back to servicios when a trailer is asked for oil or fuel", () => {
+    expect(tabForVehicle("aceite", { isTrailer: true })).toBe("servicios");
+    expect(tabForVehicle("combustible", { isTrailer: true })).toBe("servicios");
   });
 });

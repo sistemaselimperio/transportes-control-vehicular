@@ -3,7 +3,8 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
 import type { OilItem } from "@/modules/maintenance/domain/oil-items";
 import { escapeLikePattern } from "@/modules/shared/domain/like-pattern";
-import type { LogbookRepository } from "../application/logbook-ports";
+import { isTrailerClass } from "@/modules/vehicles/domain/trailer";
+import type { LogbookRepository, VehicleRef } from "../application/logbook-ports";
 import {
   driverAtDate,
   LOGBOOK_PAGE_SIZE,
@@ -364,22 +365,28 @@ const TABLES = {
 /** The three tables share `id` and `vehicle_id`, which is all the generic operations touch. */
 const asEntryTable = (kind: keyof typeof TABLES) => TABLES[kind] as typeof schema.vehicleServices;
 
+function toVehicleRef(vehicle: { id: number; status: VehicleRef["status"]; className: string }): VehicleRef {
+  return { id: vehicle.id, status: vehicle.status, isTrailer: isTrailerClass(vehicle.className) };
+}
+
 export const logbookRepository: LogbookRepository = {
   async findVehicle(plate) {
     const [vehicle] = await db
-      .select({ id: schema.vehicles.id, status: schema.vehicles.status })
+      .select({ id: schema.vehicles.id, status: schema.vehicles.status, className: schema.vehicleClasses.name })
       .from(schema.vehicles)
+      .innerJoin(schema.vehicleClasses, eq(schema.vehicles.classId, schema.vehicleClasses.id))
       .where(eq(schema.vehicles.plate, plate));
-    return vehicle ?? null;
+    return vehicle ? toVehicleRef(vehicle) : null;
   },
   async findEntryVehicle(kind, id) {
     const t = asEntryTable(kind);
     const [vehicle] = await db
-      .select({ id: schema.vehicles.id, status: schema.vehicles.status })
+      .select({ id: schema.vehicles.id, status: schema.vehicles.status, className: schema.vehicleClasses.name })
       .from(t)
       .innerJoin(schema.vehicles, eq(t.vehicleId, schema.vehicles.id))
+      .innerJoin(schema.vehicleClasses, eq(schema.vehicles.classId, schema.vehicleClasses.id))
       .where(eq(t.id, id));
-    return vehicle ?? null;
+    return vehicle ? toVehicleRef(vehicle) : null;
   },
   async create(kind, vehicleId, values) {
     // Each branch narrows `values` to its kind; the casts only tell TypeScript what the kind already proved.

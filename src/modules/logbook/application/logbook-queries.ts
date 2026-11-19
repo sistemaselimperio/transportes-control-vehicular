@@ -2,6 +2,8 @@ import { cacheLife, cacheTag } from "next/cache";
 import { readTags } from "@/lib/cache-tags";
 import { currentDay } from "@/lib/current-day";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import type { TireEventRow } from "@/modules/trailer-tires/domain/tire-events";
+import { listTrailerTireEvents } from "@/modules/trailer-tires/infrastructure/tire-event-repository";
 import { loadVehicleFormLists } from "@/modules/vehicles/infrastructure/vehicle-repository";
 import {
   normalizePlateQuery,
@@ -13,6 +15,7 @@ import {
   type OilRow,
   type ServiceRow,
   type TireRow,
+  tabForVehicle,
 } from "../domain/logbook";
 import {
   findVehicleIdByPlate,
@@ -38,7 +41,7 @@ export type TabSummary =
 export type LogbookData =
   | { tab: "servicios"; rows: ServiceRow[]; summary: CostSummary }
   | { tab: "aceite"; rows: OilRow[]; summary: CostSummary }
-  | { tab: "llantas"; rows: TireRow[]; summary: CostSummary }
+  | { tab: "llantas"; rows: TireRow[]; summary: CostSummary; positionEvents: TireEventRow[] }
   | { tab: "combustible"; rows: FuelRow[]; summary: FuelSummary };
 
 /** What the page lists for the chosen vehicle. */
@@ -52,6 +55,8 @@ export interface VehicleListing {
 }
 
 export interface LogbookPage {
+  /** The tab actually shown: a trailer has no oil or fuel, so those fall back to "servicios". */
+  tab: LogbookTab;
   /** Fleet-wide totals for the date range and group (never narrowed by plate or search). */
   fleet: TabSummary;
   /** Null until a vehicle is chosen: the fleet list is never loaded. */
@@ -60,6 +65,8 @@ export interface LogbookPage {
   providers: string[];
   /** Plates that can still receive records (not sold). */
   plates: string[];
+  /** The plates of `plates` that are trailers: no oil changes and no fuel fills can be registered for them. */
+  trailerPlates: string[];
   today: IsoDate;
 }
 
@@ -91,8 +98,15 @@ async function loadVehicleData(
       return { data: { tab, rows, summary }, hasNext };
     }
     case "llantas": {
-      const [{ rows, hasNext }, summary] = await Promise.all([loadTirePage(scope, page), summarizeTires(scope)]);
-      return { data: { tab, rows, summary }, hasNext };
+      // A trailer's tire events by position are listed beside the old tire changes (none for other vehicles).
+      const [{ rows, hasNext }, summary, positionEvents] = await Promise.all([
+        loadTirePage(scope, page),
+        summarizeTires(scope),
+        scope.vehicleId !== undefined
+          ? listTrailerTireEvents(scope.vehicleId, { from: scope.from, to: scope.to })
+          : Promise.resolve([]),
+      ]);
+      return { data: { tab, rows, summary, positionEvents }, hasNext };
     }
     case "combustible": {
       const [{ rows, hasNext }, summary] = await Promise.all([loadFuelPage(scope, page), summarizeFuelFills(scope)]);
@@ -132,16 +146,18 @@ export async function getLogbookPage(tab: LogbookTab, query: LogbookQuery): Prom
 }
 
 /** Shared by everyone: the tab and filters (plus the day) are the cache key. */
-async function loadLogbookPage(tab: LogbookTab, query: LogbookQuery, today: IsoDate): Promise<LogbookPage> {
+async function loadLogbookPage(requestedTab: LogbookTab, query: LogbookQuery, today: IsoDate): Promise<LogbookPage> {
   "use cache";
   cacheLife("minutes");
   cacheTag(...readTags("logbookPage"));
 
   const lists = await loadVehicleFormLists();
+  const chosen = query.plate ? lists.plates.find((p) => normalizePlateQuery(p) === query.plate) : undefined;
+  const tab = tabForVehicle(requestedTab, { isTrailer: chosen !== undefined && lists.trailerPlates.includes(chosen) });
   const [fleet, vehicle, providers] = await Promise.all([
     loadFleetSummary(tab, { from: query.from, to: query.to, group: query.group }),
     loadVehicleListing(tab, query, lists.plates),
     loadProviders(),
   ]);
-  return { fleet, vehicle, providers, plates: lists.plates, today };
+  return { tab, fleet, vehicle, providers, plates: lists.plates, trailerPlates: lists.trailerPlates, today };
 }

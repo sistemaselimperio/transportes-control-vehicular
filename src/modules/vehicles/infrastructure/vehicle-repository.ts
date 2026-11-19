@@ -199,7 +199,10 @@ export async function loadLastOilItems(vehicleId: number): Promise<OilItem[]> {
   return items;
 }
 
-/** Vehicle classes and the plates still in the fleet, for the create / edit forms. */
+/**
+ * Vehicle classes and the plates still in the fleet, for the create / edit forms.
+ * `trailerPlates` is the subset of `plates` of class Remolque (no oil changes, no fuel fills).
+ */
 export async function loadVehicleFormLists() {
   const [classes, plates] = await Promise.all([
     db
@@ -207,12 +210,17 @@ export async function loadVehicleFormLists() {
       .from(schema.vehicleClasses)
       .orderBy(asc(schema.vehicleClasses.name)),
     db
-      .select({ plate: schema.vehicles.plate })
+      .select({ plate: schema.vehicles.plate, className: schema.vehicleClasses.name })
       .from(schema.vehicles)
+      .innerJoin(schema.vehicleClasses, eq(schema.vehicles.classId, schema.vehicleClasses.id))
       .where(ne(schema.vehicles.status, "SOLD"))
       .orderBy(asc(schema.vehicles.plate)),
   ]);
-  return { classes, plates: plates.map((p) => p.plate) };
+  return {
+    classes,
+    plates: plates.map((p) => p.plate),
+    trailerPlates: plates.filter((p) => isTrailerClass(p.className)).map((p) => p.plate),
+  };
 }
 
 /** Plates of the vehicles still in the fleet (not sold), nothing else: the public form suggests them. */

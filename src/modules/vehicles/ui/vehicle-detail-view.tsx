@@ -11,6 +11,8 @@ import type { DailyReportRow } from "@/modules/inspections/domain/daily-report";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import type { TireEventRow } from "@/modules/trailer-tires/domain/tire-events";
+import { TrailerTiresPanel } from "@/modules/trailer-tires/ui/trailer-tires-panel";
 import { canTowTrailer, isTrailerClass } from "../domain/trailer";
 import type { VehicleInspectionRow } from "@/modules/inspections/infrastructure/inspection-repository";
 import type { VehicleDetail } from "../application/vehicle-queries";
@@ -20,6 +22,7 @@ import { formatKm, type VehicleGridRow } from "../domain/vehicle-row";
 import { Section, SubHeading } from "./file-section";
 import { VehicleDailyReports } from "./vehicle-daily-report";
 import { VehicleHistorySection } from "./vehicle-history-section";
+import { TrailerHistorySection } from "./trailer-history-section";
 import { PeoplePopover } from "./people-popover";
 import { TabParamScroll } from "./tab-param-scroll";
 import {
@@ -254,6 +257,8 @@ export function VehicleDetailView({
   dailyReports = [],
   trips = [],
   historyTab = "bitacora",
+  tireEvents = [],
+  canEditTires = false,
 }: {
   detail: VehicleDetail;
   /** Latest pre-operational inspections of this vehicle, newest first; read per request, not cached. */
@@ -262,6 +267,10 @@ export function VehicleDetailView({
   dailyReports?: readonly (DailyReportRow & { createdAt: Date })[];
   /** Latest trips of this vehicle, newest start first. */
   trips?: readonly TripRow[];
+  /** Tire events by position of a trailer (empty for any other vehicle), newest first. */
+  tireEvents?: readonly TireEventRow[];
+  /** Whether the user can register, edit and delete a trailer's tire events. */
+  canEditTires?: boolean;
   /** Tab of the Historial section the page opens on. */
   historyTab?: HistoryTab;
   readOnly?: boolean;
@@ -297,24 +306,13 @@ export function VehicleDetailView({
             <TrailerHeader r={r} towedByPlate={detail.towing.towedByPlate} />
             {sold && <SoldNotice />}
           </div>
-          {/* Trailers have no technical sheet or documents to track, but their maintenance is kept. */}
-          <Section
-            id="bitacora"
-            title="Bitácora"
-            actions={
-              // Staff cannot open the Bitácora page, so they get no link to it.
-              canOpenLogbook && (
-                <Link
-                  href={logbookHref(r.plate, "servicios")}
-                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline decoration-muted-foreground/60 underline-offset-4 transition-colors duration-150 hover:text-foreground md:min-h-7"
-                >
-                  Ver bitácora
-                </Link>
-              )
-            }
-          >
-            <VehicleLogbookPanel logbook={detail.logbook} tabs={logbookTabsFor({ isTrailer: true })} />
-          </Section>
+          {/* Trailers have no technical sheet or documents to track, but their tires and maintenance are kept. */}
+          <TrailerHistorySection
+            llantas={<TrailerTiresPanel plate={r.plate} events={tireEvents} today={detail.actions.today} canEdit={canEditTires && !sold} />}
+            bitacora={<VehicleLogbookPanel logbook={detail.logbook} tabs={logbookTabsFor({ isTrailer: true })} />}
+            // Staff cannot open the Bitácora page, so they get no link to it.
+            bitacoraHref={canOpenLogbook ? logbookHref(r.plate, "servicios") : null}
+          />
         </div>
       </FileActions>
     );

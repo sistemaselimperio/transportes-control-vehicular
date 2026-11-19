@@ -25,11 +25,16 @@ function fakeRepo(vehicles: Record<string, VehicleRef>, entries: Record<string, 
   return { repo, calls };
 }
 
-const active: VehicleRef = { id: 1, status: "ACTIVE" };
-const sold: VehicleRef = { id: 2, status: "SOLD" };
+const active: VehicleRef = { id: 1, status: "ACTIVE", isTrailer: false };
+const sold: VehicleRef = { id: 2, status: "SOLD", isTrailer: false };
+const trailer: VehicleRef = { id: 3, status: "ACTIVE", isTrailer: true };
 
 const setup = (bulkCount = 0) => {
-  const { repo, calls } = fakeRepo({ "AAA-111": active, "BBB-222": sold }, { "service:7": 1, "tire:8": 2 }, bulkCount);
+  const { repo, calls } = fakeRepo(
+    { "AAA-111": active, "BBB-222": sold, "R-001": trailer },
+    { "service:7": 1, "tire:8": 2, "tire:9": 3 },
+    bulkCount,
+  );
   return { commands: createLogbookCommands(repo, () => TODAY), calls };
 };
 
@@ -61,6 +66,25 @@ describe("create", () => {
     );
   });
 
+  it("sends the tire changes of a trailer to its per-position tab", async () => {
+    const { commands, calls } = setup();
+    const tire = { date: TODAY, quantity: 2, reference: "x", provider: null, price: null, notes: null };
+    await expect(commands.create("tire", "R-001", tire)).rejects.toThrow(/Llantas/);
+    expect(calls).toEqual([]);
+  });
+
+  it("rejects fuel fills on a trailer", async () => {
+    const { commands, calls } = setup();
+    const fuel = { date: TODAY, gallons: 10, urea: null, amount: 1000, provider: null };
+    await expect(commands.create("fuel", "R-001", fuel)).rejects.toThrow(/remolque.*combustible/);
+    expect(calls).toEqual([]);
+  });
+
+  it("still records the other kinds on a trailer", async () => {
+    const { commands } = setup();
+    expect((await commands.create("service", "R-001", service)).message).toBe("Mantenimiento registrado.");
+  });
+
   it("rejects an unknown vehicle", async () => {
     const { commands, calls } = setup();
     await expect(commands.create("service", "ZZZ-999", service)).rejects.toThrow(/no existe/);
@@ -84,6 +108,13 @@ describe("update", () => {
     const result = await commands.update("service", 7, service);
     expect(result.message).toBe("Registro actualizado.");
     expect(calls).toEqual([{ op: "update", args: { kind: "service", id: 7, values: service } }]);
+  });
+
+  it("keeps the old tire changes of a trailer editable", async () => {
+    const { commands, calls } = setup();
+    const tire = { date: TODAY, quantity: 2, reference: "x", provider: null, price: null, notes: null };
+    await commands.update("tire", 9, tire);
+    expect(calls).toEqual([{ op: "update", args: { kind: "tire", id: 9, values: tire } }]);
   });
 
   it("rejects a record that no longer exists", async () => {

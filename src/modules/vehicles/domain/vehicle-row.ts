@@ -18,6 +18,7 @@ import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
 import type { FileCategory } from "@/modules/documents/domain/vehicle-file-rules";
 import { progressOf, type Progress } from "@/modules/shared/domain/progress";
 import type { VehicleTechnicalData } from "./technical-data";
+import { isTrailerClass } from "./trailer";
 
 export type OwnerGroup = "IMPERIO" | "PAEZ" | "THIRD_PARTY";
 
@@ -171,6 +172,8 @@ function taxCell(
 
 function oilCell(input: VehicleRowInput): Cell {
   const { vehicle, classInfo, lastOil, today } = input;
+  // A trailer has no engine: no oil change is expected, so it never shows or alerts one.
+  if (isTrailerClass(classInfo.name)) return { text: "", status: "not_applicable" };
   const interval = {
     months: lastOil?.intervalMonths ?? classInfo.oilIntervalMonths,
     km: lastOil?.intervalKm ?? classInfo.oilIntervalKm,
@@ -244,7 +247,7 @@ export function buildVehicleRow(input: VehicleRowInput): VehicleGridRow {
     tax,
     driverName: driver?.name ?? null,
     driverPhone: driver?.phone ?? null,
-    lastOilDate: input.lastOil?.date ?? null,
+    lastOilDate: isTrailerClass(classInfo.name) ? null : (input.lastOil?.date ?? null),
     km: vehicle.currentKm,
     odometerWorking: vehicle.odometerWorking,
     nextChange,

@@ -78,6 +78,11 @@ export function logbookTabsFor({ isTrailer }: { isTrailer: boolean }): ReadonlyA
   return isTrailer ? LOGBOOK_TABS.filter((t) => t.key !== "aceite" && t.key !== "combustible") : LOGBOOK_TABS;
 }
 
+/** The tab to show for a vehicle: the requested one, or "servicios" when the vehicle does not have it. */
+export function tabForVehicle(tab: LogbookTab, vehicle: { isTrailer: boolean }): LogbookTab {
+  return logbookTabsFor(vehicle).some((t) => t.key === tab) ? tab : "servicios";
+}
+
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Reads the `tab` search param; anything unknown means "servicios". */

@@ -103,6 +103,21 @@ describe("buildVehicleRow", () => {
     expect(row.overall).toBe("not_applicable");
   });
 
+  it("never shows or alerts an oil change for a trailer, even with a class interval or a legacy record", () => {
+    for (const status of ["ACTIVE", "IDLE", "IN_WORKSHOP"] as const) {
+      const base = input();
+      const row = buildVehicleRow(
+        input({
+          vehicle: { ...base.vehicle, status },
+          classInfo: { ...base.classInfo, name: "Remolque" },
+          lastOil: { date: "2024-01-01", km: null, nextKm: null, nextDate: "2024-03-01", intervalKm: null, intervalMonths: 2 },
+        }),
+      );
+      expect(row.nextChange).toEqual({ text: "", status: "not_applicable" });
+      expect(row.lastOilDate).toBeNull();
+    }
+  });
+
   it("flags unpaid tax from a previous year", () => {
     const row = buildVehicleRow(input({ tax: { kind: "PAID_YEAR", year: 2025 } }));
     expect(row.tax).toMatchObject({ text: "2025", status: "expired" });

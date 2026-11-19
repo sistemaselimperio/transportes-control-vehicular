@@ -61,6 +61,13 @@ export const taxKindEnum = transportes.enum("tax_kind", [
 ]);
 
 export const serviceKindEnum = transportes.enum("service_kind", ["PREVENTIVE", "CORRECTIVE"]);
+export const trailerTireEventTypeEnum = transportes.enum("trailer_tire_event_type", [
+  "CHANGE",
+  "REPAIR",
+  "ROTATION",
+  "INSPECTION",
+]);
+export const tireConditionEnum = transportes.enum("tire_condition", ["GOOD", "FAIR", "BAD"]);
 
 export const fileCategoryEnum = transportes.enum("file_category", [
   "POLICY",
@@ -295,6 +302,47 @@ export const tireChanges = transportes.table(
     notes: text(),
   },
   (t) => [index("tire_changes_vehicle_date_idx").on(t.vehicleId, t.date)],
+);
+
+/**
+ * Events on the tire positions of a trailer (12 fixed positions, see the `trailer-tires` module).
+ * The position, not the physical tire, is the identity. A rotation is one row: `position` and
+ * `counterpart_position` swap, and it shows in the history of both.
+ */
+export const trailerTireEvents = transportes.table(
+  "trailer_tire_events",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    /** Position code `E{1..3}-{I|D}-{INT|EXT}`; validated by the domain. */
+    position: text().notNull(),
+    type: trailerTireEventTypeEnum().notNull(),
+    date: date({ mode: "string" }).notNull(),
+    /** Change: the tire reference. */
+    reference: text(),
+    provider: text(),
+    /** Whole pesos (COP); null when unknown. */
+    price: integer(),
+    /** A repair's description, or any free note. */
+    notes: text(),
+    /** Rotation: the other position of the swap. */
+    counterpartPosition: text("counterpart_position"),
+    /** Inspection: tread depth in millimetres. */
+    treadDepthMm: numeric("tread_depth_mm", { precision: 4, scale: 1, mode: "number" }),
+    /** Inspection: pressure in psi. */
+    pressurePsi: numeric("pressure_psi", { precision: 5, scale: 1, mode: "number" }),
+    condition: tireConditionEnum(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("trailer_tire_events_vehicle_position_date_idx").on(t.vehicleId, t.position, t.date),
+    check(
+      "trailer_tire_events_rotation_differs_check",
+      sql`counterpart_position is null or counterpart_position <> position`,
+    ),
+  ],
 );
 
 /** Logbook: fuel fills. `provider` is the station. */

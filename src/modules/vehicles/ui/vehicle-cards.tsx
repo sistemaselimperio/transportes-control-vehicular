@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import { technicalProgress } from "../domain/technical-data";
 import { ProgressBadge } from "./progress-badge";
+import { isTrailerClass } from "../domain/trailer";
 import type { VehicleGridRow } from "../domain/vehicle-row";
 import { PlateText } from "@/components/app/plate-text";
 
@@ -34,9 +35,11 @@ export function VehicleCards({ rows }: { rows: readonly VehicleGridRow[] }) {
               <StatusPill status={r.tecno.status}>Tecno {r.tecno.text || "—"}</StatusPill>
               <StatusPill status={r.policy.status}>Póliza {r.policy.text || "—"}</StatusPill>
               <StatusPill status={r.tax.status}>Imp. {r.tax.text || "—"}</StatusPill>
-              <StatusPill status={r.nextChange.status}>
-                Aceite {r.nextChange.text || "—"}
-              </StatusPill>
+              {!isTrailerClass(r.className) && (
+                <StatusPill status={r.nextChange.status}>
+                  Aceite {r.nextChange.text || "—"}
+                </StatusPill>
+              )}
               <ProgressBadge subject="Datos técnicos" prefix="Téc." progress={technicalProgress(r.technical)} />
               <ProgressBadge subject="Documentos subidos" prefix="Docs" progress={r.files} />
             </div>

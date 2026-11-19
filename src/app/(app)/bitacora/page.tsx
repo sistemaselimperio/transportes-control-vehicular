@@ -13,5 +13,5 @@ export default async function Page({
   const tab = parseTabParam(params.tab);
   const query = parseLogbookQuery(params);
   const page = await getLogbookPage(tab, query);
-  return <LogbookView page={page} tab={tab} query={query} />;
+  return <LogbookView page={page} tab={page.tab} query={query} />;
 }

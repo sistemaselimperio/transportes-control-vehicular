@@ -17,7 +17,7 @@ import {
 } from "../application/logbook-actions";
 import { SERVICE_KIND_LABELS, type FuelRow, type ServiceRow, type TireRow } from "../domain/logbook";
 
-const FIELD = "h-10 md:h-9";
+export const FIELD = "h-10 md:h-9";
 
 /** What every logbook form needs: today's date for `max`, the suggestions and where the record goes. */
 interface FormProps {
@@ -49,7 +49,7 @@ function VehicleField({ vehicle, id }: { vehicle: FormProps["vehicle"]; id: stri
 }
 
 /** Free text that suggests the providers already used (a native datalist). */
-function ProviderField({
+export function ProviderField({
   id,
   label,
   providers,
@@ -81,7 +81,7 @@ function ProviderField({
   );
 }
 
-function DateField({ id, today, defaultValue }: { id: string; today: IsoDate; defaultValue?: IsoDate }) {
+export function DateField({ id, today, defaultValue }: { id: string; today: IsoDate; defaultValue?: IsoDate }) {
   return (
     <Field label="Fecha" htmlFor={id} required>
       <Input id={id} name="date" type="date" className={FIELD} defaultValue={defaultValue ?? today} max={today} required />
@@ -89,7 +89,7 @@ function DateField({ id, today, defaultValue }: { id: string; today: IsoDate; de
   );
 }
 
-function Fields({ children }: { children: ReactNode }) {
+export function Fields({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">{children}</div>;
 }
 

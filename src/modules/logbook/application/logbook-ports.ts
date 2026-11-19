@@ -52,6 +52,8 @@ export interface DateRange {
 export interface VehicleRef {
   id: number;
   status: VehicleStatus;
+  /** Trailers record their tire changes per position, not in the logbook. */
+  isTrailer: boolean;
 }
 
 export interface LogbookRepository {

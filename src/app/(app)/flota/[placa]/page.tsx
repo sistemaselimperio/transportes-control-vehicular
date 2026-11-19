@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { currentDay } from "@/lib/current-day";
-import { canAssignDrivers, canEditVehicles, canManageVehicleFiles, canTransferVehicles, canViewSection } from "@/lib/permissions";
+import { canAssignDrivers, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canViewSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
+import { listTrailerTireEvents } from "@/modules/trailer-tires/infrastructure/tire-event-repository";
+import { isTrailerClass } from "@/modules/vehicles/domain/trailer";
 import { listVehicleDailyReports, listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
 import { listVehicleTrips } from "@/modules/trips/application/trip-queries";
 import { withEffectiveStatus } from "@/modules/trips/domain/trip-row";
@@ -31,10 +33,12 @@ export default async function Page({
   const detail = await getVehicleDetail(canonicalPlate(decodeURIComponent(placa)), await currentDay());
   if (!detail) notFound();
   // Inspections arrive from a public form, so no write path of the app expires them: read per request.
-  const [inspections, trips, dailyReports] = await Promise.all([
+  // Tire events of a trailer are read per request too, so an edit shows up at once.
+  const [inspections, trips, dailyReports, tireEvents] = await Promise.all([
     listVehicleInspections(detail.row.id, HISTORY_LIMIT),
     listVehicleTrips(detail.row.id, HISTORY_LIMIT),
     listVehicleDailyReports(detail.row.id, HISTORY_LIMIT),
+    isTrailerClass(detail.row.className ?? "") ? listTrailerTireEvents(detail.row.id) : Promise.resolve([]),
   ]);
   return (
     <VehicleDetailView
@@ -48,6 +52,8 @@ export default async function Page({
       dailyReports={dailyReports}
       trips={withEffectiveStatus(trips, new Date())}
       historyTab={parseHistoryTab(query.historial)}
+      tireEvents={tireEvents}
+      canEditTires={canManageSection(role, "logbook")}
     />
   );
 }

@@ -155,6 +155,13 @@
       "when": 1795031078265,
       "tag": "0021_preoperational_not_applicable_sections",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795103373831,
+      "tag": "0022_trailer_tire_events",
+      "breakpoints": true
     }
   ]
 }

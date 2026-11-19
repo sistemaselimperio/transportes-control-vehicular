@@ -13,12 +13,14 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { GROUP_LABELS } from "@/modules/dashboard/domain/dashboard-metrics";
 import { formatPrice } from "@/modules/sales/domain/sale-row";
+import { TireEventList } from "@/modules/trailer-tires/ui/tire-event-list";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import type { LogbookPage, TabSummary } from "../application/logbook-queries";
 import {
   LOGBOOK_SEARCH_MAX,
   LOGBOOK_TABS,
+  logbookTabsFor,
   monthBounds,
   normalizePlateQuery,
   SERVICE_KIND_LABELS,
@@ -97,7 +99,7 @@ function summaryText(data: TabSummary): string {
  * always match what the link says.
  */
 export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: LogbookTab; query: LogbookQuery }) {
-  const { fleet, vehicle: listing, providers, plates, today } = page;
+  const { fleet, vehicle: listing, providers, plates, trailerPlates, today } = page;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [plate, setPlate] = useState(query.plate);
@@ -219,6 +221,9 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
   const filtered = Boolean(query.plate || query.from || query.to || narrowed);
   const labels = NEW_LABELS[tab];
   const vehicle = { plates };
+  // Trailers have no oil changes or fuel fills: they are not offered when registering one, and their tabs are hidden.
+  const engineVehicle = { plates: plates.filter((p) => !trailerPlates.includes(p)) };
+  const tabs = logbookTabsFor({ isTrailer: listing !== null && trailerPlates.includes(listing.plate) });
   // The Excel import is per vehicle: it needs one plate chosen (sold vehicles are not in `plates`).
   const importPlate = query.plate ? (plates.find((p) => normalizePlateQuery(p) === query.plate) ?? null) : null;
   // Clearing a list is per vehicle too, over its plate and period: offered only when no search, kind or
@@ -277,7 +282,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
 
       <TabBar
         label="Tipo de registro"
-        items={LOGBOOK_TABS}
+        items={tabs}
         active={tab}
         onSelect={(next) => go({ tab: next })}
         idPrefix="logbook-tab"
@@ -461,7 +466,10 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
           <OilList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "aceite", row })} />
         )}
         {listing?.data.tab === "llantas" && (
-          <TireList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "llantas", row })} />
+          <>
+            <TireList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "llantas", row })} />
+            <TireEventList plate={listing.plate} events={listing.data.positionEvents} />
+          </>
         )}
         {listing?.data.tab === "combustible" && (
           <FuelList rows={listing.data.rows} {...list} onEdit={(row) => setEditing({ tab: "combustible", row })} />
@@ -526,9 +534,9 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
           />
         )}
         {creating && tab === "servicios" && <ServiceForm {...formProps} />}
-        {creating && tab === "aceite" && <OilCreateFlow plates={plates} onDone={done} onCancel={closeForm} />}
+        {creating && tab === "aceite" && <OilCreateFlow plates={engineVehicle.plates} onDone={done} onCancel={closeForm} />}
         {creating && tab === "llantas" && <TireForm {...formProps} />}
-        {creating && tab === "combustible" && <FuelForm {...formProps} />}
+        {creating && tab === "combustible" && <FuelForm {...formProps} vehicle={engineVehicle} />}
         {editing?.tab === "servicios" && <ServiceForm key={editing.row.id} row={editing.row} {...formProps} />}
         {editing?.tab === "aceite" && (
           <OilEditForm key={editing.row.id} row={editing.row} today={today} onDone={done} onCancel={closeForm} />

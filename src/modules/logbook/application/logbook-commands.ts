@@ -39,6 +39,14 @@ export function createLogbookCommands(repo: LogbookRepository, today: () => IsoD
       const vehicle = await repo.findVehicle(plate);
       if (!vehicle) throw new RuleError(`El vehículo ${plate} no existe.`);
       assertEditable(vehicle.status);
+      if (kind === "tire" && vehicle.isTrailer) {
+        throw new RuleError(
+          `${plate} es un remolque: registra sus llantas por posición en la pestaña Llantas de su ficha.`,
+        );
+      }
+      if (kind === "fuel" && vehicle.isTrailer) {
+        throw new RuleError(`${plate} es un remolque: no lleva registro de combustible.`);
+      }
       assertNotFuture(values.date, today());
       await repo.create(kind, vehicle.id, values);
       return { message: CREATED[kind] };

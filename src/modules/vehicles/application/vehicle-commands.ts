@@ -111,6 +111,11 @@ function cleanTax(tax: TaxRecord): TaxRecord {
   return { kind: tax.kind, year: tax.kind === "PAID_YEAR" ? tax.year : null };
 }
 
+/** Trailers have no oil changes, so none can be registered for one. */
+function assertNotTrailerForOil(plate: string, isTrailer: boolean): void {
+  if (isTrailer) throw new RuleError(`${plate} es un remolque: no lleva cambio de aceite.`);
+}
+
 function closeOf(
   open: { id: number; fromDate: IsoDate } | null,
   date: IsoDate,
@@ -168,6 +173,7 @@ export function createVehicleCommands(
       let currentKmAt = currentKm != null ? today() : null;
       let oilChange: OilChangeRecord | null = null;
       if (input.oilChange) {
+        assertNotTrailerForOil(plate, cls.isTrailer);
         const oil = input.oilChange;
         const plan = planOilChange({
           date: oil.date,
@@ -293,6 +299,7 @@ export function createVehicleCommands(
     ): Promise<CommandResult> {
       const vehicle = await loadOne(plate);
       assertEditable(vehicle.status);
+      assertNotTrailerForOil(vehicle.plate, vehicle.isTrailer);
       const plan = planOilChange({
         date: input.date,
         km: input.km,

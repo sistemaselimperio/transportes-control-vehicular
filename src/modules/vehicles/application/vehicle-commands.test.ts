@@ -187,6 +187,21 @@ describe("registerOilChange", () => {
     ]);
   });
 
+  it("rejects a trailer: trailers have no oil changes", async () => {
+    const c = commands([snapshot({ isTrailer: true })]);
+    await expect(
+      c.registerOilChange("AAA-111", {
+        date: TODAY,
+        km: 1,
+        notes: null,
+        price: null,
+        items: [],
+        interval: { months: 2, km: 1 },
+      }),
+    ).rejects.toThrow(/remolque.*aceite/);
+    expect(c.calls).toEqual([]);
+  });
+
   it("rejects sold vehicles", async () => {
     const c = commands([snapshot({ status: "SOLD" })]);
     await expect(

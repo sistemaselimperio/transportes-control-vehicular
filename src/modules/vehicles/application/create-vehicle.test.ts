@@ -114,6 +114,16 @@ describe("createVehicle", () => {
     expect(created).toEqual([]);
   });
 
+  it("rejects an initial oil change for a trailer", async () => {
+    const { commands, created } = setup();
+    await expect(
+      commands.createVehicle(
+        input({ classId: 3, oilChange: { date: TODAY, km: null, notes: null, interval: null } }),
+      ),
+    ).rejects.toThrow(/remolque.*aceite/);
+    expect(created).toEqual([]);
+  });
+
   it("passes owner and driver through and rejects future dates", async () => {
     const { commands, created } = setup();
     await commands.createVehicle(
