@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { createLocationAction, updateLocationAction } from "../application/client-actions";
 import { LOCATION_NAME_MAX } from "../application/client-schemas";
 import type { ClientLocationRow } from "../domain/client-location";
-import { classifyMapsLink, type MapsLinkCheck } from "../domain/maps-link";
+import { buildMapsEmbedUrl, classifyMapsLink, type MapsLinkCheck } from "../domain/maps-link";
 import { InlineForm } from "./inline-form";
 
 const FIELD = "h-10 md:h-9";
@@ -53,7 +53,6 @@ export function LocationForm({
   const check = classifyMapsLink(mapsUrl);
   const feedback = describeLink(check);
   const canTest = check.kind !== "empty" && check.kind !== "invalid";
-
   // Wait a frame so the sheet's own focus handling does not take focus back.
   useEffect(() => {
     const frame = requestAnimationFrame(() => nameRef.current?.focus());
@@ -131,6 +130,21 @@ export function LocationForm({
             </span>
           )}
         </p>
+        {/* Only links with coordinates can be previewed: Maps pages refuse to load inside an iframe. */}
+        {check.kind === "coordinates" && (
+          // Google draws an "Abrir en Maps" card in the top-left corner that cannot be styled from here
+          // (cross-origin), so the frame is taller than the box and pulled up to crop it out.
+          <div className="mt-2 h-56 w-full overflow-hidden rounded-md border">
+            <iframe
+              key={`${check.lat},${check.lng}`}
+              title="Vista previa del mapa de la finca"
+              src={buildMapsEmbedUrl({ latitude: check.lat, longitude: check.lng })}
+              className="-mt-16 h-[calc(100%+4rem)] w-full"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        )}
       </Field>
     </InlineForm>
   );

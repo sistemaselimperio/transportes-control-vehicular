@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMapsLink, buildWhatsAppShareUrl, classifyMapsLink, isHttpUrl, parseMapsCoordinates } from "./maps-link";
+import { buildMapsEmbedUrl, buildMapsLink, buildWhatsAppShareUrl, classifyMapsLink, isHttpUrl, parseMapsCoordinates } from "./maps-link";
 
 describe("parseMapsCoordinates", () => {
   it("reads the viewport after @", () => {
@@ -144,3 +144,12 @@ describe("classifyMapsLink", () => {
     expect(classifyMapsLink("  https://maps.app.goo.gl/AbC123 ")).toEqual({ kind: "short" });
   });
 });
+
+describe("buildMapsEmbedUrl", () => {
+  it("builds the keyless embed map centered on the coordinates", () => {
+    expect(buildMapsEmbedUrl({ latitude: 4.60971, longitude: -74.08175 })).toBe(
+      "https://maps.google.com/maps?q=4.60971,-74.08175&z=15&output=embed",
+    );
+  });
+});
+

@@ -49,6 +49,14 @@ export function buildMapsLink(location: {
   return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
 }
 
+/**
+ * A map of the coordinates that can be shown in an iframe. Regular Maps pages refuse to be framed
+ * (X-Frame-Options: SAMEORIGIN); this keyless `output=embed` URL redirects to the embeddable page.
+ */
+export function buildMapsEmbedUrl(coordinates: Coordinates): string {
+  return `https://maps.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}&z=15&output=embed`;
+}
+
 /** WhatsApp share link with the client, finca, address and map link, one per line. */
 export function buildWhatsAppShareUrl(location: {
   clientName: string;
