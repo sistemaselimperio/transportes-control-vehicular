@@ -12,6 +12,7 @@ import {
   canViewSection,
   ForbiddenError,
   homePath,
+  isCommercialRole,
   parseRole,
   sectionOfPath,
   type Role,
@@ -24,7 +25,8 @@ describe("parseRole", () => {
     expect(parseRole("staff")).toBe("staff");
     expect(parseRole("assistant")).toBe("assistant");
     expect(parseRole("superadmin")).toBe("superadmin");
-    expect(parseRole("commercial")).toBe("commercial");
+    expect(parseRole("dispatcher")).toBe("dispatcher");
+    expect(parseRole("loader")).toBe("loader");
   });
 
   it("falls back to the least privileged role", () => {
@@ -34,6 +36,7 @@ describe("parseRole", () => {
     expect(parseRole("root")).toBe("staff");
     expect(parseRole("ADMIN")).toBe("staff");
     expect(parseRole("Assistant")).toBe("staff");
+    expect(parseRole("commercial")).toBe("staff");
   });
 });
 
@@ -105,7 +108,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     deliveries: "manage",
     loads: "manage",
   },
-  commercial: {
+  dispatcher: {
     today: "locked",
     fleet: "locked",
     drivers: "locked",
@@ -116,11 +119,24 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     sales: "locked",
     clients: "manage",
     deliveries: "manage",
+    loads: "locked",
+  },
+  loader: {
+    today: "locked",
+    fleet: "locked",
+    drivers: "locked",
+    inspections: "locked",
+    trips: "locked",
+    logbook: "locked",
+    owners: "locked",
+    sales: "locked",
+    clients: "manage",
+    deliveries: "locked",
     loads: "manage",
   },
 };
 
-const ROLES = ["admin", "staff", "assistant", "superadmin", "commercial"] as const;
+const ROLES = ["admin", "staff", "assistant", "superadmin", "dispatcher", "loader"] as const;
 
 describe("access matrix", () => {
   for (const role of ROLES) {
@@ -160,7 +176,8 @@ describe("homePath", () => {
     expect(homePath("staff")).toBe("/flota");
     expect(homePath("assistant")).toBe("/");
     expect(homePath("superadmin")).toBe("/");
-    expect(homePath("commercial")).toBe("/entregas");
+    expect(homePath("dispatcher")).toBe("/entregas");
+    expect(homePath("loader")).toBe("/cargues");
   });
 });
 
@@ -181,12 +198,12 @@ describe("vehicle capabilities", () => {
     expect(canManageTrips("superadmin")).toBe(true);
   });
 
-  it("gives the commercial role no fleet capability", () => {
-    expect(canTransferVehicles("commercial")).toBe(false);
-    expect(canEditVehicles("commercial")).toBe(false);
-    expect(canDeleteVehicles("commercial")).toBe(false);
-    expect(canManageVehicleFiles("commercial")).toBe(false);
-    expect(canAssignDrivers("commercial")).toBe(false);
+  it.each<Role>(["dispatcher", "loader"])("gives %s no fleet capability", (role) => {
+    expect(canTransferVehicles(role)).toBe(false);
+    expect(canEditVehicles(role)).toBe(false);
+    expect(canDeleteVehicles(role)).toBe(false);
+    expect(canManageVehicleFiles(role)).toBe(false);
+    expect(canAssignDrivers(role)).toBe(false);
   });
 
   it("lets admins and assistants create and edit vehicles, but not staff", () => {
@@ -280,15 +297,34 @@ describe("canUsePettyCash", () => {
 });
 
 describe("commercial sections", () => {
-  const COMMERCIAL: ReadonlyArray<Section> = ["clients", "deliveries", "loads"];
+  it("lets the dispatcher manage clients and deliveries but not see loads", () => {
+    expect(canManageSection("dispatcher", "clients")).toBe(true);
+    expect(canManageSection("dispatcher", "deliveries")).toBe(true);
+    expect(canViewSection("dispatcher", "loads")).toBe(false);
+  });
 
-  it("are managed only by the superadmin and the commercial role", () => {
-    for (const section of COMMERCIAL) {
+  it("lets the loader manage clients and loads but not see deliveries", () => {
+    expect(canManageSection("loader", "clients")).toBe(true);
+    expect(canManageSection("loader", "loads")).toBe(true);
+    expect(canViewSection("loader", "deliveries")).toBe(false);
+  });
+
+  it("keeps the whole area closed to the fleet roles and open to the superadmin", () => {
+    for (const section of ["clients", "deliveries", "loads"] as const) {
       expect(canManageSection("superadmin", section)).toBe(true);
-      expect(canManageSection("commercial", section)).toBe(true);
       for (const role of ["admin", "staff", "assistant"] as const) {
         expect(canViewSection(role, section)).toBe(false);
       }
+    }
+  });
+});
+
+describe("isCommercialRole", () => {
+  it("is true only for the dispatcher and the loader", () => {
+    expect(isCommercialRole("dispatcher")).toBe(true);
+    expect(isCommercialRole("loader")).toBe(true);
+    for (const role of ["admin", "staff", "assistant", "superadmin"] as const) {
+      expect(isCommercialRole(role)).toBe(false);
     }
   });
 });

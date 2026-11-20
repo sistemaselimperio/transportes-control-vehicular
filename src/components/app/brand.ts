@@ -1,4 +1,4 @@
-import type { Role } from "@/lib/permissions";
+import { isCommercialRole, type Role } from "@/lib/permissions";
 
 export type BrandVariant = "imperio" | "logistics";
 
@@ -13,5 +13,5 @@ const LOGISTICS_BRAND: Brand = { variant: "logistics", name: "Logística Ganader
 
 /** The lockup the sidebar shows: the commercial area has its own brand, every other role the fleet one. */
 export function brandFor(role: Role): Brand {
-  return role === "commercial" ? LOGISTICS_BRAND : FLEET_BRAND;
+  return isCommercialRole(role) ? LOGISTICS_BRAND : FLEET_BRAND;
 }

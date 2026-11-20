@@ -3,8 +3,8 @@ import type { Role } from "@/lib/permissions";
 import { brandFor } from "./brand";
 
 describe("brandFor", () => {
-  it("gives the commercial role the livestock logistics brand", () => {
-    expect(brandFor("commercial")).toEqual({
+  it.each<Role>(["dispatcher", "loader"])("gives %s the livestock logistics brand", (role) => {
+    expect(brandFor(role)).toEqual({
       variant: "logistics",
       name: "Logística Ganadera",
       slogan: "Del campo a tu destino",

@@ -1,7 +1,7 @@
 /**
  * Idempotent seed: owners, vehicle classes, the delivery destinations of the commercial area and the
  * users (rocio: admin, yellow theme; leidy: staff, sky theme; gabriella: assistant, yellow theme;
- * superadmin: superadmin, yellow theme; sandra and esperanza: commercial, sky theme).
+ * superadmin: superadmin, yellow theme; sandra: dispatcher, esperanza: loader, sky theme).
  * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD,
  * SEED_LEIDY_PASSWORD, SEED_GABRIELLA_PASSWORD, SEED_SUPERADMIN_PASSWORD, SEED_SANDRA_PASSWORD or
  * SEED_ESPERANZA_PASSWORD; a user without one is skipped).
@@ -91,7 +91,7 @@ async function seedClasses() {
 async function seedUser(user: {
   username: string;
   name: string;
-  role: "admin" | "staff" | "assistant" | "superadmin" | "commercial";
+  role: "admin" | "staff" | "assistant" | "superadmin" | "dispatcher" | "loader";
   theme: Theme;
   /** Sees the petty-cash ledgers (caja menor). */
   hasPettyCash?: boolean;
@@ -145,9 +145,9 @@ const seedGabriella = () =>
 const seedSuperadmin = () =>
   seedUser({ username: "superadmin", name: "Administrador", role: "superadmin", theme: "yellow", passwordVar: "SEED_SUPERADMIN_PASSWORD" });
 const seedSandra = () =>
-  seedUser({ username: "sandra", name: "Sandra", role: "commercial", theme: "sky", passwordVar: "SEED_SANDRA_PASSWORD" });
+  seedUser({ username: "sandra", name: "Sandra", role: "dispatcher", theme: "sky", passwordVar: "SEED_SANDRA_PASSWORD" });
 const seedEsperanza = () =>
-  seedUser({ username: "esperanza", name: "Esperanza", role: "commercial", theme: "sky", passwordVar: "SEED_ESPERANZA_PASSWORD" });
+  seedUser({ username: "esperanza", name: "Esperanza", role: "loader", theme: "sky", passwordVar: "SEED_ESPERANZA_PASSWORD" });
 
 async function main() {
   await seedOwners();

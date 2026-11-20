@@ -6,21 +6,22 @@
  * hidden and the server rejects the writes) or no entry (locked: the page redirects to `homePath`
  * and the sidebar shows the item disabled).
  *
- *   section        admin (Rocio)   staff (Leidy)   assistant (Gabriella)   superadmin   commercial (Sandra, Esperanza)
- *   today/Alertas  read            locked          read                    manage       locked
- *   fleet          manage          read (+ driver) read (+ create/edit vehicles, driver and files; no delete, sell or transfer)   manage   locked
- *   drivers        manage          manage          read                    manage       locked
- *   inspections    manage          read            read                    manage       locked
- *   trips          read            manage          read                    manage       locked
- *   logbook        manage          locked          locked                  manage       locked
- *   owners         manage          read            locked                  manage       locked
- *   sales          manage          locked          locked                  manage       locked
- *   clients        locked          locked          locked                  manage       manage
- *   deliveries     locked          locked          locked                  manage       manage
- *   loads          locked          locked          locked                  manage       manage
+ *   section        admin (Rocio)   staff (Leidy)   assistant (Gabriella)   superadmin   dispatcher (Sandra)   loader (Esperanza)
+ *   today/Alertas  read            locked          read                    manage       locked                  locked
+ *   fleet          manage          read (+ driver) read (+ create/edit vehicles, driver and files; no delete, sell or transfer)   manage   locked                  locked
+ *   drivers        manage          manage          read                    manage       locked                  locked
+ *   inspections    manage          read            read                    manage       locked                  locked
+ *   trips          read            manage          read                    manage       locked                  locked
+ *   logbook        manage          locked          locked                  manage       locked                  locked
+ *   owners         manage          read            locked                  manage       locked                  locked
+ *   sales          manage          locked          locked                  manage       locked                  locked
+ *   clients        locked          locked          locked                  manage       manage                manage
+ *   deliveries     locked          locked          locked                  manage       manage                 locked
+ *   loads          locked          locked          locked                  manage       locked                  manage
  *
  * The superadmin manages every section, so it also passes every fine-grained fleet capability below.
- * The commercial sections (clients, deliveries, loads) belong to the superadmin and the commercial role only.
+ * The commercial sections belong to the superadmin and two commercial roles: the dispatcher (clients and
+ * deliveries) and the loader (clients and loads). Each is locked out of the other's section.
  *
  * Fleet writes are finer than the matrix: `canEditVehicles`, `canDeleteVehicles` and
  * `canManageVehicleFiles` and `canTransferVehicles` (sell, transfer owner) say who may do each one.
@@ -28,7 +29,7 @@
  *
  * The public pre-operational form (/preoperacional) is outside every section.
  */
-export type Role = "admin" | "staff" | "assistant" | "superadmin" | "commercial";
+export type Role = "admin" | "staff" | "assistant" | "superadmin" | "dispatcher" | "loader";
 
 export type Section =
   | "today"
@@ -83,9 +84,12 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     deliveries: "manage",
     loads: "manage",
   },
-  commercial: {
+  dispatcher: {
     clients: "manage",
     deliveries: "manage",
+  },
+  loader: {
+    clients: "manage",
     loads: "manage",
   },
 };
@@ -106,7 +110,13 @@ const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
 
 /** Anything that is not exactly a known role is the least privileged one. */
 export function parseRole(value: unknown): Role {
-  return value === "admin" || value === "assistant" || value === "superadmin" || value === "commercial" ? value : "staff";
+  return value === "admin" ||
+    value === "assistant" ||
+    value === "superadmin" ||
+    value === "dispatcher" ||
+    value === "loader"
+    ? value
+    : "staff";
 }
 
 /** The role's level on a section, `null` when the section is locked for it. */
@@ -171,7 +181,14 @@ export function canUsePettyCash(flag: unknown): boolean {
 export function homePath(role: Role): string {
   if (canViewSection(role, "today")) return "/";
   if (canViewSection(role, "fleet")) return "/flota";
-  return "/entregas";
+  if (canViewSection(role, "deliveries")) return "/entregas";
+  if (canViewSection(role, "loads")) return "/cargues";
+  return "/clientes";
+}
+
+/** The roles of the commercial area (the dispatcher and the loader): they work under the logistics brand. */
+export function isCommercialRole(role: Role): boolean {
+  return role === "dispatcher" || role === "loader";
 }
 
 export function sectionOfPath(pathname: string): Section | null {
