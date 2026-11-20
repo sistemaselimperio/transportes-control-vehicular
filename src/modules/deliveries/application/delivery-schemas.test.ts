@@ -20,6 +20,7 @@ describe("deliverySchema", () => {
       shift: "2do viaje",
       priority: "urgente",
       clientId: 4,
+      locationId: null,
       destinationId: 7,
       quantity: 40,
       weightKg: 2000.5,
@@ -33,6 +34,13 @@ describe("deliverySchema", () => {
     expect(parsed.priority).toBe("normal");
     expect(parsed.plate).toBeNull();
     expect(parsed.notes).toBeNull();
+  });
+
+  it("takes the optional finca as an id, blank meaning none", () => {
+    expect(deliverySchema.parse({ ...valid, locationId: "12" }).locationId).toBe(12);
+    expect(deliverySchema.parse({ ...valid, locationId: "" }).locationId).toBeNull();
+    const r = deliverySchema.safeParse({ ...valid, locationId: "abc" });
+    expect(!r.success && r.error.issues[0]?.message).toBe("La finca no es válida.");
   });
 
   it("requires a valid date", () => {

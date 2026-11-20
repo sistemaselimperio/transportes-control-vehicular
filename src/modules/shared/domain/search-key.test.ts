@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesQuery, searchKey } from "./search-key";
+import { collapseWhitespace, matchesQuery, searchKey } from "./search-key";
 
 describe("searchKey", () => {
   it("drops case, accents, spaces and punctuation", () => {
@@ -19,5 +19,12 @@ describe("matchesQuery", () => {
   it("matches everything for a blank query and skips empty fields", () => {
     expect(matchesQuery(["x"], "   ")).toBe(true);
     expect(matchesQuery([null, undefined, "Susa"], "susa")).toBe(true);
+  });
+});
+
+describe("collapseWhitespace", () => {
+  it("trims and turns every run of whitespace into one space, keeping the casing", () => {
+    expect(collapseWhitespace("  Agro \t Ñandú \n S.A.  ")).toBe("Agro Ñandú S.A.");
+    expect(collapseWhitespace("   ")).toBe("");
   });
 });

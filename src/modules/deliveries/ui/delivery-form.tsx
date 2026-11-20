@@ -41,6 +41,8 @@ function DeliveryFields({
   defaultShift?: string;
 }) {
   const [weight, setWeight] = useState(delivery ? String(delivery.weightKg) : "");
+  const [clientId, setClientId] = useState<number | null>(delivery?.clientId ?? null);
+  const locations = options.clients.find((c) => c.id === clientId)?.locations ?? [];
   const kg = parseDecimal(weight);
   // The stored plate stays selectable when its vehicle left the fleet.
   const plateOptions = delivery?.plate && !options.plates.includes(delivery.plate) ? [delivery.plate, ...options.plates] : options.plates;
@@ -88,8 +90,31 @@ function DeliveryFields({
         </NativeSelect>
       </Field>
       <Field label="Cliente" htmlFor={`${idPrefix}-client`} required>
-        <ClientPicker id={`${idPrefix}-client`} clients={options.clients} defaultClientId={delivery?.clientId} />
+        <ClientPicker
+          id={`${idPrefix}-client`}
+          clients={options.clients}
+          defaultClientId={delivery?.clientId}
+          onChange={setClientId}
+        />
       </Field>
+      {locations.length > 0 && (
+        <Field label="Finca" htmlFor={`${idPrefix}-location`} hint="Opcional">
+          <NativeSelect
+            // A new client brings its own fincas: start over instead of keeping the previous choice.
+            key={clientId}
+            id={`${idPrefix}-location`}
+            name="locationId"
+            defaultValue={delivery && delivery.clientId === clientId && delivery.locationId ? String(delivery.locationId) : ""}
+          >
+            <option value="">Sin finca</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )}
       <Field label="Destino" htmlFor={`${idPrefix}-destination`} required>
         <NativeSelect id={`${idPrefix}-destination`} name="destinationId" defaultValue={delivery ? String(delivery.destinationId) : ""} required>
           <option value="" disabled>

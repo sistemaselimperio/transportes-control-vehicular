@@ -21,6 +21,8 @@ const row = (over: Partial<DeliveryRow>): DeliveryRow => ({
   clientId: 1,
   clientName: "Agro Ñandú",
   clientNit: "9001234567",
+  locationId: null,
+  locationName: null,
   destinationId: 1,
   destinationName: "Susa",
   quantity: 10,

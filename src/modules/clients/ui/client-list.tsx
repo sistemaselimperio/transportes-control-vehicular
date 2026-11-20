@@ -3,7 +3,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNit } from "@/modules/petty-cash/domain/nit";
-import type { ClientRow } from "../domain/client-row";
+import { missingLocationCount, type ClientRow } from "../domain/client-row";
 
 function RowActions({
   row,
@@ -52,22 +52,47 @@ function NameButton({ row, onOpen }: { row: ClientRow; onOpen: (row: ClientRow) 
   );
 }
 
+/** "2 fincas · 1 sin ubicación", with the missing part in the warn tone. */
+function LocationsSummary({ row }: { row: ClientRow }) {
+  const total = row.locations.length;
+  const missing = missingLocationCount(row);
+  if (total === 0) return <>Sin fincas</>;
+  return (
+    <>
+      {total} {total === 1 ? "finca" : "fincas"}
+      {missing > 0 && (
+        <>
+          {" · "}
+          <span className="font-medium text-warn-foreground">{missing} sin ubicación</span>
+        </>
+      )}
+    </>
+  );
+}
+
 /** Clients as a table from `md`, as cards on phones. Without `canManage` the rows carry no edit / delete. */
 export function ClientList({
   rows,
   canManage,
+  missingOnly,
   onOpen,
   onEdit,
   onDelete,
 }: {
   rows: readonly ClientRow[];
   canManage: boolean;
+  /** The "fincas sin ubicación" filter is on, so an empty list is explained by it. */
+  missingOnly: boolean;
   onOpen: (row: ClientRow) => void;
   onEdit: (row: ClientRow) => void;
   onDelete: (row: ClientRow) => void;
 }) {
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No hay clientes para esta búsqueda.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {missingOnly ? "No hay clientes con fincas sin ubicación para esta búsqueda." : "No hay clientes para esta búsqueda."}
+      </p>
+    );
   }
   return (
     <>
@@ -84,9 +109,8 @@ export function ClientList({
             </div>
             {r.nit && <p className="num text-sm text-muted-foreground">NIT {formatNit(r.nit)}</p>}
             {r.phone && <p className="num text-sm text-muted-foreground">{r.phone}</p>}
-            {r.address && <p className="text-sm text-muted-foreground">{r.address}</p>}
             <p className="num text-xs text-muted-foreground">
-              {r.deliveryCount} {r.deliveryCount === 1 ? "entrega" : "entregas"}
+              <LocationsSummary row={r} /> · {r.deliveryCount} {r.deliveryCount === 1 ? "entrega" : "entregas"}
             </p>
           </li>
         ))}
@@ -100,7 +124,7 @@ export function ClientList({
           <table className="w-full text-sm">
             <thead className="text-left">
               <tr className="border-b">
-                {["Cliente", "NIT", "Teléfono", "Dirección", "Entregas"].map((h) => (
+                {["Cliente", "NIT", "Teléfono", "Fincas", "Entregas"].map((h) => (
                   <th key={h} scope="col" className="micro-label px-4 py-3 font-medium">
                     {h}
                   </th>
@@ -120,10 +144,8 @@ export function ClientList({
                   </td>
                   <td className="num px-4 py-3 whitespace-nowrap">{r.nit ? formatNit(r.nit) : "—"}</td>
                   <td className="num px-4 py-3 whitespace-nowrap">{r.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="block max-w-64 truncate" title={r.address ?? undefined}>
-                      {r.address ?? "—"}
-                    </span>
+                  <td className="num px-4 py-3 whitespace-nowrap">
+                    <LocationsSummary row={r} />
                   </td>
                   <td className="num px-4 py-3">{r.deliveryCount}</td>
                   {canManage && (

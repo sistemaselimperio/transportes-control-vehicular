@@ -14,6 +14,8 @@ export async function loadDeliveryRows(): Promise<DeliveryRow[]> {
       clientId: schema.deliveries.clientId,
       clientName: schema.clients.name,
       clientNit: schema.clients.nit,
+      locationId: schema.deliveries.locationId,
+      locationName: schema.clientLocations.name,
       destinationId: schema.deliveries.destinationId,
       destinationName: schema.destinations.name,
       quantity: schema.deliveries.quantity,
@@ -26,6 +28,7 @@ export async function loadDeliveryRows(): Promise<DeliveryRow[]> {
     .from(schema.deliveries)
     .innerJoin(schema.clients, eq(schema.deliveries.clientId, schema.clients.id))
     .innerJoin(schema.destinations, eq(schema.deliveries.destinationId, schema.destinations.id))
+    .leftJoin(schema.clientLocations, eq(schema.deliveries.locationId, schema.clientLocations.id))
     .orderBy(desc(schema.deliveries.date), asc(schema.deliveries.id));
   return rows;
 }
@@ -63,6 +66,7 @@ const toColumns = (v: DeliveryValues) => ({
   shift: v.shift,
   priority: v.priority,
   clientId: v.clientId,
+  locationId: v.locationId,
   destinationId: v.destinationId,
   quantity: v.quantity,
   weightKg: v.weightKg,
@@ -82,6 +86,15 @@ export const deliveryRepository: DeliveryPorts = {
       .select({ id: schema.destinations.id })
       .from(schema.destinations)
       .where(eq(schema.destinations.id, id))
+      .limit(1);
+    return row !== undefined;
+  },
+
+  async locationBelongsToClient(locationId, clientId) {
+    const [row] = await db
+      .select({ id: schema.clientLocations.id })
+      .from(schema.clientLocations)
+      .where(and(eq(schema.clientLocations.id, locationId), eq(schema.clientLocations.clientId, clientId)))
       .limit(1);
     return row !== undefined;
   },

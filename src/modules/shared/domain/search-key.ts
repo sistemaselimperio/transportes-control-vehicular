@@ -14,3 +14,8 @@ export function matchesQuery(fields: ReadonlyArray<string | null | undefined>, q
   const haystack = fields.filter((f): f is string => Boolean(f)).map(searchKey);
   return words.every((word) => haystack.some((field) => field.includes(word)));
 }
+
+/** Trims and turns every run of whitespace into one space; the casing is kept. */
+export function collapseWhitespace(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}

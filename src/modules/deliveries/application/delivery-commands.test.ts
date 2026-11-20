@@ -7,6 +7,7 @@ const input = (over: Partial<DeliveryInput> = {}): DeliveryInput => ({
   shift: "1er viaje",
   priority: "normal",
   clientId: 4,
+  locationId: null,
   destinationId: 7,
   quantity: 40,
   weightKg: 2000,
@@ -19,6 +20,7 @@ function ports(over: Partial<DeliveryPorts> = {}): DeliveryPorts {
   return {
     clientExists: vi.fn(async () => true),
     destinationExists: vi.fn(async () => true),
+    locationBelongsToClient: vi.fn(async () => true),
     findVehicleByPlate: vi.fn(async (plate: string) => (plate === "ABC-123" ? { id: 9, plate: "ABC-123" } : null)),
     findDelivery: vi.fn(async () => ({ plate: null, vehicleId: null })),
     insertDelivery: vi.fn(async () => undefined),
@@ -55,6 +57,31 @@ describe("create", () => {
     await expect(createDeliveryCommands(noDestination).create(input())).rejects.toThrow("El destino ya no existe.");
     expect(noClient.insertDelivery).not.toHaveBeenCalled();
     expect(noDestination.insertDelivery).not.toHaveBeenCalled();
+  });
+});
+
+describe("finca", () => {
+  it("does not check the finca when the delivery has none", async () => {
+    const p = ports();
+    await createDeliveryCommands(p).create(input());
+    expect(p.locationBelongsToClient).not.toHaveBeenCalled();
+  });
+
+  it("saves a finca that belongs to the delivery's client", async () => {
+    const p = ports();
+    await createDeliveryCommands(p).create(input({ locationId: 12 }));
+    expect(p.locationBelongsToClient).toHaveBeenCalledWith(12, 4);
+    expect(p.insertDelivery).toHaveBeenCalledWith(expect.objectContaining({ locationId: 12 }));
+  });
+
+  it("refuses a finca of another client, or one that is gone, on create and update", async () => {
+    const p = ports({ locationBelongsToClient: vi.fn(async () => false) });
+    await expect(createDeliveryCommands(p).create(input({ locationId: 12 }))).rejects.toThrow(
+      "La finca no pertenece al cliente elegido.",
+    );
+    await expect(createDeliveryCommands(p).update(3, input({ locationId: 12 }))).rejects.toThrow(DeliveryError);
+    expect(p.insertDelivery).not.toHaveBeenCalled();
+    expect(p.updateDelivery).not.toHaveBeenCalled();
   });
 });
 

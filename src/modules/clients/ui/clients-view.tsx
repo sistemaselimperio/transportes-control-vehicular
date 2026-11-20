@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
@@ -10,37 +10,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { deleteClientAction } from "../application/client-actions";
-import { filterClients, type ClientRow } from "../domain/client-row";
+import { filterClientList, missingLocationCount, type ClientRow } from "../domain/client-row";
 import { ClientDetail } from "./client-detail";
 import { ClientForm } from "./client-form";
 import { ClientList } from "./client-list";
 
-/** Clients page: search, the list, the detail / create / edit side sheets and the delete confirmation. */
+/** Clients page: search and filter, the list, the client sheet (data and fincas in place), the create sheet and the delete confirmation. */
 export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; canManage: boolean }) {
   const [query, setQuery] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<ClientRow | undefined>();
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [missingOnly, setMissingOnly] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  // The open client sheet; `edit` opens its data section straight in edit mode.
+  const [sheet, setSheet] = useState<{ id: number; edit: boolean } | null>(null);
   const [deleting, setDeleting] = useState<ClientRow | undefined>();
   const { message, flash } = useFlashMessage();
 
-  const shown = useMemo(() => filterClients(rows, query), [rows, query]);
-  // Read the detail from the fresh rows, so an edit shows right away.
-  const detail = detailId === null ? undefined : rows.find((r) => r.id === detailId);
-
-  const openForm = (client?: ClientRow) => {
-    setEditing(client);
-    setFormOpen(true);
-  };
+  const shown = useMemo(() => filterClientList(rows, query, missingOnly), [rows, query, missingOnly]);
+  const withMissing = useMemo(() => rows.filter((r) => missingLocationCount(r) > 0).length, [rows]);
+  // Read the client from the fresh rows, so a save shows right away.
+  const detail = sheet === null ? undefined : rows.find((r) => r.id === sheet.id);
 
   return (
     <section className="space-y-5">
       <PageHeader
         title="Clientes"
-        description="Clientes del área comercial, con su dirección y link de ubicación."
+        description="Clientes del área comercial y las fincas donde se les entrega."
         actions={
           canManage && (
-            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
+            <Button className="h-11 px-4 md:h-10" onClick={() => setCreateOpen(true)}>
               <Plus aria-hidden />
               Nuevo cliente
             </Button>
@@ -67,6 +64,17 @@ export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; c
             autoComplete="off"
           />
         </div>
+        <Button
+          type="button"
+          variant={missingOnly ? "default" : "outline"}
+          aria-pressed={missingOnly}
+          className="h-11 px-3 md:h-9"
+          onClick={() => setMissingOnly((on) => !on)}
+        >
+          <TriangleAlert aria-hidden />
+          Con fincas sin ubicación
+          <span className="num">({withMissing})</span>
+        </Button>
         <p className="num text-sm text-muted-foreground" aria-live="polite">
           {shown.length} de {rows.length} clientes
         </p>
@@ -75,8 +83,9 @@ export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; c
       <ClientList
         rows={shown}
         canManage={canManage}
-        onOpen={(row) => setDetailId(row.id)}
-        onEdit={openForm}
+        missingOnly={missingOnly}
+        onOpen={(row) => setSheet({ id: row.id, edit: false })}
+        onEdit={(row) => setSheet({ id: row.id, edit: true })}
         onDelete={setDeleting}
       />
 
@@ -92,27 +101,29 @@ export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; c
         onDone={flash}
       />
 
+      {/* Opening a client only shows it; data and fincas are changed only when entering through Editar. */}
       <SlideOver
         open={detail !== undefined}
-        onOpenChange={(next) => !next && setDetailId(null)}
+        onOpenChange={(next) => !next && setSheet(null)}
         title={detail?.name ?? "Cliente"}
-        description={detail?.address ?? undefined}
+        description={sheet?.edit ? "Editando cliente y fincas" : undefined}
       >
-        {detail && <ClientDetail client={detail} />}
+        {detail && (
+          <ClientDetail
+            key={`${detail.id}-${sheet?.edit ? "edit" : "view"}`}
+            client={detail}
+            canManage={canManage && (sheet?.edit ?? false)}
+            startEditing={sheet?.edit ?? false}
+          />
+        )}
       </SlideOver>
 
-      <SlideOver
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        title={editing ? "Editar cliente" : "Nuevo cliente"}
-        description={editing?.name}
-      >
+      <SlideOver open={createOpen} onOpenChange={setCreateOpen} title="Nuevo cliente">
         <ClientForm
-          client={editing}
-          onCancel={() => setFormOpen(false)}
+          onCancel={() => setCreateOpen(false)}
           onDone={(msg) => {
             flash(msg);
-            setFormOpen(false);
+            setCreateOpen(false);
           }}
         />
       </SlideOver>

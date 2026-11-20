@@ -505,26 +505,52 @@ export const deliveryPriorityEnum = comercial.enum("delivery_priority", ["urgent
 export const deliveryStatusEnum = comercial.enum("delivery_status", ["pendiente", "entregado"]);
 export const loadSupplierEnum = comercial.enum("load_supplier", ["Finca", "Italcol", "Contegral"]);
 
-/** Customers of the commercial area. Names are stored in title case. */
+/**
+ * Customers of the commercial area. Names keep the casing typed; `nameKey` (see `searchKey`) makes
+ * them unique regardless of case, accents and spaces. Where a client receives goods lives in
+ * `clientLocations` (fincas).
+ */
 export const clients = comercial.table(
   "clients",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: text().notNull(),
+    /** `searchKey(name)`: the unique, case/accent/space-insensitive identity of the name. */
+    nameKey: text("name_key").notNull(),
     /** Digits only (see `normalizeNit`); unique when present. */
     nit: text(),
     phone: text(),
+    notes: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("clients_nit_uq").on(t.nit).where(sql`nit is not null`),
+    uniqueIndex("clients_name_key_uq").on(t.nameKey),
+  ],
+);
+
+/** A place of a client where goods are delivered (a "finca"). Its name is unique per client. */
+export const clientLocations = comercial.table(
+  "client_locations",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    /** `searchKey(name)`; unique together with the client. */
+    nameKey: text("name_key").notNull(),
     address: text(),
     /** The link as pasted from Google Maps. */
     mapsUrl: text("maps_url"),
     /** Parsed from `mapsUrl` when the link carries coordinates; null for short links. */
     latitude: numeric({ precision: 10, scale: 7, mode: "number" }),
     longitude: numeric({ precision: 10, scale: 7, mode: "number" }),
-    notes: text(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("clients_nit_uq").on(t.nit).where(sql`nit is not null`)],
+  (t) => [uniqueIndex("client_locations_client_name_uq").on(t.clientId, t.nameKey)],
 );
 
 /** Editable list of delivery destinations (title case, unique). */
@@ -550,6 +576,8 @@ export const deliveries = comercial.table(
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "restrict" }),
+    /** Optional finca of the client; goes null when the finca is deleted. */
+    locationId: integer("location_id").references(() => clientLocations.id, { onDelete: "set null" }),
     destinationId: integer("destination_id")
       .notNull()
       .references(() => destinations.id, { onDelete: "restrict" }),
@@ -566,6 +594,7 @@ export const deliveries = comercial.table(
   (t) => [
     index("deliveries_date_idx").on(t.date),
     index("deliveries_client_idx").on(t.clientId),
+    index("deliveries_location_idx").on(t.locationId),
     index("deliveries_status_idx").on(t.status),
     check("deliveries_quantity_positive", sql`${t.quantity} > 0`),
     check("deliveries_weight_positive", sql`${t.weightKg} > 0`),

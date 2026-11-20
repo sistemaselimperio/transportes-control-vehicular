@@ -11,6 +11,8 @@ export interface DeliveryValues extends DeliveryInput {
 export interface DeliveryPorts {
   clientExists(id: number): Promise<boolean>;
   destinationExists(id: number): Promise<boolean>;
+  /** The finca exists and belongs to that client. */
+  locationBelongsToClient(locationId: number, clientId: number): Promise<boolean>;
   /** A fleet vehicle that has not been sold, by normalized plate. */
   findVehicleByPlate(plate: string): Promise<{ id: number; plate: string } | null>;
   findDelivery(id: number): Promise<{ plate: string | null; vehicleId: number | null } | null>;
@@ -30,6 +32,9 @@ export function createDeliveryCommands(ports: DeliveryPorts) {
   async function ensureReferences(input: DeliveryInput) {
     if (!(await ports.clientExists(input.clientId))) throw new DeliveryError("El cliente ya no existe.");
     if (!(await ports.destinationExists(input.destinationId))) throw new DeliveryError("El destino ya no existe.");
+    if (input.locationId !== null && !(await ports.locationBelongsToClient(input.locationId, input.clientId))) {
+      throw new DeliveryError("La finca no pertenece al cliente elegido.");
+    }
   }
 
   /** The optional vehicle: blank, a fleet plate, or (on update) the plate the delivery was saved with. */

@@ -1,4 +1,4 @@
-/** Google Maps links of a client: offline coordinate parsing and the links built from it. */
+/** Google Maps links of a client finca: offline coordinate parsing and the links built from it. */
 
 export interface Coordinates {
   latitude: number;
@@ -31,21 +31,34 @@ export function parseMapsCoordinates(url: string): Coordinates | null {
   return toCoordinates(PIN.exec(text)) ?? toCoordinates(QUERY.exec(text)) ?? toCoordinates(VIEWPORT.exec(text));
 }
 
-/** The link to open or share: built from the coordinates when known, else the pasted link, else `null`. */
-export function buildMapsLink(client: {
+/**
+ * The link to open or share, in order: built from the coordinates, the pasted link, a Maps search by
+ * address. `null` when the finca has none of them.
+ */
+export function buildMapsLink(location: {
   latitude: number | null;
   longitude: number | null;
   mapsUrl: string | null;
+  address?: string | null;
 }): string | null {
-  if (client.latitude !== null && client.longitude !== null) {
-    return `https://www.google.com/maps/search/?api=1&query=${client.latitude},${client.longitude}`;
+  if (location.latitude !== null && location.longitude !== null) {
+    return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
   }
-  return client.mapsUrl;
+  if (location.mapsUrl) return location.mapsUrl;
+  const address = location.address?.trim();
+  return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
 }
 
-/** WhatsApp share link with the client's name, address and map link, one per line. */
-export function buildWhatsAppShareUrl(client: { name: string; address: string | null; link: string | null }): string {
-  const text = [client.name, client.address, client.link].filter((part): part is string => Boolean(part)).join("\n");
+/** WhatsApp share link with the client, finca, address and map link, one per line. */
+export function buildWhatsAppShareUrl(location: {
+  clientName: string;
+  locationName: string;
+  address: string | null;
+  link: string | null;
+}): string {
+  const text = [location.clientName, location.locationName, location.address, location.link]
+    .filter((part): part is string => Boolean(part))
+    .join("\n");
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
@@ -57,4 +70,31 @@ export function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export type MapsLinkCheck =
+  | { kind: "empty" }
+  | { kind: "coordinates"; lat: number; lng: number }
+  | { kind: "short" }
+  | { kind: "maps" }
+  | { kind: "invalid" };
+
+const GOOGLE_HOST = /(?:^|\.)google\.[a-z]{2,3}(?:\.[a-z]{2})?$/;
+
+/**
+ * What a pasted link is, for live feedback while typing: coordinates found, a short link (kept as is),
+ * a Google Maps link without coordinates, or something that is not a Maps link. Display only; the
+ * server keeps its own validation.
+ */
+export function classifyMapsLink(url: string): MapsLinkCheck {
+  const text = url.trim();
+  if (text === "") return { kind: "empty" };
+  if (!isHttpUrl(text)) return { kind: "invalid" };
+  const { hostname, pathname } = new URL(text);
+  const host = hostname.toLowerCase();
+  if (host === "maps.app.goo.gl" || (host === "goo.gl" && pathname.startsWith("/maps"))) return { kind: "short" };
+  const isMaps = GOOGLE_HOST.test(host) && (host.startsWith("maps.") || pathname.startsWith("/maps"));
+  if (!isMaps) return { kind: "invalid" };
+  const coordinates = parseMapsCoordinates(text);
+  return coordinates ? { kind: "coordinates", lat: coordinates.latitude, lng: coordinates.longitude } : { kind: "maps" };
 }

@@ -169,6 +169,13 @@
       "when": 1795108172598,
       "tag": "0023_comercial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795200000000,
+      "tag": "0024_client_locations",
+      "breakpoints": true
     }
   ]
 }

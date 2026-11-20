@@ -18,6 +18,15 @@ const idField = (message: string) =>
     .refine((v) => /^\d{1,10}$/.test(v) && Number(v) > 0, message)
     .transform(Number);
 
+/** An optional id coming from a select: blank means none. */
+const optionalIdField = (message: string) =>
+  z
+    .string(message)
+    .default("")
+    .transform((v) => v.trim())
+    .refine((v) => v === "" || (/^\d{1,10}$/.test(v) && Number(v) > 0), message)
+    .transform((v) => (v === "" ? null : Number(v)));
+
 export const deliverySchema = z.object({
   date: dateField("La fecha"),
   shift: z.enum(DELIVERY_SHIFTS, "Elige el turno."),
@@ -27,6 +36,8 @@ export const deliverySchema = z.object({
     .transform((v) => (v === "" ? "normal" : v))
     .pipe(z.enum(DELIVERY_PRIORITIES, "Elige la prioridad.")),
   clientId: idField("Elige el cliente."),
+  /** Finca of the client where the delivery goes; checked against the client by the command. */
+  locationId: optionalIdField("La finca no es válida."),
   destinationId: idField("Elige el destino."),
   quantity: z
     .string()

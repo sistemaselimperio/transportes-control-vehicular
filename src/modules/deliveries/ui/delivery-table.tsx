@@ -88,6 +88,7 @@ export function DeliveryTable({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-medium">{r.clientName}</p>
+                {r.locationName && <p className="text-sm text-muted-foreground">Finca {r.locationName}</p>}
                 <p className="text-sm text-muted-foreground">
                   {r.destinationName} · {r.shift}
                 </p>
@@ -140,6 +141,7 @@ export function DeliveryTable({
                   <td className="px-4 py-3 whitespace-nowrap">{r.shift}</td>
                   <td className="px-4 py-3">
                     <span className="font-medium">{r.clientName}</span>
+                    {r.locationName && <span className="block text-xs text-muted-foreground">Finca {r.locationName}</span>}
                     {r.clientNit && <span className="num block text-xs text-muted-foreground">{formatNit(r.clientNit)}</span>}
                     {r.notes && (
                       <span className="block max-w-64 truncate text-xs text-muted-foreground" title={r.notes}>

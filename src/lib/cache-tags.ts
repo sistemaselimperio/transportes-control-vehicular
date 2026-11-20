@@ -100,7 +100,7 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   tripRows: [trips, fleet],
   /** Latest trips of one vehicle; same dependencies as `tripRows`. */
   vehicleTrips: [trips, fleet],
-  /** Each client row carries its number of deliveries. */
+  /** Each client row carries its fincas and its number of deliveries. */
   clientRows: [clients, deliveries],
   /** Rows show the client and destination names; deleting a vehicle unlinks its deliveries. */
   deliveryRows: [deliveries, clients, destinations, fleet],

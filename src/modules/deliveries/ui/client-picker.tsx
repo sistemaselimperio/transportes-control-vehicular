@@ -11,6 +11,8 @@ export interface ClientOption {
   id: number;
   name: string;
   nit: string | null;
+  /** Fincas of the client, for the optional finca select of the form. */
+  locations: ReadonlyArray<{ id: number; name: string }>;
 }
 
 const MAX_OPTIONS = 8;
@@ -23,11 +25,14 @@ export function ClientPicker({
   id,
   clients,
   defaultClientId,
+  onChange,
   className,
 }: {
   id: string;
   clients: readonly ClientOption[];
   defaultClientId?: number;
+  /** Called with the chosen client, or null when the choice is cleared or being retyped. */
+  onChange?: (clientId: number | null) => void;
   className?: string;
 }) {
   const listId = useId();
@@ -47,12 +52,14 @@ export function ClientPicker({
     setSelected(option);
     setQuery(option.name);
     setOpen(false);
+    onChange?.(option.id);
   }
 
   function clear() {
     setSelected(null);
     setQuery("");
     setActive(0);
+    onChange?.(null);
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -92,6 +99,7 @@ export function ClientPicker({
         onChange={(e) => {
           setQuery(e.target.value);
           setSelected(null);
+          onChange?.(null);
           setActive(0);
           setOpen(true);
         }}

@@ -114,6 +114,7 @@ export function DeliveryToday({
                     <div className="min-w-0 space-y-1">
                       <p className={cn("font-medium", r.status === "entregado" && "line-through")}>{r.clientName}</p>
                       <p className="text-sm text-muted-foreground">
+                        {r.locationName && <>Finca {r.locationName} · </>}
                         {r.destinationName}
                         {r.clientNit && <span className="num"> · {formatNit(r.clientNit)}</span>}
                       </p>

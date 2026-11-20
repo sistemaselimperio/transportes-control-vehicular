@@ -31,6 +31,9 @@ export interface DeliveryRow {
   clientId: number;
   clientName: string;
   clientNit: string | null;
+  /** Finca of the client the delivery goes to; null when none was chosen or it was deleted. */
+  locationId: number | null;
+  locationName: string | null;
   destinationId: number;
   destinationName: string;
   /** Bags (bultos). */

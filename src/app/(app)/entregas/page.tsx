@@ -27,7 +27,12 @@ export default async function Page({
   return (
     <DeliveriesView
       rows={rows}
-      clients={clients.map(({ id, name, nit }) => ({ id, name, nit }))}
+      clients={clients.map(({ id, name, nit, locations }) => ({
+        id,
+        name,
+        nit,
+        locations: locations.map((l) => ({ id: l.id, name: l.name })),
+      }))}
       destinations={destinations}
       plates={plates}
       alerts={computeClientAlerts(lastDeliveries, today)}
