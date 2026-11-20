@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export const extractedExpenseSchema = z.object({
-  /** Short description of the purchase or service. */
+  /** Names of every item or service on the invoice, comma-separated. */
   detail: z.string(),
   invoiceNumber: z.string().nullable(),
   /** NIT of the issuing supplier, without the verification digit. */
@@ -62,7 +62,7 @@ export const EXTRACTION_PROMPT = `Eres un asistente de contabilidad para una emp
 Reglas:
 - Un gasto por factura o recibo. Una factura puede ocupar varias hojas del PDF y una hoja puede traer varias facturas pequeñas. En "pages" pon las hojas (empezando en 1) donde está cada factura; en una foto usa [1].
 - Los soportes son variados: facturas electrónicas impresas, talonarios escritos a mano, pólizas de SOAT, guías de mensajería, tiquetes de peaje o combustible.
-- "detail": descripción corta de la compra o servicio (por ejemplo "Filtro de aceite", "SOAT", "Envío de documentos").
+- "detail": los nombres de TODOS los ítems o servicios de la factura, separados por comas, en el orden en que aparecen (por ejemplo "Filtro de aceite, Aceite 15W40, Mano de obra"). Escribe cada ítem con su nombre corto, sin cantidades, códigos ni precios. No resumas varios ítems en una categoría ("Repuestos", "Varios", "Compra de repuestos") ni pongas solo el primero: lista cada uno. Si la factura tiene un solo ítem, escribe solo ese nombre (por ejemplo "SOAT", "Envío de documentos"). Máximo 200 caracteres en total.
 - "supplierNit" y "supplierName": el NIT y el nombre de quien EMITE la factura (el proveedor). Escribe el NIT solo con dígitos y SIN el dígito de verificación (el que va después del guion, por ejemplo 900123456-7 se escribe 900123456).
 - "billedTo": a quién se le factura, el campo "Señor(es)", "Cliente", "Adquiriente" o "Tomador". La empresa SIEMPRE debe ser uno de los propietarios de la lista: pon su "ownerId" y su nombre exacto de la lista. La letra a mano puede estar mal escrita ("Fabion Pae7" es FABIAN PAEZ): usa la lista para acertar. Si no corresponde claramente a ninguno, pon "ownerId": null; nunca inventes una empresa que no esté en la lista.
 - "vehiclePlate": la placa o código del vehículo si aparece (a mano o impresa). Si coincide con un vehículo de la lista, pon su "vehicleId" ("TRNO84" es TRN-084). Si no hay vehículo, null.
