@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMapsEmbedUrl, buildMapsLink, buildWhatsAppShareUrl, classifyMapsLink, isHttpUrl, parseMapsCoordinates } from "./maps-link";
+import { buildDirectionsLink, buildMapsEmbedUrl, buildMapsLink, buildWhatsAppShareUrl, classifyMapsLink, isHttpUrl, parseMapsCoordinates } from "./maps-link";
 
 describe("parseMapsCoordinates", () => {
   it("reads the viewport after @", () => {
@@ -153,3 +153,26 @@ describe("buildMapsEmbedUrl", () => {
   });
 });
 
+describe("buildDirectionsLink", () => {
+  it("routes from wherever the driver is to the finca coordinates", () => {
+    expect(buildDirectionsLink({ latitude: 5.5353, longitude: -73.3678, mapsUrl: "https://maps.app.goo.gl/x" })).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=5.5353,-73.3678&travelmode=driving",
+    );
+  });
+
+  it("keeps the pasted link when there are no coordinates: its pin is more precise than the address", () => {
+    expect(buildDirectionsLink({ latitude: null, longitude: null, mapsUrl: "https://maps.app.goo.gl/x", address: "Vereda La Y" })).toBe(
+      "https://maps.app.goo.gl/x",
+    );
+  });
+
+  it("routes to the address when it is all the finca has", () => {
+    expect(buildDirectionsLink({ latitude: null, longitude: null, mapsUrl: null, address: "Vereda La Y, Susa" })).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=Vereda%20La%20Y%2C%20Susa&travelmode=driving",
+    );
+  });
+
+  it("gives nothing when the finca has no location", () => {
+    expect(buildDirectionsLink({ latitude: null, longitude: null, mapsUrl: null, address: null })).toBeNull();
+  });
+});

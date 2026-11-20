@@ -10,7 +10,7 @@ import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dial
 import { deleteLocationAction, updateClientAction } from "../application/client-actions";
 import type { ClientLocationRow } from "../domain/client-location";
 import { missingLocationCount, type ClientRow } from "../domain/client-row";
-import { buildMapsLink, buildWhatsAppShareUrl } from "../domain/maps-link";
+import { buildDirectionsLink, buildMapsLink, buildWhatsAppShareUrl } from "../domain/maps-link";
 import { ClientFields } from "./client-fields";
 import { InlineForm } from "./inline-form";
 import { LocationForm } from "./location-form";
@@ -120,13 +120,15 @@ function LocationItem({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const editRef = useRef<HTMLButtonElement>(null);
   const link = buildMapsLink(location);
+  // What the driver gets (WhatsApp or a copied link): the route from wherever the phone is.
+  const routeLink = buildDirectionsLink(location);
   useReturnFocus(editing, editRef);
   useEffect(() => () => clearTimeout(timer.current), []);
 
   async function copyLink() {
-    if (!link) return;
+    if (!routeLink) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(routeLink);
       setCopied("done");
     } catch {
       setCopied("failed");
@@ -172,7 +174,7 @@ function LocationItem({
                 clientName: client.name,
                 locationName: location.name,
                 address: location.address,
-                link,
+                link: routeLink,
               })}
               target="_blank"
               rel="noopener noreferrer"
@@ -243,7 +245,7 @@ function LocationItem({
         {copied === "done" && "Link copiado."}
         {copied === "failed" && "No se pudo copiar. Mantén presionado el link para copiarlo."}
       </p>
-      {copied === "failed" && link && <p className="text-xs break-all text-muted-foreground">{link}</p>}
+      {copied === "failed" && routeLink && <p className="text-xs break-all text-muted-foreground">{routeLink}</p>}
     </li>
   );
 }

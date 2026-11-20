@@ -49,6 +49,28 @@ export function buildMapsLink(location: {
   return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
 }
 
+const directions = (destination: string) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+
+/**
+ * The link shared with the driver: it opens Maps with the route from wherever the phone is (no origin
+ * means "current location"). Order: route to the coordinates, the pasted link (its pin beats a rural
+ * address), route to the address. `null` when the finca has none of them.
+ */
+export function buildDirectionsLink(location: {
+  latitude: number | null;
+  longitude: number | null;
+  mapsUrl: string | null;
+  address?: string | null;
+}): string | null {
+  if (location.latitude !== null && location.longitude !== null) {
+    return directions(`${location.latitude},${location.longitude}`);
+  }
+  if (location.mapsUrl) return location.mapsUrl;
+  const address = location.address?.trim();
+  return address ? directions(encodeURIComponent(address)) : null;
+}
+
 /**
  * A map of the coordinates that can be shown in an iframe. Regular Maps pages refuse to be framed
  * (X-Frame-Options: SAMEORIGIN); this keyless `output=embed` URL redirects to the embeddable page.
