@@ -52,6 +52,17 @@ function NameButton({ row, onOpen }: { row: ClientRow; onOpen: (row: ClientRow) 
   );
 }
 
+/**
+ * Click anywhere on a row (card or table row) to open the client; clicks on its own buttons keep
+ * their action. The name stays a real button, so keyboard and screen reader users open it there.
+ */
+function openOnRowClick(row: ClientRow, onOpen: (row: ClientRow) => void) {
+  return (e: React.MouseEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+    onOpen(row);
+  };
+}
+
 /** "2 fincas · 1 sin ubicación", with the missing part in the warn tone. */
 function LocationsSummary({ row }: { row: ClientRow }) {
   const total = row.locations.length;
@@ -98,7 +109,11 @@ export function ClientList({
     <>
       <ul className="grid gap-3 md:hidden">
         {rows.map((r) => (
-          <li key={r.id} className="space-y-1.5 rounded-2xl border bg-card p-4">
+          <li
+            key={r.id}
+            onClick={openOnRowClick(r, onOpen)}
+            className="cursor-pointer space-y-1.5 rounded-2xl border bg-card p-4 transition-colors duration-150 hover:bg-muted/50 active:bg-muted motion-reduce:transition-none"
+          >
             <div className="flex items-start justify-between gap-2">
               <NameButton row={r} onOpen={onOpen} />
               {canManage && (
@@ -138,7 +153,11 @@ export function ClientList({
             </thead>
             <tbody className="divide-y">
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/50">
+                <tr
+                  key={r.id}
+                  onClick={openOnRowClick(r, onOpen)}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 motion-reduce:transition-none"
+                >
                   <td className="px-4 py-3">
                     <NameButton row={r} onOpen={onOpen} />
                   </td>
