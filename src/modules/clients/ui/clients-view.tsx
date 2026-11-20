@@ -8,6 +8,7 @@ import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatNit } from "@/modules/petty-cash/domain/nit";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { deleteClientAction } from "../application/client-actions";
 import { filterClientList, missingLocationCount, type ClientRow } from "../domain/client-row";
@@ -16,6 +17,19 @@ import { ClientForm } from "./client-form";
 import { ClientList } from "./client-list";
 
 /** Clients page: search and filter, the list, the client sheet (data and fincas in place), the create sheet and the delete confirmation. */
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** The sheet's subline: what identifies the client and how much it is used, instead of the mode it is in. */
+function clientSummary(client: ClientRow): string {
+  return [
+    client.nit ? `NIT ${formatNit(client.nit)}` : null,
+    plural(client.locations.length, "finca", "fincas"),
+    plural(client.deliveryCount, "entrega", "entregas"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; canManage: boolean }) {
   const [query, setQuery] = useState("");
   const [missingOnly, setMissingOnly] = useState(false);
@@ -106,7 +120,7 @@ export function ClientsView({ rows, canManage }: { rows: readonly ClientRow[]; c
         open={detail !== undefined}
         onOpenChange={(next) => !next && setSheet(null)}
         title={detail?.name ?? "Cliente"}
-        description={sheet?.edit ? "Editando cliente y fincas" : undefined}
+        description={detail && clientSummary(detail)}
       >
         {detail && (
           <ClientDetail

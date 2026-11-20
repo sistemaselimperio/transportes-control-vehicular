@@ -35,7 +35,7 @@ export function ClientFields({
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="NIT" htmlFor={`${id}-nit`} hint="Opcional">
+        <Field label="NIT" htmlFor={`${id}-nit`}>
           <Input
             id={`${id}-nit`}
             name="nit"
@@ -45,7 +45,7 @@ export function ClientFields({
             autoComplete="off"
           />
         </Field>
-        <Field label="Teléfono" htmlFor={`${id}-phone`} hint="Opcional">
+        <Field label="Teléfono" htmlFor={`${id}-phone`}>
           <Input
             id={`${id}-phone`}
             name="phone"
@@ -56,7 +56,7 @@ export function ClientFields({
           />
         </Field>
       </div>
-      <Field label="Notas" htmlFor={`${id}-notes`} hint="Opcional">
+      <Field label="Notas" htmlFor={`${id}-notes`}>
         <Textarea id={`${id}-notes`} name="notes" rows={3} maxLength={500} defaultValue={client?.notes ?? ""} />
       </Field>
     </>

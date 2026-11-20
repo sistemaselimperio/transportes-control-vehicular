@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, ExternalLink, MapPin, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, Copy, MapPin, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useFlashMessage } from "@/components/app/flash-message";
 import { StatusMark } from "@/components/app/status-mark";
@@ -61,10 +61,10 @@ function DataSection({
   }, [editing]);
 
   return (
-    <section aria-labelledby={`client-${client.id}-data`} className="space-y-2">
+    <section aria-labelledby={`client-${client.id}-data`} className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 id={`client-${client.id}-data`} className="micro-label">
-          Datos
+        <h3 id={`client-${client.id}-data`} className="text-base font-semibold">
+          Datos del cliente
         </h3>
         {canManage && !editing && (
           <Button ref={editRef} variant="outline" className="h-11 px-4 md:h-9" onClick={() => setEditing(true)}>
@@ -143,7 +143,7 @@ function LocationItem({
   if (editing) {
     return (
       <li className="space-y-3 rounded-xl border bg-card p-3">
-        <p className="text-sm font-medium break-words">Editar finca {location.name}</p>
+        <p className="text-[15px] font-semibold break-words">Editar finca {location.name}</p>
         <LocationForm
           clientId={client.id}
           location={location}
@@ -157,68 +157,21 @@ function LocationItem({
     );
   }
 
+  const action = "h-11 justify-center px-2 md:h-9";
   return (
-    <li className="space-y-2.5 rounded-xl border bg-card p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium break-words">{location.name}</p>
-          <p className="text-sm break-words text-muted-foreground">{location.address ?? "Sin dirección"}</p>
+    <li className="rounded-xl border bg-card">
+      <div className="flex items-start gap-2 p-3 pb-0">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="text-[15px] leading-snug font-semibold break-words">{location.name}</p>
+          <p className={cn("text-sm break-words", location.address ? "text-foreground/80" : "text-muted-foreground")}>
+            {location.address ?? "Sin dirección"}
+          </p>
+          <StatusMark status={link ? "ok" : "warning"} className="pt-1">
+            {link ? "Lista para enviar" : "Sin ubicación"}
+          </StatusMark>
         </div>
-        <StatusMark status={link ? "ok" : "warning"} className="mt-0.5">
-          {link ? "Lista" : "Sin ubicación"}
-        </StatusMark>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {link ? (
-          <>
-            <a
-              href={buildWhatsAppShareUrl({
-                clientName: client.name,
-                locationName: location.name,
-                address: location.address,
-                link: routeLink,
-              })}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Compartir finca ${location.name} por WhatsApp`}
-              className={buttonVariants({ className: "h-11 px-3 md:h-9" })}
-            >
-              <MessageCircle aria-hidden />
-              WhatsApp
-            </a>
-            <a
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Abrir finca ${location.name} en Maps`}
-              className={buttonVariants({ variant: "outline", className: "h-11 px-3 md:h-9" })}
-            >
-              <MapPin aria-hidden />
-              Maps
-              <ExternalLink className="size-3.5" aria-hidden />
-            </a>
-            <Button
-              variant="outline"
-              className={cn("h-11 px-3 md:h-9", copied === "done" && "border-ok bg-ok text-ok-foreground hover:bg-ok hover:text-ok-foreground")}
-              aria-label={`Copiar link de la finca ${location.name}`}
-              onClick={copyLink}
-            >
-              {copied === "done" ? <Check aria-hidden /> : <Copy aria-hidden />}
-              {copied === "done" ? "¡Copiado!" : "Copiar"}
-            </Button>
-          </>
-        ) : (
-          canManage && (
-            <Button variant="outline" className="h-11 px-3 md:h-9" onClick={onEdit}>
-              <MapPin aria-hidden />
-              Agregar ubicación
-              <span className="sr-only"> a la finca {location.name}</span>
-            </Button>
-          )
-        )}
         {canManage && (
-          <div className="ml-auto flex shrink-0 items-center">
+          <div className="-mt-1.5 -mr-1.5 flex shrink-0 items-center">
             <Button
               ref={editRef}
               variant="ghost"
@@ -244,12 +197,62 @@ function LocationItem({
         )}
       </div>
 
+      <div className="p-3">
+        {link ? (
+          // Three equal actions: the row ends on both edges of the card at every width.
+          <div className="grid grid-cols-3 gap-2">
+            <a
+              href={buildWhatsAppShareUrl({
+                clientName: client.name,
+                locationName: location.name,
+                address: location.address,
+                link: routeLink,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Enviar la ruta a la finca ${location.name} por WhatsApp`}
+              className={buttonVariants({ className: action })}
+            >
+              <MessageCircle aria-hidden />
+              WhatsApp
+            </a>
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Abrir finca ${location.name} en Maps (pestaña nueva)`}
+              className={buttonVariants({ variant: "outline", className: action })}
+            >
+              <MapPin aria-hidden />
+              Maps
+            </a>
+            <Button
+              variant="outline"
+              className={cn(action, copied === "done" && "border-ok bg-ok text-ok-foreground hover:bg-ok hover:text-ok-foreground")}
+              aria-label={`Copiar la ruta a la finca ${location.name}`}
+              onClick={copyLink}
+            >
+              {copied === "done" ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied === "done" ? "¡Copiado!" : "Copiar"}
+            </Button>
+          </div>
+        ) : canManage ? (
+          <Button variant="outline" className="h-11 w-full md:h-9" onClick={onEdit}>
+            <MapPin aria-hidden />
+            Agregar ubicación
+            <span className="sr-only"> a la finca {location.name}</span>
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground">Falta la ubicación para enviarla al conductor.</p>
+        )}
+      </div>
+
       {/* The button itself shows a successful copy; this line only announces it to screen readers. */}
-      <p role="status" aria-live="polite" className={cn("text-sm text-muted-foreground empty:hidden", copied === "done" && "sr-only")}>
+      <p role="status" aria-live="polite" className={cn("px-3 pb-3 text-sm text-muted-foreground empty:hidden", copied === "done" && "sr-only")}>
         {copied === "done" && "Link copiado."}
         {copied === "failed" && "No se pudo copiar. Mantén presionado el link para copiarlo."}
       </p>
-      {copied === "failed" && routeLink && <p className="text-xs break-all text-muted-foreground">{routeLink}</p>}
+      {copied === "failed" && routeLink && <p className="-mt-2 px-3 pb-3 text-xs break-all text-muted-foreground">{routeLink}</p>}
     </li>
   );
 }
@@ -272,11 +275,12 @@ function LocationsSection({
   const missing = missingLocationCount(client);
 
   return (
-    <section aria-labelledby={`client-${client.id}-locations`} className="space-y-3">
+    <section aria-labelledby={`client-${client.id}-locations`} className="space-y-3 border-t pt-6">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={`client-${client.id}-locations`} className="micro-label">
-            Fincas ({client.locations.length})
+          <h3 id={`client-${client.id}-locations`} className="flex items-baseline gap-2 text-base font-semibold">
+            Fincas
+            <span className="num text-sm font-normal text-muted-foreground">{client.locations.length}</span>
           </h3>
           {missing > 0 && <p className="text-sm font-medium text-warn-foreground">{missing} sin ubicación</p>}
         </div>
@@ -300,7 +304,7 @@ function LocationsSection({
         <ul className="space-y-3">
           {editor === "new" && (
             <li className="space-y-3 rounded-xl border bg-card p-3">
-              <p className="text-sm font-medium">Nueva finca</p>
+              <p className="text-[15px] font-semibold">Nueva finca</p>
               <LocationForm
                 clientId={client.id}
                 onCancel={() => setEditor(null)}
