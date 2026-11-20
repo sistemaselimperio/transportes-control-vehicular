@@ -343,6 +343,25 @@ body:has([data-theme="orange"]) {
       animation: none;
     }
   }
+  /* <details> that slides open and closed. Browsers without ::details-content just snap. */
+  .smooth-details {
+    interpolate-size: allow-keywords;
+  }
+  .smooth-details::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size 220ms cubic-bezier(0.2, 0, 0, 1),
+      content-visibility 220ms allow-discrete;
+  }
+  .smooth-details[open]::details-content {
+    block-size: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .smooth-details::details-content {
+      transition: none;
+    }
+  }
 }
 
 /* Printed pages (e.g. a saved inspection): modest margins; the app chrome hides itself with `print:`. */
