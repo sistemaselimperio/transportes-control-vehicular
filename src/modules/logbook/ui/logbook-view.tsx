@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, ChevronLeft, ChevronRight, Plus, Search, Trash2, Truck, X } from "lucide-react";
+import { Camera, CalendarRange, ChevronLeft, ChevronRight, Plus, Search, Trash2, Truck, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -36,6 +36,7 @@ import { LogbookBulkDelete } from "./logbook-bulk-delete";
 import { FuelForm, ServiceForm, TireForm } from "./logbook-forms";
 import { FuelList, OilList, ServiceList, TireList } from "./logbook-lists";
 import { NoticeToast, useNotice } from "./notice";
+import { LogbookPhotoImportFlow } from "./logbook-photo-import";
 import { OilCreateFlow, OilEditForm } from "./oil-forms";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -110,6 +111,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [photoImport, setPhotoImport] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [notice, notify] = useNotice();
 
@@ -231,6 +233,7 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
   const closeForm = () => {
     setCreating(false);
     setDeletingAll(false);
+    setPhotoImport(false);
     setEditing(null);
   };
   const done = (message: string) => {
@@ -261,6 +264,12 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
               >
                 <Trash2 aria-hidden />
                 Eliminar registros
+              </Button>
+            )}
+            {tab === "servicios" && (
+              <Button type="button" variant="outline" className="h-11 px-4 md:h-9" onClick={() => setPhotoImport(true)}>
+                <Camera aria-hidden />
+                Importar desde foto
               </Button>
             )}
             <Button type="button" className="h-11 px-4 md:h-9" onClick={() => setCreating(true)}>
@@ -498,10 +507,16 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
       <NoticeToast notice={notice} />
 
       <SlideOver
-        open={creating || deletingAll || editing !== null}
+        open={creating || deletingAll || photoImport || editing !== null}
         onOpenChange={(open) => !open && closeForm()}
         title={
-          deletingAll ? "Eliminar registros" : editing ? NEW_LABELS[editing.tab].edit : labels.create
+          deletingAll
+            ? "Eliminar registros"
+            : photoImport
+              ? "Importar mantenimientos desde foto"
+              : editing
+                ? NEW_LABELS[editing.tab].edit
+                : labels.create
         }
         description={deletingAll ? (selectedPlate ?? undefined) : editing?.row.plate}
       >
@@ -513,6 +528,16 @@ export function LogbookView({ page, tab, query }: { page: LogbookPage; tab: Logb
             to={query.to ?? ""}
             count={bulkCount}
             scopeText={bulkScope}
+            onDone={done}
+            onCancel={closeForm}
+          />
+        )}
+        {photoImport && (
+          <LogbookPhotoImportFlow
+            today={today}
+            plates={plates}
+            providers={providers}
+            defaultPlate={selectedPlate ?? ""}
             onDone={done}
             onCancel={closeForm}
           />
