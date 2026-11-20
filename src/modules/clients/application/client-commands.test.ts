@@ -129,11 +129,39 @@ function locationPorts(over: Partial<LocationPorts> = {}): LocationPorts {
     insertLocation: vi.fn(async () => undefined),
     updateLocation: vi.fn(async () => true),
     deleteLocation: vi.fn(async () => true),
+    expandMapsLink: vi.fn(async () => null),
     ...over,
   };
 }
 
 describe("locations", () => {
+  it("takes the coordinates of a short Maps link from the link it expands to", async () => {
+    const short = "https://maps.app.goo.gl/AbC123";
+    const p = locationPorts({
+      expandMapsLink: vi.fn(async () => "https://www.google.com/maps/place/Finca/@5.5353,-73.3678,17z/data=!3m1"),
+    });
+    await createLocationCommands(p).create(4, location({ mapsUrl: short }));
+    expect(p.expandMapsLink).toHaveBeenCalledWith(short);
+    expect(p.insertLocation).toHaveBeenCalledWith(4, location({ mapsUrl: short, latitude: 5.5353, longitude: -73.3678 }));
+  });
+
+  it("keeps a short link without coordinates when it cannot be expanded or holds none", async () => {
+    const short = "https://maps.app.goo.gl/AbC123";
+    const failed = locationPorts();
+    await createLocationCommands(failed).update(8, location({ mapsUrl: short }));
+    expect(failed.updateLocation).toHaveBeenCalledWith(8, location({ mapsUrl: short }));
+    const noPin = locationPorts({ expandMapsLink: vi.fn(async () => "https://www.google.com/maps?q=Finca+La+Y") });
+    await createLocationCommands(noPin).create(4, location({ mapsUrl: short }));
+    expect(noPin.insertLocation).toHaveBeenCalledWith(4, location({ mapsUrl: short }));
+  });
+
+  it("only expands short links that still have no coordinates", async () => {
+    const p = locationPorts();
+    await createLocationCommands(p).create(4, location({ mapsUrl: "https://www.google.com/maps/@5.5,-73.3,15z", latitude: 5.5, longitude: -73.3 }));
+    await createLocationCommands(p).create(4, location({ mapsUrl: "https://example.com/finca" }));
+    expect(p.expandMapsLink).not.toHaveBeenCalled();
+  });
+
   it("adds a finca to a client", async () => {
     const p = locationPorts();
     await createLocationCommands(p).create(4, location());

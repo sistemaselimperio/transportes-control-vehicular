@@ -1,3 +1,4 @@
+import { isShortMapsLink, parseMapsCoordinates } from "../domain/maps-link";
 import type { ClientInput, LocationInput } from "./client-schemas";
 
 /** A rule of the clients refused the operation; the message is for the user. */
@@ -62,6 +63,8 @@ export interface LocationPorts {
   updateLocation(id: number, values: LocationInput): Promise<boolean>;
   /** False when no finca has that id. Deliveries that used it keep existing without a finca. */
   deleteLocation(id: number): Promise<boolean>;
+  /** The URL a short Maps link redirects to; null when it cannot be expanded. Never throws. */
+  expandMapsLink(url: string): Promise<string | null>;
 }
 
 const LOCATION_GONE = "La finca ya no existe.";
@@ -74,18 +77,26 @@ export function createLocationCommands(ports: LocationPorts) {
     }
   }
 
+  /** A short link carries no coordinates: they are read from the link it expands to, when it has them. */
+  async function withCoordinates(input: LocationInput): Promise<LocationInput> {
+    if (input.latitude !== null || !input.mapsUrl || !isShortMapsLink(input.mapsUrl)) return input;
+    const expanded = await ports.expandMapsLink(input.mapsUrl);
+    const coordinates = expanded ? parseMapsCoordinates(expanded) : null;
+    return coordinates ? { ...input, ...coordinates } : input;
+  }
+
   return {
     async create(clientId: number, input: LocationInput) {
       if (!(await ports.clientExists(clientId))) throw new ClientError(GONE);
       await ensureUniqueName(clientId, input);
-      await ports.insertLocation(clientId, input);
+      await ports.insertLocation(clientId, await withCoordinates(input));
     },
 
     async update(id: number, input: LocationInput) {
       const clientId = await ports.findLocationClientId(id);
       if (clientId === null) throw new ClientError(LOCATION_GONE);
       await ensureUniqueName(clientId, input, id);
-      if (!(await ports.updateLocation(id, input))) throw new ClientError(LOCATION_GONE);
+      if (!(await ports.updateLocation(id, await withCoordinates(input)))) throw new ClientError(LOCATION_GONE);
     },
 
     async remove(id: number) {

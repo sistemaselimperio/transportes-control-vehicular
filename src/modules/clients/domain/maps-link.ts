@@ -71,6 +71,11 @@ export function buildDirectionsLink(location: {
   return address ? directions(encodeURIComponent(address)) : null;
 }
 
+/** A maps.app.goo.gl / goo.gl/maps link: it holds no coordinates until expanded. */
+export function isShortMapsLink(url: string): boolean {
+  return classifyMapsLink(url).kind === "short";
+}
+
 /**
  * A map of the coordinates that can be shown in an iframe. Regular Maps pages refuse to be framed
  * (X-Frame-Options: SAMEORIGIN); this keyless `output=embed` URL redirects to the embeddable page.

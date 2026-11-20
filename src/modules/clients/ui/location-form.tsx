@@ -53,6 +53,14 @@ export function LocationForm({
   const check = classifyMapsLink(mapsUrl);
   const feedback = describeLink(check);
   const canTest = check.kind !== "empty" && check.kind !== "invalid";
+  // A short link has no coordinates of its own; the saved finca may have them from when it was expanded.
+  const saved =
+    location && location.latitude !== null && location.longitude !== null && location.mapsUrl === mapsUrl.trim()
+      ? { latitude: location.latitude, longitude: location.longitude }
+      : null;
+  const preview =
+    check.kind === "coordinates" ? { latitude: check.lat, longitude: check.lng } : check.kind === "short" ? saved : null;
+
   // Wait a frame so the sheet's own focus handling does not take focus back.
   useEffect(() => {
     const frame = requestAnimationFrame(() => nameRef.current?.focus());
@@ -130,15 +138,15 @@ export function LocationForm({
             </span>
           )}
         </p>
-        {/* Only links with coordinates can be previewed: Maps pages refuse to load inside an iframe. */}
-        {check.kind === "coordinates" && (
+        {/* Only coordinates can be previewed: Maps pages refuse to load inside an iframe. */}
+        {preview && (
           // Google draws an "Abrir en Maps" card in the top-left corner that cannot be styled from here
           // (cross-origin), so the frame is taller than the box and pulled up to crop it out.
           <div className="mt-2 h-56 w-full overflow-hidden rounded-md border">
             <iframe
-              key={`${check.lat},${check.lng}`}
+              key={`${preview.latitude},${preview.longitude}`}
               title="Vista previa del mapa de la finca"
-              src={buildMapsEmbedUrl({ latitude: check.lat, longitude: check.lng })}
+              src={buildMapsEmbedUrl(preview)}
               className="-mt-16 h-[calc(100%+4rem)] w-full"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"

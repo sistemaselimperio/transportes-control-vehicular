@@ -4,6 +4,7 @@ import type { ClientPorts, LocationPorts } from "../application/client-commands"
 import type { ClientInput, LocationInput } from "../application/client-schemas";
 import type { ClientLocationRow } from "../domain/client-location";
 import type { ClientRow } from "../domain/client-row";
+import { expandMapsLink } from "./maps-link-expander";
 
 /** Every client with its fincas and how many deliveries it has, by name. */
 export async function loadClientRows(): Promise<ClientRow[]> {
@@ -157,4 +158,6 @@ export const locationRepository: LocationPorts = {
       .returning({ id: schema.clientLocations.id });
     return rows.length === 1;
   },
+
+  expandMapsLink,
 };
