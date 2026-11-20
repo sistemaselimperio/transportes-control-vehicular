@@ -24,7 +24,7 @@ export interface DeliveryFormOptions {
   plates: readonly string[];
 }
 
-/** The controls of a delivery, shared by the inline "Registrar" form and the edit sheet. */
+/** The controls of a delivery, shared by the "Registrar entrega" sheet and the edit sheet. */
 function DeliveryFields({
   idPrefix,
   options,
@@ -32,6 +32,7 @@ function DeliveryFields({
   date,
   onDateChange,
   defaultShift,
+  defaultPlate,
 }: {
   idPrefix: string;
   options: DeliveryFormOptions;
@@ -39,6 +40,7 @@ function DeliveryFields({
   date: string;
   onDateChange: (date: string) => void;
   defaultShift?: string;
+  defaultPlate?: string;
 }) {
   const [weight, setWeight] = useState(delivery ? String(delivery.weightKg) : "");
   const [clientId, setClientId] = useState<number | null>(delivery?.clientId ?? null);
@@ -159,9 +161,11 @@ function DeliveryFields({
           />
         </Field>
       </div>
-      <Field label="Vehículo" htmlFor={`${idPrefix}-plate`} hint="Opcional">
-        <NativeSelect id={`${idPrefix}-plate`} name="plate" defaultValue={delivery?.plate ?? ""}>
-          <option value="">Sin vehículo</option>
+      <Field label="Vehículo" htmlFor={`${idPrefix}-plate`} required>
+        <NativeSelect id={`${idPrefix}-plate`} name="plate" defaultValue={delivery?.plate ?? defaultPlate ?? ""} required>
+          <option value="" disabled>
+            Elige un vehículo
+          </option>
           {plateOptions.map((p) => (
             <option key={p} value={p}>
               {p}
@@ -176,59 +180,90 @@ function DeliveryFields({
   );
 }
 
-/** The "Registrar" tab form: sits in the page, and starts over after each saved delivery. */
-export function DeliveryInlineForm({
+/**
+ * The "Registrar entrega" sheet form. "Registrar" saves and closes the sheet; "Registrar y otra" saves,
+ * starts the form over keeping the date, trip and vehicle, and stays open.
+ */
+export function DeliveryCreateForm({
   options,
-  date,
-  onDateChange,
+  today,
   onDone,
+  onClose,
 }: {
   options: DeliveryFormOptions;
-  /** The day being registered; the page lists that day's deliveries beside the form. */
-  date: string;
-  onDateChange: (date: string) => void;
+  /** Colombia's current day: the date the form starts on. */
+  today: string;
   onDone: (message: string) => void;
+  onClose: () => void;
 }) {
   const [formKey, setFormKey] = useState(0);
+  const [date, setDate] = useState(today);
   const [lastShift, setLastShift] = useState<string | undefined>();
+  const [lastPlate, setLastPlate] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [pendingMode, setPendingMode] = useState<"close" | "another" | null>(null);
   const [pending, startTransition] = useTransition();
 
   return (
     <form
       key={formKey}
-      data-slot="inline-delivery-form"
-      className="panel"
+      data-slot="action-form"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(e) => {
         e.preventDefault();
+        const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+        const mode = submitter?.value === "another" ? "another" : "close";
         const fd = new FormData(e.currentTarget);
         setError(null);
+        setPendingMode(mode);
         startTransition(async () => {
           const result = await createDeliveryAction(fd);
           if (result.ok) {
-            const shift = fd.get("shift");
-            setLastShift(typeof shift === "string" ? shift : undefined);
-            setFormKey((k) => k + 1);
-            onDone(result.message);
+            if (mode === "another") {
+              const shift = fd.get("shift");
+              const plate = fd.get("plate");
+              setLastShift(typeof shift === "string" ? shift : undefined);
+              setLastPlate(typeof plate === "string" ? plate : undefined);
+              setFormKey((k) => k + 1);
+              onDone(result.message);
+            } else {
+              onDone(result.message);
+              onClose();
+            }
           } else {
             setError(result.error);
           }
+          setPendingMode(null);
         });
       }}
     >
-      <div className="plate-head">
-        <span className="micro-label">Nueva entrega</span>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5">
+        <DeliveryFields
+          idPrefix="delivery-new"
+          options={options}
+          date={date}
+          onDateChange={setDate}
+          defaultShift={lastShift}
+          defaultPlate={lastPlate}
+        />
       </div>
-      <div className="space-y-4 p-4">
-        <DeliveryFields idPrefix="delivery-new" options={options} date={date} onDateChange={onDateChange} defaultShift={lastShift} />
+      <div className="shrink-0 space-y-3 border-t bg-popover px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {error && (
           <p role="alert" className="rounded-lg bg-destructive-soft p-2 text-sm text-destructive">
             {error}
           </p>
         )}
-        <Button type="submit" className="h-11 w-full px-4 md:h-10" disabled={pending}>
-          {pending ? "Guardando…" : "Registrar entrega"}
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" className="h-11 px-4 md:h-10" onClick={onClose} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button type="submit" name="mode" value="another" variant="outline" className="h-11 px-4 md:h-10" disabled={pending}>
+            {pending && pendingMode === "another" ? "Guardando…" : "Registrar y otra"}
+          </Button>
+          <Button type="submit" name="mode" value="close" className="h-11 px-4 md:h-10" disabled={pending}>
+            {pending && pendingMode === "close" ? "Guardando…" : "Registrar"}
+          </Button>
+        </div>
       </div>
     </form>
   );

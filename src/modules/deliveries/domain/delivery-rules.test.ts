@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   ALERT_THRESHOLD_DAYS,
   computeClientAlerts,
+  DELIVERY_SHIFTS,
   filterDeliveries,
-  groupByShift,
+  groupByVehicle,
+  shiftLabel,
   isDeliveryShift,
   isSunday,
   sortDeliveries,
@@ -87,17 +89,31 @@ describe("sortDeliveries", () => {
   });
 });
 
-describe("groupByShift", () => {
-  it("always returns the three shifts in order, with their totals", () => {
-    const groups = groupByShift([
-      row({ id: 1, shift: "2do viaje", quantity: 4, weightKg: 200 }),
-      row({ id: 2, shift: "1er viaje", priority: "urgente" }),
-      row({ id: 3, shift: "1er viaje" }),
+describe("shiftLabel", () => {
+  it("maps each stored shift to its display label", () => {
+    expect(DELIVERY_SHIFTS.map(shiftLabel)).toEqual(["Viaje 1", "Viaje 2", "Viaje 3"]);
+  });
+});
+
+describe("groupByVehicle", () => {
+  it("groups by plate sorted, null plate last, each with the three trips in order", () => {
+    const groups = groupByVehicle([
+      row({ id: 1, plate: "ZZZ-999", shift: "2do viaje", quantity: 4, weightKg: 200 }),
+      row({ id: 2, plate: null }),
+      row({ id: 3, plate: "ABC-123", shift: "1er viaje" }),
+      row({ id: 4, plate: "ABC-123", shift: "1er viaje", priority: "urgente" }),
     ]);
-    expect(groups.map((g) => g.shift)).toEqual(["1er viaje", "2do viaje", "3er viaje"]);
-    expect(groups[0].rows.map((r) => r.id)).toEqual([2, 3]);
-    expect(groups[1].totals).toMatchObject({ count: 1, quantity: 4, weightKg: 200 });
-    expect(groups[2].rows).toEqual([]);
+    expect(groups.map((g) => g.plate)).toEqual(["ABC-123", "ZZZ-999", null]);
+    expect(groups[0].totals).toMatchObject({ count: 2, quantity: 20 });
+    expect(groups[0].trips.map((t) => t.shift)).toEqual(["1er viaje", "2do viaje", "3er viaje"]);
+    expect(groups[0].trips[0].rows.map((r) => r.id)).toEqual([4, 3]);
+    expect(groups[0].trips[1].rows).toEqual([]);
+    expect(groups[1].trips[1].totals).toMatchObject({ count: 1, quantity: 4, weightKg: 200 });
+  });
+
+  it("omits the no-vehicle group when it has no rows, and returns nothing for no rows", () => {
+    expect(groupByVehicle([row({ plate: "ABC-123" })]).map((g) => g.plate)).toEqual(["ABC-123"]);
+    expect(groupByVehicle([])).toEqual([]);
   });
 });
 

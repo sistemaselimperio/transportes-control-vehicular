@@ -55,7 +55,8 @@ export const deliverySchema = z.object({
   plate: z
     .string()
     .default("")
-    .transform((v) => (v.trim() === "" ? null : normalizePlate(v))),
+    .refine((v) => v.trim() !== "", "Elige el vehículo.")
+    .transform((v) => normalizePlate(v)),
   notes: textField.refine((v) => v === null || v.length <= NOTES_MAX, "La observación no puede pasar de 500 caracteres."),
 });
 

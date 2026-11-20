@@ -1,9 +1,8 @@
-export const DELIVERY_TABS = ["hoy", "registrar", "historial", "alertas", "resumen"] as const;
+export const DELIVERY_TABS = ["hoy", "historial", "alertas", "resumen"] as const;
 export type DeliveryTab = (typeof DELIVERY_TABS)[number];
 
 export const DELIVERY_TAB_LABELS: Record<DeliveryTab, string> = {
   hoy: "Hoy",
-  registrar: "Registrar",
   historial: "Historial",
   alertas: "Alertas",
   resumen: "Resumen",

@@ -29,11 +29,17 @@ describe("deliverySchema", () => {
     });
   });
 
-  it("defaults the priority to normal and the optional fields to null", () => {
-    const parsed = deliverySchema.parse({ ...valid, priority: "", plate: "", notes: undefined });
+  it("defaults the priority to normal and the notes to null", () => {
+    const parsed = deliverySchema.parse({ ...valid, priority: "", notes: undefined });
     expect(parsed.priority).toBe("normal");
-    expect(parsed.plate).toBeNull();
     expect(parsed.notes).toBeNull();
+  });
+
+  it("requires the vehicle", () => {
+    for (const plate of ["", "   ", undefined]) {
+      const r = deliverySchema.safeParse({ ...valid, plate });
+      expect(!r.success && r.error.issues[0]?.message).toBe("Elige el vehículo.");
+    }
   });
 
   it("takes the optional finca as an id, blank meaning none", () => {

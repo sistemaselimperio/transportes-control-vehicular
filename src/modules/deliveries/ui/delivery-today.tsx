@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatNit } from "@/modules/petty-cash/domain/nit";
 import { setDeliveryStatusAction } from "../application/delivery-actions";
 import { formatBags, formatKg, formatTons } from "../domain/delivery-format";
-import { groupByShift, totalsOf, type DeliveryRow, type DeliveryTotals } from "../domain/delivery-rules";
+import { groupByVehicle, shiftLabel, totalsOf, type DeliveryRow, type DeliveryTotals } from "../domain/delivery-rules";
 import { DeliveryPriorityBadge } from "./delivery-badges";
 
 export function TotalsLine({ totals, className }: { totals: DeliveryTotals; className?: string }) {
@@ -56,7 +56,7 @@ function StatusToggle({ row, onDone }: { row: DeliveryRow; onDone: (message: str
   );
 }
 
-/** "Hoy": today's deliveries grouped by shift, urgent first, with the pendiente / entregado toggle. */
+/** "Hoy": today's deliveries grouped by vehicle and then by trip, urgent first, with the pendiente / entregado toggle. */
 export function DeliveryToday({
   rows,
   canManage,
@@ -67,7 +67,7 @@ export function DeliveryToday({
   canManage: boolean;
   onDone: (message: string) => void;
 }) {
-  const groups = groupByShift(rows);
+  const groups = groupByVehicle(rows);
   const total = totalsOf(rows);
   const pending = rows.filter((r) => r.status === "pendiente").length;
 
@@ -89,49 +89,56 @@ export function DeliveryToday({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
-          <section key={group.shift} aria-label={group.shift} className="panel">
+          <section key={group.plate ?? "none"} aria-label={group.plate ? `Vehículo ${group.plate}` : "Sin vehículo"} className="panel">
             <div className="plate-head">
-              <h2 className="micro-label">{group.shift}</h2>
+              <h2 className={cn("micro-label", group.plate && "num")}>{group.plate ?? "Sin vehículo"}</h2>
             </div>
             <div className="border-b px-4 py-2">
               <TotalsLine totals={group.totals} />
             </div>
-            {group.rows.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-muted-foreground">Sin entregas en este turno.</p>
-            ) : (
-              <ul className="divide-y">
-                {group.rows.map((r) => (
-                  <li
-                    key={r.id}
-                    className={cn(
-                      "flex items-start justify-between gap-3 px-4 py-3",
-                      r.priority === "urgente" && "border-l-4 border-destructive bg-destructive-faint",
-                      r.status === "entregado" && "opacity-70",
-                    )}
-                  >
-                    <div className="min-w-0 space-y-1">
-                      <p className={cn("font-medium", r.status === "entregado" && "line-through")}>{r.clientName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {r.locationName && <>Finca {r.locationName} · </>}
-                        {r.destinationName}
-                        {r.clientNit && <span className="num"> · {formatNit(r.clientNit)}</span>}
-                      </p>
-                      <p className="num text-sm">
-                        {formatBags(r.quantity)} bultos · {formatKg(r.weightKg)} kg · {formatTons(r.weightKg)} t
-                      </p>
-                      {r.notes && <p className="text-sm text-muted-foreground">{r.notes}</p>}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <DeliveryPriorityBadge priority={r.priority} />
-                        {r.plate && <span className="num text-xs text-muted-foreground">{r.plate}</span>}
-                      </div>
-                    </div>
-                    {canManage && <StatusToggle row={r} onDone={onDone} />}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {group.trips.map((trip) => (
+              <div key={trip.shift} className="border-b last:border-b-0">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 bg-muted/40 px-4 py-2">
+                  <h3 className="text-sm font-semibold">{shiftLabel(trip.shift)}</h3>
+                  <TotalsLine totals={trip.totals} className="text-xs" />
+                </div>
+                {trip.rows.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">Sin entregas en este viaje.</p>
+                ) : (
+                  <ul className="divide-y">
+                    {trip.rows.map((r) => (
+                      <li
+                        key={r.id}
+                        className={cn(
+                          "flex items-start justify-between gap-3 px-4 py-3",
+                          r.priority === "urgente" && "border-l-4 border-destructive bg-destructive-faint",
+                          r.status === "entregado" && "opacity-70",
+                        )}
+                      >
+                        <div className="min-w-0 space-y-1">
+                          <p className={cn("font-medium", r.status === "entregado" && "line-through")}>{r.clientName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {r.locationName && <>Finca {r.locationName} · </>}
+                            {r.destinationName}
+                            {r.clientNit && <span className="num"> · {formatNit(r.clientNit)}</span>}
+                          </p>
+                          <p className="num text-sm">
+                            {formatBags(r.quantity)} bultos · {formatKg(r.weightKg)} kg · {formatTons(r.weightKg)} t
+                          </p>
+                          {r.notes && <p className="text-sm text-muted-foreground">{r.notes}</p>}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <DeliveryPriorityBadge priority={r.priority} />
+                          </div>
+                        </div>
+                        {canManage && <StatusToggle row={r} onDone={onDone} />}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
           </section>
         ))}
       </div>

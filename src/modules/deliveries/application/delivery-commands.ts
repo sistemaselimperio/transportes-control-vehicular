@@ -37,12 +37,11 @@ export function createDeliveryCommands(ports: DeliveryPorts) {
     }
   }
 
-  /** The optional vehicle: blank, a fleet plate, or (on update) the plate the delivery was saved with. */
+  /** The required vehicle: a fleet plate, or (on update) the plate the delivery was saved with. */
   async function resolveVehicle(
-    plate: string | null,
+    plate: string,
     stored?: { plate: string | null; vehicleId: number | null },
-  ): Promise<{ plate: string | null; vehicleId: number | null }> {
-    if (plate === null) return { plate: null, vehicleId: null };
+  ): Promise<{ plate: string; vehicleId: number | null }> {
     const vehicle = await ports.findVehicleByPlate(plate);
     if (vehicle) return { plate: vehicle.plate, vehicleId: vehicle.id };
     // The vehicle left the fleet since: the delivery keeps the plate and link it was saved with.

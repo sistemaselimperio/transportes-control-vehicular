@@ -11,7 +11,7 @@ const input = (over: Partial<DeliveryInput> = {}): DeliveryInput => ({
   destinationId: 7,
   quantity: 40,
   weightKg: 2000,
-  plate: null,
+  plate: "ABC-123",
   notes: null,
   ...over,
 });
@@ -32,10 +32,10 @@ function ports(over: Partial<DeliveryPorts> = {}): DeliveryPorts {
 }
 
 describe("create", () => {
-  it("inserts a delivery without vehicle", async () => {
+  it("inserts a delivery linked to its fleet vehicle", async () => {
     const p = ports();
     await createDeliveryCommands(p).create(input());
-    expect(p.insertDelivery).toHaveBeenCalledWith({ ...input(), plate: null, vehicleId: null });
+    expect(p.insertDelivery).toHaveBeenCalledWith({ ...input(), plate: "ABC-123", vehicleId: 9 });
   });
 
   it("links the fleet vehicle when a plate is given", async () => {
@@ -89,7 +89,7 @@ describe("update", () => {
   it("saves the changes", async () => {
     const p = ports();
     await createDeliveryCommands(p).update(3, input({ quantity: 10 }));
-    expect(p.updateDelivery).toHaveBeenCalledWith(3, expect.objectContaining({ quantity: 10, plate: null, vehicleId: null }));
+    expect(p.updateDelivery).toHaveBeenCalledWith(3, expect.objectContaining({ quantity: 10, plate: "ABC-123", vehicleId: 9 }));
   });
 
   it("keeps the stored plate and link of a deleted vehicle when the plate is unchanged", async () => {

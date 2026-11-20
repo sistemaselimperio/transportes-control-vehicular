@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPinned } from "lucide-react";
+import { MapPinned, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
@@ -12,17 +12,16 @@ import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dial
 import { deleteDeliveryAction } from "../application/delivery-actions";
 import type { DestinationRow } from "../application/delivery-queries";
 import { DELIVERY_TABS, DELIVERY_TAB_LABELS, type DeliveryTab } from "../domain/delivery-tabs";
-import { groupByShift, totalsOf, type ClientAlert, type DeliveryRow } from "../domain/delivery-rules";
+import { type ClientAlert, type DeliveryRow } from "../domain/delivery-rules";
 import type { ClientOption } from "./client-picker";
 import { DeliveryAlerts } from "./delivery-alerts";
-import { DeliveryEditForm, DeliveryInlineForm } from "./delivery-form";
+import { DeliveryCreateForm, DeliveryEditForm } from "./delivery-form";
 import { DeliveryHistory } from "./delivery-history";
 import { DeliverySummary } from "./delivery-summary";
-import { DeliveryTable } from "./delivery-table";
-import { DeliveryToday, TotalsLine } from "./delivery-today";
+import { DeliveryToday } from "./delivery-today";
 import { DestinationsManager } from "./destinations-manager";
 
-/** Deliveries page: the five tabs, the edit sheet, the delete confirmation and the destination list. */
+/** Deliveries page: the four tabs, the edit sheet, the delete confirmation and the destination list. */
 export function DeliveriesView({
   rows,
   clients,
@@ -44,30 +43,32 @@ export function DeliveriesView({
   initialTab: DeliveryTab;
 }) {
   const [tab, setTab] = useState<DeliveryTab>(initialTab);
-  const [registerDate, setRegisterDate] = useState(today);
+  const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<DeliveryRow | undefined>();
   const [deleting, setDeleting] = useState<DeliveryRow | undefined>();
   const [destinationsOpen, setDestinationsOpen] = useState(false);
   const { message, flash } = useFlashMessage();
 
   const todayRows = useMemo(() => rows.filter((r) => r.date === today), [rows, today]);
-  const dayRows = useMemo(
-    () => groupByShift(rows.filter((r) => r.date === registerDate)).flatMap((g) => g.rows),
-    [rows, registerDate],
-  );
   const options = { clients, destinations, plates };
 
   return (
     <section className="space-y-5">
       <PageHeader
         title="Entregas"
-        description="Entregas de bultos a clientes por turno y destino."
+        description="Entregas de bultos a clientes por vehículo y viaje."
         actions={
           canManage && (
-            <Button variant="outline" className="h-11 px-4 md:h-10" onClick={() => setDestinationsOpen(true)}>
-              <MapPinned aria-hidden />
-              Destinos
-            </Button>
+            <>
+              <Button className="h-11 px-4 md:h-10" onClick={() => setCreating(true)}>
+                <Plus aria-hidden />
+                Registrar entrega
+              </Button>
+              <Button variant="outline" className="h-11 px-4 md:h-10" onClick={() => setDestinationsOpen(true)}>
+                <MapPinned aria-hidden />
+                Destinos
+              </Button>
+            </>
           )
         }
       />
@@ -87,31 +88,6 @@ export function DeliveriesView({
 
       <div role="tabpanel" id="delivery-panel" aria-labelledby={`delivery-tab-${tab}`} className="space-y-4">
         {tab === "hoy" && <DeliveryToday rows={todayRows} canManage={canManage} onDone={flash} />}
-
-        {tab === "registrar" && (
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-            {canManage ? (
-              <DeliveryInlineForm options={options} date={registerDate} onDateChange={setRegisterDate} onDone={flash} />
-            ) : (
-              <p className="text-sm text-muted-foreground">No tienes permiso para registrar entregas.</p>
-            )}
-            <div className="min-w-0 space-y-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Entregas del {registerDate ? formatDisplayDate(registerDate) : "día elegido"}
-                </h2>
-                <TotalsLine totals={totalsOf(dayRows)} />
-              </div>
-              <DeliveryTable
-                rows={dayRows}
-                canManage={canManage}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-                emptyMessage="No hay entregas registradas para este día."
-              />
-            </div>
-          </div>
-        )}
 
         {tab === "historial" && (
           <DeliveryHistory rows={rows} destinations={destinations} canManage={canManage} onEdit={setEditing} onDelete={setDeleting} />
@@ -135,6 +111,17 @@ export function DeliveriesView({
         onClose={() => setDeleting(undefined)}
         onDone={flash}
       />
+
+      <SlideOver
+        open={creating}
+        onOpenChange={setCreating}
+        title="Registrar entrega"
+        description="Nueva entrega de bultos a un cliente."
+      >
+        {creating && (
+          <DeliveryCreateForm options={options} today={today} onDone={flash} onClose={() => setCreating(false)} />
+        )}
+      </SlideOver>
 
       <SlideOver
         open={editing !== undefined}

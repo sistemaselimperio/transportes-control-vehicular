@@ -79,19 +79,38 @@ export function sortDeliveries<T extends Pick<DeliveryRow, "id" | "priority">>(r
   });
 }
 
-export interface ShiftGroup<T> {
+/** Display label of a stored shift: "1er viaje" is shown as "Viaje 1". */
+export const shiftLabel = (shift: DeliveryShift): string => `Viaje ${DELIVERY_SHIFTS.indexOf(shift) + 1}`;
+
+export interface TripGroup<T> {
   shift: DeliveryShift;
   rows: T[];
   totals: DeliveryTotals;
 }
 
-/** The three shifts in order (empty ones included), each with its rows (urgent first) and totals. */
-export function groupByShift<T extends Pick<DeliveryRow, "id" | "priority" | "shift" | "quantity" | "weightKg">>(
-  rows: readonly T[],
-): ShiftGroup<T>[] {
-  return DELIVERY_SHIFTS.map((shift) => {
-    const inShift = sortDeliveries(rows.filter((r) => r.shift === shift));
-    return { shift, rows: inShift, totals: totalsOf(inShift) };
+export interface VehicleGroup<T> {
+  /** Null groups the deliveries saved without a vehicle. */
+  plate: string | null;
+  totals: DeliveryTotals;
+  /** The three trips in order (empty ones included), each with its rows (urgent first). */
+  trips: TripGroup<T>[];
+}
+
+/** Rows per vehicle (plates sorted, the no-vehicle group last and only if it has rows), then per trip. */
+export function groupByVehicle<
+  T extends Pick<DeliveryRow, "id" | "priority" | "shift" | "plate" | "quantity" | "weightKg">,
+>(rows: readonly T[]): VehicleGroup<T>[] {
+  const byPlate = new Map<string | null, T[]>();
+  for (const r of rows) byPlate.set(r.plate, [...(byPlate.get(r.plate) ?? []), r]);
+  const plates = [...byPlate.keys()].filter((p): p is string => p !== null).sort((a, b) => a.localeCompare(b, "es"));
+  const keys: (string | null)[] = byPlate.has(null) ? [...plates, null] : plates;
+  return keys.map((plate) => {
+    const own = byPlate.get(plate) ?? [];
+    const trips = DELIVERY_SHIFTS.map((shift) => {
+      const inTrip = sortDeliveries(own.filter((r) => r.shift === shift));
+      return { shift, rows: inTrip, totals: totalsOf(inTrip) };
+    });
+    return { plate, totals: totalsOf(own), trips };
   });
 }
 
