@@ -144,7 +144,7 @@
 }
 
 /*
- * Sky theme (per-user, `data-theme="sky"` on the app shell): #87CEEB (sky) as the fill with dark
+ * Sky theme (picked per browser, `data-theme="sky"` on <html>): #87CEEB (sky) as the fill with dark
  * ink on top, #a9dcf1 and #cdeaf6 (tints), #1e6f8c (deep teal-blue ink for lines and marks on light
  * surfaces, like the olive of the yellow palette). Plates take the sky fill too, matching the active
  * nav item. Status colors, destructive and the other series colors keep their meaning and are not
@@ -188,6 +188,51 @@ body:has([data-theme="sky"]) {
   --sidebar-ring: #1e6f8c;
   --selection: #a9dcf1;
   --selection-foreground: #0f1d24;
+}
+
+/*
+ * Orange theme (picked per browser, `data-theme="orange"` on <html>): #fb923c (orange) as the fill
+ * with dark ink on top, #fdba74 and #fed7aa (tints), #c2410c (burnt-orange ink for lines and marks on
+ * light surfaces, 5.2:1 on white). The third-party chart series is orange by default, so it turns
+ * violet here to stay apart from the brand series. Status colors and destructive keep their meaning.
+ */
+[data-theme="orange"],
+body:has([data-theme="orange"]) {
+  --tint-hue: 35;
+  --plate: #fb923c;
+  --plate-foreground: #1f1308;
+  --background: #f9f5f1;
+  --foreground: #1f1308;
+  --card-foreground: #1f1308;
+  --popover-foreground: #1f1308;
+  --primary: #fb923c;
+  --primary-foreground: #1f1308;
+  --brand: #c2410c;
+  --brand-foreground: #ffffff;
+  --secondary: #fed7aa;
+  --secondary-foreground: #7c2d12;
+  --muted: #f1e9e1;
+  --muted-foreground: #5e4a3a;
+  --accent: #fdba74;
+  --accent-foreground: #1f1308;
+  --border: #e6d8ca;
+  --input: #d0bba6;
+  --ring: #c2410c;
+  --foreground-soft: #e9e7e6;
+  --background-soft: #433a32;
+  --brand-soft: #f8e8e2;
+  --chart-1: #c2410c;
+  --chart-3: #7c3aed;
+  --chart-4: #fb923c;
+  --sidebar-foreground: #1f1308;
+  --sidebar-primary: #fb923c;
+  --sidebar-primary-foreground: #1f1308;
+  --sidebar-accent: #fed7aa;
+  --sidebar-accent-foreground: #7c2d12;
+  --sidebar-border: #e6d8ca;
+  --sidebar-ring: #c2410c;
+  --selection: #fdba74;
+  --selection-foreground: #1f1308;
 }
 
 @layer base {

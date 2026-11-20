@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/app/sidebar";
 import { canUsePettyCash, canViewSection, parseRole } from "@/lib/permissions";
-import { getRequestSession, getRequestTheme } from "@/lib/session";
-import type { Theme } from "@/lib/theme";
+import { getRequestSession } from "@/lib/session";
 import { getExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 
 /**
@@ -32,12 +31,12 @@ export default function AppLayout({
   );
 }
 
-/** The user's theme lives on the wrapper of the whole shell so every token cascades, background included. */
+/** The color theme is per browser (localStorage), applied on <html> by the root layout's head script. */
 async function ThemedShell({ children }: { children: React.ReactNode }) {
-  const theme = await getRequestTheme();
-  if (!theme) redirect("/login");
+  const session = await getRequestSession();
+  if (!session) redirect("/login");
   return (
-    <Frame theme={theme}>
+    <Frame>
       {/* useSearchParams in the sidebar needs a boundary, and the counts stream in here. */}
       <Suspense fallback={<div className="hidden w-60 shrink-0 border-r bg-sidebar md:block" />}>
         <SessionSidebar />
@@ -51,10 +50,9 @@ async function ThemedShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Frame({ theme, children }: { theme?: Theme; children: React.ReactNode }) {
+function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div
-      data-theme={theme}
       className="flex min-h-dvh flex-1 flex-col bg-background text-foreground md:flex-row"
     >
       <a

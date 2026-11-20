@@ -26,6 +26,7 @@ import { useState } from "react";
 import { brandFor, type Brand } from "@/components/app/brand";
 import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
+import { ThemePicker } from "@/components/app/theme-picker";
 import { authClient } from "@/lib/auth-client";
 import { canUsePettyCash, canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -248,6 +249,7 @@ function SidebarBody({ pathname, role, hasPettyCash, grupo, currentQuery, userNa
 
       {/* Account: a tone-step field at the foot, the name set as text and one flat, square sign-out bar. */}
       <div className="mt-auto flex flex-col gap-3 bg-muted px-4 pt-4 pb-4 md:pb-3">
+        <ThemePicker />
         <button
           type="button"
           onClick={signOut}
