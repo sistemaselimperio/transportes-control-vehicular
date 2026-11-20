@@ -154,7 +154,7 @@ export function DeliveryTable({
                   <td className="num px-4 py-3 text-right">{formatKg(r.weightKg)}</td>
                   <td className="num px-4 py-3 text-right">{formatTons(r.weightKg)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-col items-start gap-1">
                       <DeliveryStatusBadge status={r.status} />
                       <DeliveryPriorityBadge priority={r.priority} />
                     </div>
