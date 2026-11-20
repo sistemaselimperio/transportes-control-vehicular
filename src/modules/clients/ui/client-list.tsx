@@ -40,14 +40,23 @@ function RowActions({
   );
 }
 
+/** The client's name; a warn-toned count rides on top of it when some fincas lack a location. */
 function NameButton({ row, onOpen }: { row: ClientRow; onOpen: (row: ClientRow) => void }) {
+  const missing = missingLocationCount(row);
   return (
     <button
       type="button"
       onClick={() => onOpen(row)}
+      title={missing > 0 ? `${missing} ${missing === 1 ? "finca" : "fincas"} sin ubicación` : undefined}
       className="min-w-0 rounded-sm text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/70"
     >
       {row.name}
+      {missing > 0 && (
+        <span className="num ml-1 inline-flex size-[1.125rem] -translate-y-1.5 items-center justify-center rounded-full bg-warn align-top text-[0.625rem] leading-none font-semibold text-warn-foreground no-underline">
+          <span aria-hidden>{missing}</span>
+          <span className="sr-only">, {missing} sin ubicación</span>
+        </span>
+      )}
     </button>
   );
 }
@@ -63,20 +72,13 @@ function openOnRowClick(row: ClientRow, onOpen: (row: ClientRow) => void) {
   };
 }
 
-/** "2 fincas · 1 sin ubicación", with the missing part in the warn tone. */
-function LocationsSummary({ row }: { row: ClientRow }) {
+/** "2 fincas", or just the number (`bare`) in the table, where the "Fincas" header names it. */
+function LocationsSummary({ row, bare = false }: { row: ClientRow; bare?: boolean }) {
   const total = row.locations.length;
-  const missing = missingLocationCount(row);
-  if (total === 0) return <>Sin fincas</>;
+  if (total === 0) return <>{bare ? "0" : "Sin fincas"}</>;
   return (
     <>
-      {total} {total === 1 ? "finca" : "fincas"}
-      {missing > 0 && (
-        <>
-          {" · "}
-          <span className="font-medium text-warn-foreground">{missing} sin ubicación</span>
-        </>
-      )}
+      {bare ? total : `${total} ${total === 1 ? "finca" : "fincas"}`}
     </>
   );
 }
@@ -164,7 +166,7 @@ export function ClientList({
                   <td className="num px-4 py-3 whitespace-nowrap">{r.nit ? formatNit(r.nit) : "—"}</td>
                   <td className="num px-4 py-3 whitespace-nowrap">{r.phone ?? "—"}</td>
                   <td className="num px-4 py-3 whitespace-nowrap">
-                    <LocationsSummary row={r} />
+                    <LocationsSummary row={r} bare />
                   </td>
                   <td className="num px-4 py-3">{r.deliveryCount}</td>
                   {canManage && (
