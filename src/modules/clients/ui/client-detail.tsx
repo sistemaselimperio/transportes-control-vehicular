@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCircle2, Copy, ExternalLink, MapPin, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, Copy, ExternalLink, MapPin, MessageCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useFlashMessage } from "@/components/app/flash-message";
 import { StatusMark } from "@/components/app/status-mark";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formatNit } from "@/modules/petty-cash/domain/nit";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { deleteLocationAction, updateClientAction } from "../application/client-actions";
@@ -127,14 +128,16 @@ function LocationItem({
 
   async function copyLink() {
     if (!routeLink) return;
+    let result: "done" | "failed" = "done";
     try {
       await navigator.clipboard.writeText(routeLink);
-      setCopied("done");
     } catch {
-      setCopied("failed");
+      result = "failed";
     }
+    setCopied(result);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(null), 4000);
+    // A failure stays longer: the link is shown so it can be copied by hand.
+    timer.current = setTimeout(() => setCopied(null), result === "failed" ? 4000 : 2000);
   }
 
   if (editing) {
@@ -197,12 +200,12 @@ function LocationItem({
             </a>
             <Button
               variant="outline"
-              className="h-11 px-3 md:h-9"
+              className={cn("h-11 px-3 md:h-9", copied === "done" && "border-ok bg-ok text-ok-foreground hover:bg-ok hover:text-ok-foreground")}
               aria-label={`Copiar link de la finca ${location.name}`}
               onClick={copyLink}
             >
-              <Copy aria-hidden />
-              Copiar
+              {copied === "done" ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied === "done" ? "¡Copiado!" : "Copiar"}
             </Button>
           </>
         ) : (
@@ -241,7 +244,8 @@ function LocationItem({
         )}
       </div>
 
-      <p role="status" aria-live="polite" className="text-sm text-muted-foreground empty:hidden">
+      {/* The button itself shows a successful copy; this line only announces it to screen readers. */}
+      <p role="status" aria-live="polite" className={cn("text-sm text-muted-foreground empty:hidden", copied === "done" && "sr-only")}>
         {copied === "done" && "Link copiado."}
         {copied === "failed" && "No se pudo copiar. Mantén presionado el link para copiarlo."}
       </p>
