@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import type { OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { deleteLoadAction } from "../application/load-actions";
 import { filterLoads, formatCop, isLoadSupplier, LOAD_SUPPLIERS, totalsOfLoads, type LoadFilters, type LoadRow } from "../domain/load-rules";
@@ -21,13 +22,22 @@ import { LoadList } from "./load-list";
 export function LoadsView({
   rows,
   plates,
+  orders,
+  kgPerBag,
+  presetOrderId,
   canManage,
 }: {
   rows: readonly LoadRow[];
   plates: readonly string[];
+  /** Orders a load can hold: the pending ones and the loaded ones (each form keeps only its own). */
+  orders: readonly OrderRow[];
+  kgPerBag: number;
+  /** An order to start the new load with, from the "Crear cargue" button of the orders page. */
+  presetOrderId: number | null;
   canManage: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(presetOrderId !== null);
+  const [preset, setPreset] = useState<number | null>(presetOrderId);
   const [editing, setEditing] = useState<LoadRow | undefined>();
   const [deleting, setDeleting] = useState<LoadRow | undefined>();
   const [filters, setFilters] = useState<LoadFilters>({ supplier: null, from: null, to: null });
@@ -38,6 +48,7 @@ export function LoadsView({
 
   const openForm = (load?: LoadRow) => {
     setEditing(load);
+    setPreset(null);
     setOpen(true);
   };
 
@@ -130,6 +141,9 @@ export function LoadsView({
         <LoadForm
           load={editing}
           plates={plates}
+          orders={orders}
+          kgPerBag={kgPerBag}
+          presetOrderId={editing ? null : preset}
           onCancel={() => setOpen(false)}
           onDone={(msg) => {
             flash(msg);

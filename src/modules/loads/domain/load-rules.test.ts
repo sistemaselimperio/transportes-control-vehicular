@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterLoads, formatCop, isLoadSupplier, totalsOfLoads, type LoadRow } from "./load-rules";
+import { filterLoads, formatCop, isLoadSupplier, summarizeLinkedOrders, totalsOfLoads, type LoadRow } from "./load-rules";
 
 const load = (over: Partial<LoadRow>): LoadRow => ({
   id: 1,
@@ -12,6 +12,7 @@ const load = (over: Partial<LoadRow>): LoadRow => ({
   siesaNumber: "S-1",
   orderNumber: "P-1",
   notes: null,
+  orders: [],
   ...over,
 });
 
@@ -58,5 +59,17 @@ describe("formatCop", () => {
   it("formats whole pesos in es-CO", () => {
     expect(formatCop(1_500_000).replace(/\s/g, " ")).toBe("$ 1.500.000");
     expect(formatCop(0).replace(/\s/g, " ")).toBe("$ 0");
+  });
+});
+
+describe("summarizeLinkedOrders", () => {
+  const linked = (id: number, bags: number) => ({ id, bags, lines: [{ clientName: "Cliente", locationName: null }] });
+
+  it("lists the order numbers and adds up the bags", () => {
+    expect(summarizeLinkedOrders([linked(3, 50), linked(5, 25)])).toEqual({ label: "#3, #5", bags: 75 });
+  });
+
+  it("is empty without orders", () => {
+    expect(summarizeLinkedOrders([])).toEqual({ label: "", bags: 0 });
   });
 });

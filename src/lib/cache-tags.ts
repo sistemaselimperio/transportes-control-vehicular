@@ -27,6 +27,8 @@ export const CACHE_TAGS = {
   clients: "clients",
   deliveries: "deliveries",
   loads: "loads",
+  /** Concentrate orders, their lines, the reference catalog and the kg-per-bag setting. */
+  orders: "orders",
 } as const;
 
 type EntityTag =
@@ -39,7 +41,8 @@ type EntityTag =
   | typeof CACHE_TAGS.inspections
   | typeof CACHE_TAGS.clients
   | typeof CACHE_TAGS.deliveries
-  | typeof CACHE_TAGS.loads;
+  | typeof CACHE_TAGS.loads
+  | typeof CACHE_TAGS.orders;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
@@ -58,6 +61,7 @@ const {
   clients,
   deliveries,
   loads,
+  orders,
 } = CACHE_TAGS;
 
 export type ReadName =
@@ -76,7 +80,10 @@ export type ReadName =
   | "vehicleTrips"
   | "clientRows"
   | "deliveryRows"
-  | "loadRows";
+  | "loadRows"
+  | "orderRows"
+  | "orderReferences"
+  | "kgPerBag";
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
@@ -100,8 +107,12 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   clientRows: [clients, deliveries],
   /** Rows show the client name; deleting a vehicle unlinks its deliveries. */
   deliveryRows: [deliveries, clients, fleet],
-  /** Deleting a vehicle unlinks its loads. */
-  loadRows: [loads, fleet],
+  /** Deleting a vehicle unlinks its loads; each load lists its orders, with client and finca names. */
+  loadRows: [loads, fleet, orders, clients],
+  /** Rows carry the client and finca names. */
+  orderRows: [orders, clients],
+  orderReferences: [orders],
+  kgPerBag: [orders],
 };
 
 /** The tags to hand to `cacheTag` for a read. The vehicle detail also needs its plate. */
@@ -127,6 +138,7 @@ export type Change =
   | { kind: "client" }
   | { kind: "delivery" }
   | { kind: "load" }
+  | { kind: "order" }
   | { kind: "vehicle-file"; plate: string };
 
 const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTag[]> = {
@@ -140,7 +152,9 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   inspection: [inspections],
   client: [clients],
   delivery: [deliveries],
-  load: [loads],
+  /** A load links and unlinks orders, so it also changes their status. */
+  load: [loads, orders],
+  order: [orders],
 };
 
 /** The tags a write must expire so every read that shows what it changed is recomputed. */

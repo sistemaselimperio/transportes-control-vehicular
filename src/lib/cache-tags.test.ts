@@ -21,6 +21,7 @@ const CHANGES: Change[] = [
   { kind: "client" },
   { kind: "delivery" },
   { kind: "load" },
+  { kind: "order" },
   { kind: "vehicle-file", plate: "ABC-123" },
 ];
 
@@ -95,7 +96,19 @@ describe("changeTags", () => {
   it("commercial writes only expire their own entity", () => {
     expect(changeTags({ kind: "client" })).toEqual([CACHE_TAGS.clients]);
     expect(changeTags({ kind: "delivery" })).toEqual([CACHE_TAGS.deliveries]);
-    expect(changeTags({ kind: "load" })).toEqual([CACHE_TAGS.loads]);
+    expect(changeTags({ kind: "order" })).toEqual([CACHE_TAGS.orders]);
+  });
+
+  it("a load write also expires the orders, because it changes their status", () => {
+    expect(changeTags({ kind: "load" })).toEqual([CACHE_TAGS.loads, CACHE_TAGS.orders]);
+  });
+
+  it("the loads list shows the linked orders with their client names", () => {
+    expect(readTags("loadRows")).toEqual(expect.arrayContaining([CACHE_TAGS.loads, CACHE_TAGS.orders, CACHE_TAGS.clients]));
+  });
+
+  it("the order rows show client and finca names", () => {
+    expect(readTags("orderRows")).toEqual(expect.arrayContaining([CACHE_TAGS.orders, CACHE_TAGS.clients]));
   });
 
   it("the delivery list shows client names and unlinks deleted vehicles", () => {
@@ -145,7 +158,8 @@ describe("read / change consistency", () => {
     inspection: [CACHE_TAGS.inspections],
     client: [CACHE_TAGS.clients],
     delivery: [CACHE_TAGS.deliveries],
-    load: [CACHE_TAGS.loads],
+    load: [CACHE_TAGS.loads, CACHE_TAGS.orders],
+    order: [CACHE_TAGS.orders],
     "vehicle-file": [CACHE_TAGS.files],
   };
 

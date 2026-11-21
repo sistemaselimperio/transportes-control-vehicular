@@ -23,6 +23,7 @@ describe("loadSchema", () => {
       siesaNumber: "FV-100",
       orderNumber: "P-77",
       notes: null,
+      orderIds: [],
     });
   });
 
@@ -57,6 +58,18 @@ describe("loadSchema", () => {
     expect(!siesa.success && siesa.error.issues[0]?.message).toBe("Ingresa el número SIESA.");
     const order = loadSchema.safeParse({ ...valid, orderNumber: "" });
     expect(!order.success && order.error.issues[0]?.message).toBe("Ingresa el número de pedido.");
+  });
+});
+
+describe("loadSchema orderIds", () => {
+  it("parses the checked orders as unique positive ids", () => {
+    expect(loadSchema.parse({ ...valid, orderIds: ["3", "5", "3"] }).orderIds).toEqual([3, 5]);
+  });
+
+  it("rejects an id that is not a positive integer", () => {
+    for (const bad of ["x", "0", "-2", "1.5"]) {
+      expect(loadSchema.safeParse({ ...valid, orderIds: [bad] }).success).toBe(false);
+    }
   });
 });
 

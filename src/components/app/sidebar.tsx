@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Container,
   Contact,
+  ListOrdered,
   Loader2,
   Lock,
   LogOut,
@@ -73,6 +74,7 @@ const SECTIONS: ReadonlyArray<NavGroup> = [
     label: "Comercial",
     items: [
       { href: "/clientes", label: "Clientes", icon: Contact },
+      { href: "/pedidos", label: "Pedidos", icon: ListOrdered },
       { href: "/entregas", label: "Entregas", icon: PackageCheck },
       { href: "/cargues", label: "Cargues", icon: Container },
     ],

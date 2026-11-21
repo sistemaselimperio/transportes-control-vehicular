@@ -504,6 +504,7 @@ export const deliveryShiftEnum = comercial.enum("delivery_shift", ["1er viaje", 
 export const deliveryPriorityEnum = comercial.enum("delivery_priority", ["urgente", "normal"]);
 export const deliveryStatusEnum = comercial.enum("delivery_status", ["pendiente", "entregado"]);
 export const loadSupplierEnum = comercial.enum("load_supplier", ["Finca", "Italcol", "Contegral"]);
+export const orderStatusEnum = comercial.enum("order_status", ["pendiente", "cargado", "anulado"]);
 
 /**
  * Customers of the commercial area. Names keep the casing typed; `nameKey` (see `searchKey`) makes
@@ -616,6 +617,79 @@ export const loads = comercial.table(
     index("loads_supplier_idx").on(t.supplier),
     check("loads_tons_positive", sql`${t.tons} > 0`),
     check("loads_cost_non_negative", sql`${t.cost} >= 0`),
+  ],
+);
+
+/** Key/value settings of the commercial area (today only the kilograms per bag, `kg_per_bag`). */
+export const comercialSettings = comercial.table("settings", {
+  key: text().primaryKey(),
+  value: text().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Catalog of the references (products) of the concentrate orders; created inline from the order form. */
+export const orderReferences = comercial.table(
+  "order_references",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: text().notNull(),
+    /** `searchKey(name)`: the unique, case/accent/space-insensitive identity of the name. */
+    nameKey: text("name_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("order_references_name_key_uq").on(t.nameKey)],
+);
+
+/**
+ * A concentrate order ("pedido"): the bags several clients asked for, to be delivered on a day. Only
+ * bags are stored; kg and tons are derived with the current kg per bag. A `cargado` order belongs to
+ * exactly one load, and only a `pendiente` one can be edited or annulled.
+ */
+export const orders = comercial.table(
+  "orders",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    deliveryDate: date("delivery_date", { mode: "string" }).notNull(),
+    /** Free text, e.g. "7–11 a.m.". */
+    timeWindow: text("time_window"),
+    note: text(),
+    status: orderStatusEnum().notNull().default("pendiente"),
+    /** The load that picked this order up; the order is `cargado` exactly while this is set. */
+    loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("orders_delivery_date_idx").on(t.deliveryDate),
+    index("orders_status_idx").on(t.status),
+    index("orders_load_idx").on(t.loadId),
+    check("orders_status_matches_load", sql`(${t.status} = 'cargado') = (${t.loadId} is not null)`),
+  ],
+);
+
+export const orderLines = comercial.table(
+  "order_lines",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    /** Optional finca of the client; goes null when the finca is deleted. */
+    locationId: integer("location_id").references(() => clientLocations.id, { onDelete: "set null" }),
+    referenceId: integer("reference_id")
+      .notNull()
+      .references(() => orderReferences.id, { onDelete: "restrict" }),
+    bags: integer().notNull(),
+    /** Order of the line inside its order. */
+    position: integer().notNull().default(0),
+  },
+  (t) => [
+    index("order_lines_order_idx").on(t.orderId),
+    index("order_lines_client_idx").on(t.clientId),
+    check("order_lines_bags_positive", sql`${t.bags} > 0`),
   ],
 );
 

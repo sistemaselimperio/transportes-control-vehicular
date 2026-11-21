@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { formatCop, type LoadRow } from "../domain/load-rules";
+import { formatCop, summarizeLinkedOrders, type LoadRow } from "../domain/load-rules";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
 function Plate({ row }: { row: LoadRow }) {
@@ -19,6 +19,27 @@ function Plate({ row }: { row: LoadRow }) {
     >
       <PlateText plate={row.plate} />
     </Link>
+  );
+}
+
+/** "#3, #5 · 75 bultos"; opening it lists the clients and fincas of every order. */
+function LinkedOrders({ orders }: { orders: LoadRow["orders"] }) {
+  if (orders.length === 0) return <span className="text-muted-foreground">—</span>;
+  const { label, bags } = summarizeLinkedOrders(orders);
+  return (
+    <details className="group">
+      <summary className="num cursor-pointer rounded-sm outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
+        {label} · {formatDecimal(bags, 0)} bultos
+      </summary>
+      <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+        {orders.map((o) => (
+          <li key={o.id}>
+            <span className="num font-medium text-foreground">#{o.id}</span>{" "}
+            {o.lines.map((l) => (l.locationName ? `${l.clientName} (${l.locationName})` : l.clientName)).join(", ")}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -57,7 +78,7 @@ function RowActions({
   );
 }
 
-const HEADERS = ["Fecha", "Proveedor", "Placa", "Toneladas", "Costo", "SIESA", "Pedido"] as const;
+const HEADERS = ["Fecha", "Proveedor", "Placa", "Toneladas", "Costo", "SIESA", "Pedido proveedor", "Pedidos"] as const;
 const NUMERIC = new Set<string>(["Toneladas", "Costo"]);
 
 /** Loads as a table from `md`, as cards on phones. Without `canManage` the rows carry no edit / delete. */
@@ -93,8 +114,13 @@ export function LoadList({
               {formatDecimal(r.tons, 3)} t · {formatCop(r.cost)}
             </p>
             <p className="num text-sm text-muted-foreground">
-              SIESA {r.siesaNumber} · Pedido {r.orderNumber}
+              SIESA {r.siesaNumber} · Pedido proveedor {r.orderNumber}
             </p>
+            {r.orders.length > 0 && (
+              <div className="text-sm">
+                <LinkedOrders orders={r.orders} />
+              </div>
+            )}
             {r.notes && <p className="line-clamp-2 text-sm text-muted-foreground">{r.notes}</p>}
             <div className="border-t pt-2">
               <Plate row={r} />
@@ -142,6 +168,9 @@ export function LoadList({
                   <td className="num px-4 py-3 text-right whitespace-nowrap">{formatCop(r.cost)}</td>
                   <td className="num px-4 py-3">{r.siesaNumber}</td>
                   <td className="num px-4 py-3">{r.orderNumber}</td>
+                  <td className="px-4 py-3 align-top">
+                    <LinkedOrders orders={r.orders} />
+                  </td>
                   {canManage && (
                     <td className="px-2 py-1.5 text-right whitespace-nowrap">
                       <RowActions row={r} onEdit={onEdit} onDelete={onDelete} />

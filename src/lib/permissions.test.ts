@@ -8,6 +8,7 @@ import {
   canManageDrivers,
   canManageSection,
   canManageTrips,
+  canSetKgPerBag,
   canUsePettyCash,
   canViewSection,
   ForbiddenError,
@@ -52,6 +53,7 @@ const SECTIONS: ReadonlyArray<Section> = [
   "clients",
   "deliveries",
   "loads",
+  "orders",
 ];
 
 /** The agreed matrix: "manage" = every write, "read" = view only, "locked" = not even the page. */
@@ -68,6 +70,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     clients: "locked",
     deliveries: "locked",
     loads: "locked",
+    orders: "locked",
   },
   staff: {
     today: "locked",
@@ -81,6 +84,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     clients: "locked",
     deliveries: "locked",
     loads: "locked",
+    orders: "locked",
   },
   assistant: {
     today: "read",
@@ -94,6 +98,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     clients: "locked",
     deliveries: "locked",
     loads: "locked",
+    orders: "locked",
   },
   superadmin: {
     today: "manage",
@@ -107,6 +112,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     clients: "manage",
     deliveries: "manage",
     loads: "manage",
+    orders: "manage",
   },
   dispatcher: {
     today: "locked",
@@ -119,7 +125,8 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     sales: "locked",
     clients: "manage",
     deliveries: "manage",
-    loads: "locked",
+    loads: "read",
+    orders: "manage",
   },
   loader: {
     today: "locked",
@@ -133,6 +140,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     clients: "manage",
     deliveries: "locked",
     loads: "manage",
+    orders: "read",
   },
 };
 
@@ -241,6 +249,7 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/clientes")).toBe("clients");
     expect(sectionOfPath("/entregas")).toBe("deliveries");
     expect(sectionOfPath("/cargues")).toBe("loads");
+    expect(sectionOfPath("/pedidos")).toBe("orders");
   });
 
   it("does not match a path that merely starts with a section name", () => {
@@ -297,20 +306,32 @@ describe("canUsePettyCash", () => {
 });
 
 describe("commercial sections", () => {
-  it("lets the dispatcher manage clients and deliveries but not see loads", () => {
+  it("lets the dispatcher manage clients, deliveries and orders but only read loads", () => {
     expect(canManageSection("dispatcher", "clients")).toBe(true);
     expect(canManageSection("dispatcher", "deliveries")).toBe(true);
-    expect(canViewSection("dispatcher", "loads")).toBe(false);
+    expect(canManageSection("dispatcher", "orders")).toBe(true);
+    expect(canViewSection("dispatcher", "loads")).toBe(true);
+    expect(canManageSection("dispatcher", "loads")).toBe(false);
   });
 
-  it("lets the loader manage clients and loads but not see deliveries", () => {
+  it("lets the loader manage clients and loads, only read orders, and not see deliveries", () => {
     expect(canManageSection("loader", "clients")).toBe(true);
     expect(canManageSection("loader", "loads")).toBe(true);
+    expect(canViewSection("loader", "orders")).toBe(true);
+    expect(canManageSection("loader", "orders")).toBe(false);
     expect(canViewSection("loader", "deliveries")).toBe(false);
   });
 
+  it("lets only the roles that manage orders change the kilograms per bag", () => {
+    expect(canSetKgPerBag("dispatcher")).toBe(true);
+    expect(canSetKgPerBag("superadmin")).toBe(true);
+    for (const role of ["admin", "staff", "assistant", "loader"] as const) {
+      expect(canSetKgPerBag(role)).toBe(false);
+    }
+  });
+
   it("keeps the whole area closed to the fleet roles and open to the superadmin", () => {
-    for (const section of ["clients", "deliveries", "loads"] as const) {
+    for (const section of ["clients", "deliveries", "loads", "orders"] as const) {
       expect(canManageSection("superadmin", section)).toBe(true);
       for (const role of ["admin", "staff", "assistant"] as const) {
         expect(canViewSection(role, section)).toBe(false);

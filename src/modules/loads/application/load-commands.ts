@@ -1,3 +1,4 @@
+import { unavailableOrderIds, type OrderStatus } from "@/modules/orders/domain/order-rules";
 import type { LoadInput } from "./load-schemas";
 
 /** A rule of the loads refused the operation; the message is for the user. */
@@ -13,20 +14,38 @@ export interface LoadPorts {
   findLoad(id: number): Promise<{ plate: string; vehicleId: number | null } | null>;
   /** Id of the load holding that SIESA number, ignoring `exceptId`. */
   findLoadIdBySiesa(siesaNumber: string, exceptId?: number): Promise<number | null>;
-  insertLoad(values: LoadValues): Promise<void>;
-  /** False when no load has that id. */
-  updateLoad(id: number, values: LoadValues): Promise<boolean>;
-  /** False when no load has that id. */
+  /** The orders among `ids` that exist, with their status and the load they belong to. */
+  findOrdersByIds(ids: number[]): Promise<Array<{ id: number; status: OrderStatus; loadId: number | null }>>;
+  /**
+   * Stores the load and, in the same transaction, marks `values.orderIds` as loaded. False (nothing
+   * stored) when one of those orders stopped being available meanwhile.
+   */
+  insertLoad(values: LoadValues): Promise<boolean>;
+  /**
+   * Updates the load; its orders become exactly `values.orderIds` (the ones unchecked go back to
+   * pending), all in one transaction. "gone" when no load has that id, "orders_unavailable" (nothing
+   * changed) when a checked order stopped being available.
+   */
+  updateLoad(id: number, values: LoadValues): Promise<"ok" | "gone" | "orders_unavailable">;
+  /** Deletes the load and returns its orders to pending in the same transaction. False when no load has that id. */
   deleteLoad(id: number): Promise<boolean>;
 }
 
 export const SIESA_TAKEN = "Ya existe un cargue con ese número SIESA.";
 const GONE = "El cargue ya no existe.";
 const NOT_IN_FLEET = "Elige una placa de la flota.";
+export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya pertenece a otro cargue.";
 
 export function createLoadCommands(ports: LoadPorts) {
   async function ensureUniqueSiesa(input: LoadInput, exceptId?: number) {
     if ((await ports.findLoadIdBySiesa(input.siesaNumber, exceptId)) !== null) throw new LoadError(SIESA_TAKEN);
+  }
+
+  /** The checked orders must be pending, or already linked to this same load. */
+  async function ensureOrdersAvailable(orderIds: readonly number[], loadId?: number) {
+    if (orderIds.length === 0) return;
+    const found = await ports.findOrdersByIds([...orderIds]);
+    if (unavailableOrderIds(found, orderIds, loadId).length > 0) throw new LoadError(ORDERS_UNAVAILABLE);
   }
 
   return {
@@ -34,7 +53,10 @@ export function createLoadCommands(ports: LoadPorts) {
       const vehicle = await ports.findVehicleByPlate(input.plate);
       if (!vehicle) throw new LoadError(NOT_IN_FLEET);
       await ensureUniqueSiesa(input);
-      await ports.insertLoad({ ...input, plate: vehicle.plate, vehicleId: vehicle.id });
+      await ensureOrdersAvailable(input.orderIds);
+      if (!(await ports.insertLoad({ ...input, plate: vehicle.plate, vehicleId: vehicle.id }))) {
+        throw new LoadError(ORDERS_UNAVAILABLE);
+      }
     },
 
     async update(id: number, input: LoadInput) {
@@ -51,7 +73,10 @@ export function createLoadCommands(ports: LoadPorts) {
         throw new LoadError(NOT_IN_FLEET);
       }
       await ensureUniqueSiesa(input, id);
-      if (!(await ports.updateLoad(id, values))) throw new LoadError(GONE);
+      await ensureOrdersAvailable(input.orderIds, id);
+      const result = await ports.updateLoad(id, values);
+      if (result === "gone") throw new LoadError(GONE);
+      if (result === "orders_unavailable") throw new LoadError(ORDERS_UNAVAILABLE);
     },
 
     async remove(id: number) {

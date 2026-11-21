@@ -6,6 +6,21 @@ export type LoadSupplier = (typeof LOAD_SUPPLIERS)[number];
 export const isLoadSupplier = (value: unknown): value is LoadSupplier =>
   typeof value === "string" && (LOAD_SUPPLIERS as readonly string[]).includes(value);
 
+/** A concentrate order (pedido) picked up by a load, with what the loads list shows of it. */
+export interface LinkedOrder {
+  id: number;
+  bags: number;
+  lines: ReadonlyArray<{ clientName: string; locationName: string | null }>;
+}
+
+/** "#3, #5" and the bags of every linked order, for the loads list. */
+export function summarizeLinkedOrders(orders: readonly LinkedOrder[]): { label: string; bags: number } {
+  return {
+    label: orders.map((o) => `#${o.id}`).join(", "),
+    bags: orders.reduce((sum, o) => sum + o.bags, 0),
+  };
+}
+
 export interface LoadRow {
   id: number;
   date: IsoDate;
@@ -21,6 +36,8 @@ export interface LoadRow {
   siesaNumber: string;
   orderNumber: string;
   notes: string | null;
+  /** The orders this load picked up, oldest first. */
+  orders: readonly LinkedOrder[];
 }
 
 export interface LoadFilters {

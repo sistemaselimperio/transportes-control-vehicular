@@ -14,7 +14,8 @@ import { loadIdSchema, loadSchema } from "./load-schemas";
 
 const commands = createLoadCommands(loadRepository);
 
-const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
+/** The checked orders repeat the `orderIds` field, which `Object.fromEntries` would collapse into one. */
+const formValues = (fd: FormData) => ({ ...Object.fromEntries(fd.entries()), orderIds: fd.getAll("orderIds") });
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {

@@ -17,11 +17,13 @@
  *   sales          manage          locked          locked                  manage       locked                  locked
  *   clients        locked          locked          locked                  manage       manage                manage
  *   deliveries     locked          locked          locked                  manage       manage                 locked
- *   loads          locked          locked          locked                  manage       locked                  manage
+ *   loads          locked          locked          locked                  manage       read                    manage
+ *   orders         locked          locked          locked                  manage       manage                  read
  *
  * The superadmin manages every section, so it also passes every fine-grained fleet capability below.
  * The commercial sections belong to the superadmin and two commercial roles: the dispatcher (clients and
- * deliveries) and the loader (clients and loads). Each is locked out of the other's section.
+ * deliveries and orders) and the loader (clients and loads). The dispatcher only reads loads and the loader
+ * only reads orders; deliveries stay locked for the loader.
  *
  * Fleet writes are finer than the matrix: `canEditVehicles`, `canDeleteVehicles` and
  * `canManageVehicleFiles` and `canTransferVehicles` (sell, transfer owner) say who may do each one.
@@ -42,7 +44,8 @@ export type Section =
   | "sales"
   | "clients"
   | "deliveries"
-  | "loads";
+  | "loads"
+  | "orders";
 
 export type Access = "read" | "manage";
 
@@ -83,14 +86,18 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     clients: "manage",
     deliveries: "manage",
     loads: "manage",
+    orders: "manage",
   },
   dispatcher: {
     clients: "manage",
     deliveries: "manage",
+    loads: "read",
+    orders: "manage",
   },
   loader: {
     clients: "manage",
     loads: "manage",
+    orders: "read",
   },
 };
 
@@ -106,6 +113,7 @@ const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
   ["clients", "/clientes"],
   ["deliveries", "/entregas"],
   ["loads", "/cargues"],
+  ["orders", "/pedidos"],
 ];
 
 /** Anything that is not exactly a known role is the least privileged one. */
@@ -132,6 +140,11 @@ export function canViewSection(role: Role, section: Section): boolean {
 /** Create, edit, delete and every other write of a section. */
 export function canManageSection(role: Role, section: Section): boolean {
   return accessOf(role, section) === "manage";
+}
+
+/** Change the kilograms per bag of the concentrate orders: whoever manages the orders. */
+export function canSetKgPerBag(role: Role): boolean {
+  return canManageSection(role, "orders");
 }
 
 /** Create, edit and delete drivers. */
