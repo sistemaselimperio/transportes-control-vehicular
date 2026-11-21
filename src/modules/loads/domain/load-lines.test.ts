@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  draftsTotals,
   firstDuplicate,
+  isDraftComplete,
   loadTotals,
   orderedVersusLoaded,
   reconcileDrafts,
@@ -127,5 +129,38 @@ describe("orderedVersusLoaded", () => {
       { referenceName: "Engorde 40", ordered: 7.2, loaded: 7.6, difference: 0.4 },
       { referenceName: "Levante", ordered: 2, loaded: 0, difference: -2 },
     ]);
+  });
+});
+
+describe("isDraftComplete", () => {
+  const full = draft({ reference: "Maxi-Leche", tons: "7,2", cost: "1.500.000", siesaNumber: "123", orderNumber: "P-9" });
+
+  it("accepts a line with every field filled", () => {
+    expect(isDraftComplete(full)).toBe(true);
+  });
+
+  it.each([
+    ["reference", { reference: "  " }],
+    ["tons blank", { tons: "" }],
+    ["tons zero", { tons: "0" }],
+    ["tons not a number", { tons: "abc" }],
+    ["cost blank", { cost: "" }],
+    ["cost zero", { cost: "0" }],
+    ["siesa", { siesaNumber: " " }],
+    ["supplier order", { orderNumber: "" }],
+  ])("rejects a line with %s missing or invalid", (_name, over) => {
+    expect(isDraftComplete({ ...full, ...over })).toBe(false);
+  });
+});
+
+describe("draftsTotals", () => {
+  it("counts the lines and adds what was typed, ignoring what cannot be read", () => {
+    expect(
+      draftsTotals([
+        draft({ tons: "7,2", cost: "1.500.000" }),
+        draft({ tons: "0,1", cost: "2.000" }),
+        draft({ tons: "x", cost: "" }),
+      ]),
+    ).toEqual({ count: 3, tons: 7.3, cost: 1502000 });
   });
 });

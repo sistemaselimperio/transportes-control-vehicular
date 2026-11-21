@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
 import { PesosInput } from "@/components/app/pesos-input";
@@ -8,14 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { orderTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDisplayDate, todayInBogota } from "@/modules/shared/domain/dates";
-import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { formatDecimal, parseDecimal } from "@/modules/shared/domain/decimal";
 import { searchKey } from "@/modules/shared/domain/search-key";
 import { createLoadAction, updateLoadAction } from "../application/load-actions";
 import { MAX_LINES, NOTES_MAX, PRODUCT_MAX, REFERENCE_MAX } from "../application/load-schemas";
-import { orderedVersusLoaded, reconcileDrafts, suggestLines, type LineDraft } from "../domain/load-lines";
-import { LOAD_SUPPLIERS, type LoadRow } from "../domain/load-rules";
+import {
+  costOf,
+  draftsTotals,
+  isDraftComplete,
+  orderedVersusLoaded,
+  reconcileDrafts,
+  suggestLines,
+  type LineDraft,
+} from "../domain/load-lines";
+import { formatCop, LOAD_SUPPLIERS, type LoadRow } from "../domain/load-rules";
 
 const FIELD = "h-10 md:h-9";
 
@@ -25,6 +34,9 @@ const formatSigned = (value: number): string => `${value > 0 ? "+" : ""}${format
 const emptyLine = (key: number): LineDraft => ({ key, reference: "", tons: "", cost: "", siesaNumber: "", orderNumber: "", auto: false });
 
 const nextKey = (drafts: readonly LineDraft[]): number => Math.max(-1, ...drafts.map((d) => d.key)) + 1;
+
+/** The line to open for editing: the first one that is not complete yet. */
+const firstIncompleteKey = (drafts: readonly LineDraft[]): number | null => drafts.find((d) => !isDraftComplete(d))?.key ?? null;
 
 /** The JSON the server action parses: what was typed, as text. */
 const serializeLines = (drafts: readonly LineDraft[]): string =>
@@ -83,6 +95,8 @@ export function LoadForm({
     }
     return checked.size > 0 ? reconcileDrafts([], suggestionsOf(checked), 0) : [emptyLine(0)];
   });
+  // At most one line is open; a line that is not complete starts open.
+  const [openKey, setOpenKey] = useState<number | null>(() => firstIncompleteKey(lines));
   const knownKeys = new Set(references.map(searchKey));
 
   const suggestions = suggestionsOf(checked);
@@ -97,8 +111,19 @@ export function LoadForm({
     else next.delete(id);
     setChecked(next);
     // The checked orders suggest one line per product; what the user already entered stays.
-    setLines((all) => reconcileDrafts(all, suggestionsOf(next), nextKey(all)));
+    const reconciled = reconcileDrafts(lines, suggestionsOf(next), nextKey(lines));
+    setLines(reconciled);
+    // Suggested lines arrive incomplete: keep the open one, or else open the first that needs data.
+    setOpenKey((open) => (open !== null && reconciled.some((l) => l.key === open) ? open : firstIncompleteKey(reconciled)));
   }
+
+  function addLine() {
+    const key = nextKey(lines);
+    setLines([...lines, emptyLine(key)]);
+    setOpenKey(key);
+  }
+
+  const totals = draftsTotals(lines);
 
   /** An edited line stops following the orders. */
   const patch = (key: number, change: Partial<LineDraft>) =>
@@ -107,6 +132,14 @@ export function LoadForm({
   return (
     <ActionForm
       action={(fd) => {
+        // Collapsed lines keep their values in state, so nothing is lost. An incomplete one is opened here
+        // instead of relying on native "required", which cannot show a message on a hidden input.
+        const incomplete = firstIncompleteKey(lines);
+        if (incomplete !== null) {
+          setOpenKey(incomplete);
+          const n = lines.findIndex((l) => l.key === incomplete) + 1;
+          return Promise.resolve({ ok: false as const, error: `Completa los datos del producto ${n}.` });
+        }
         fd.set("lines", serializeLines(lines));
         return load ? updateLoadAction(load.id, fd) : createLoadAction(fd);
       }}
@@ -187,20 +220,60 @@ export function LoadForm({
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-medium">Productos</legend>
+        <p className="num text-sm text-muted-foreground" aria-live="polite">
+          {totals.count} {totals.count === 1 ? "producto" : "productos"} · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
+        </p>
         {lines.map((line, index) => {
           const typed = line.reference.trim();
           const vs = compared(line.reference);
           const showsDifference = vs !== undefined && firstLineOf(line.reference)?.key === line.key;
+          const open = openKey === line.key;
+          const complete = isDraftComplete(line);
+          const tons = parseDecimal(line.tons) ?? 0;
+          const cost = costOf(line.cost);
+          const summary = [
+            tons > 0 ? `${formatDecimal(tons, 3)} t` : null,
+            cost > 0 ? formatCop(cost) : null,
+            line.siesaNumber.trim() !== "" ? `SIESA ${line.siesaNumber.trim()}` : null,
+            showsDifference ? `Pedido ${formatDecimal(vs.ordered, 3)} t (${formatSigned(vs.difference)})` : null,
+          ].filter((part): part is string => part !== null);
+          const bodyId = `load-line-${line.key}`;
           return (
-            <div key={line.key} className="space-y-3 rounded-xl border bg-card p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="micro-label">Producto {index + 1}</p>
+            <div key={line.key} className="rounded-xl border bg-card">
+              <div className="flex items-center gap-1 pr-1">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={bodyId}
+                  onClick={() => setOpenKey(open ? null : line.key)}
+                  className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground"
+                >
+                  <ChevronDown
+                    aria-hidden
+                    className={cn("size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")}
+                  />
+                  {open ? (
+                    <span className="micro-label">Producto {index + 1}</span>
+                  ) : (
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2">
+                        <span className={cn("truncate text-sm font-medium", typed === "" && "text-muted-foreground")}>
+                          {typed === "" ? "Sin producto" : typed}
+                        </span>
+                        {!complete && (
+                          <span className="shrink-0 rounded-full bg-destructive-soft px-2 py-0.5 text-xs text-destructive">Incompleta</span>
+                        )}
+                      </span>
+                      {summary.length > 0 && <span className="num block truncate text-xs text-muted-foreground">{summary.join(" · ")}</span>}
+                    </span>
+                  )}
+                </button>
                 {lines.length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="-my-1 size-11 text-destructive md:size-9"
+                    className="size-11 shrink-0 text-destructive md:size-9"
                     aria-label={`Quitar producto ${index + 1}`}
                     title="Quitar producto"
                     onClick={() => setLines((all) => all.filter((l) => l.key !== line.key))}
@@ -209,79 +282,77 @@ export function LoadForm({
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-[1fr_7rem] gap-3">
-                <Field
-                  label="Producto"
-                  htmlFor={`load-product-${line.key}`}
-                  required
-                  hint={
-                    typed === "" && line.legacy
-                      ? "Sin producto: elige uno para poder guardar."
-                      : typed !== "" && !knownKeys.has(searchKey(typed))
-                        ? "Producto nuevo: se creará al guardar."
-                        : undefined
-                  }
-                >
-                  <Input
-                    id={`load-product-${line.key}`}
-                    list={listId}
-                    className={FIELD}
-                    value={line.reference}
-                    maxLength={PRODUCT_MAX}
-                    autoComplete="off"
+              {/* Kept mounted while collapsed: the values live in the drafts and the inputs keep their own state. */}
+              <div id={bodyId} hidden={!open} className="space-y-3 px-3 pb-3">
+                <div className="grid grid-cols-[1fr_7rem] gap-3">
+                  <Field
+                    label="Producto"
+                    htmlFor={`load-product-${line.key}`}
                     required
-                    onChange={(e) => patch(line.key, { reference: e.target.value })}
+                    hint={
+                      typed === "" && line.legacy
+                        ? "Sin producto: elige uno para poder guardar."
+                        : typed !== "" && !knownKeys.has(searchKey(typed))
+                          ? "Producto nuevo: se creará al guardar."
+                          : undefined
+                    }
+                  >
+                    <Input
+                      id={`load-product-${line.key}`}
+                      list={listId}
+                      className={FIELD}
+                      value={line.reference}
+                      maxLength={PRODUCT_MAX}
+                      autoComplete="off"
+                      onChange={(e) => patch(line.key, { reference: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Toneladas" htmlFor={`load-tons-${line.key}`} required>
+                    <Input
+                      id={`load-tons-${line.key}`}
+                      inputMode="decimal"
+                      className={`${FIELD} num`}
+                      value={line.tons}
+                      autoComplete="off"
+                      onChange={(e) => patch(line.key, { tons: e.target.value })}
+                    />
+                  </Field>
+                </div>
+                {showsDifference && (
+                  <p className="num -mt-1 text-xs text-muted-foreground" aria-live="polite">
+                    Pedido {formatDecimal(vs.ordered, 3)} t · {formatSigned(vs.difference)}
+                  </p>
+                )}
+                <Field label="Costo (COP)" htmlFor={`load-cost-${line.key}`} required>
+                  <PesosInput
+                    id={`load-cost-${line.key}`}
+                    name={`cost-${line.key}`}
+                    defaultValue={line.cost === "" ? undefined : costOf(line.cost)}
+                    onValueChange={(cost) => patch(line.key, { cost })}
                   />
                 </Field>
-                <Field label="Toneladas" htmlFor={`load-tons-${line.key}`} required>
-                  <Input
-                    id={`load-tons-${line.key}`}
-                    inputMode="decimal"
-                    className={`${FIELD} num`}
-                    value={line.tons}
-                    autoComplete="off"
-                    required
-                    onChange={(e) => patch(line.key, { tons: e.target.value })}
-                  />
-                </Field>
-              </div>
-              {showsDifference && (
-                <p className="num -mt-1 text-xs text-muted-foreground" aria-live="polite">
-                  Pedido {formatDecimal(vs.ordered, 3)} t · {formatSigned(vs.difference)}
-                </p>
-              )}
-              <Field label="Costo (COP)" htmlFor={`load-cost-${line.key}`} required>
-                <PesosInput
-                  id={`load-cost-${line.key}`}
-                  name={`cost-${line.key}`}
-                  defaultValue={line.cost === "" ? undefined : Number(line.cost.replace(/\D/g, ""))}
-                  required
-                  onValueChange={(cost) => patch(line.key, { cost })}
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Número SIESA" htmlFor={`load-siesa-${line.key}`} required hint="No se puede repetir.">
-                  <Input
-                    id={`load-siesa-${line.key}`}
-                    className={`${FIELD} num`}
-                    value={line.siesaNumber}
-                    maxLength={REFERENCE_MAX}
-                    autoComplete="off"
-                    required
-                    onChange={(e) => patch(line.key, { siesaNumber: e.target.value })}
-                  />
-                </Field>
-                <Field label="Pedido proveedor" htmlFor={`load-order-${line.key}`} required>
-                  <Input
-                    id={`load-order-${line.key}`}
-                    className={`${FIELD} num`}
-                    value={line.orderNumber}
-                    maxLength={REFERENCE_MAX}
-                    autoComplete="off"
-                    required
-                    onChange={(e) => patch(line.key, { orderNumber: e.target.value })}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Número SIESA" htmlFor={`load-siesa-${line.key}`} required hint="No se puede repetir.">
+                    <Input
+                      id={`load-siesa-${line.key}`}
+                      className={`${FIELD} num`}
+                      value={line.siesaNumber}
+                      maxLength={REFERENCE_MAX}
+                      autoComplete="off"
+                      onChange={(e) => patch(line.key, { siesaNumber: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Pedido proveedor" htmlFor={`load-order-${line.key}`} required>
+                    <Input
+                      id={`load-order-${line.key}`}
+                      className={`${FIELD} num`}
+                      value={line.orderNumber}
+                      maxLength={REFERENCE_MAX}
+                      autoComplete="off"
+                      onChange={(e) => patch(line.key, { orderNumber: e.target.value })}
+                    />
+                  </Field>
+                </div>
               </div>
             </div>
           );
@@ -291,7 +362,7 @@ export function LoadForm({
             type="button"
             variant="outline"
             className="h-11 w-full md:h-9"
-            onClick={() => setLines((all) => [...all, emptyLine(nextKey(all))])}
+            onClick={addLine}
           >
             <Plus aria-hidden />
             Agregar producto

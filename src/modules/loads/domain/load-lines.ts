@@ -122,3 +122,26 @@ export function orderedVersusLoaded(
     return { referenceName: s.referenceName, ordered: s.tons, loaded, difference: round3(loaded - s.tons) };
   });
 }
+
+/** The whole pesos typed in a cost field ("1.500.000" -> 1500000); 0 when there are no digits. */
+export const costOf = (text: string): number => Number(text.replace(/\D/g, "")) || 0;
+
+/** A line the server would accept: product, tons > 0, cost > 0, SIESA and supplier order filled. */
+export function isDraftComplete(d: Pick<LineDraft, "reference" | "tons" | "cost" | "siesaNumber" | "orderNumber">): boolean {
+  return (
+    d.reference.trim() !== "" &&
+    (parseDecimal(d.tons) ?? 0) > 0 &&
+    costOf(d.cost) > 0 &&
+    d.siesaNumber.trim() !== "" &&
+    d.orderNumber.trim() !== ""
+  );
+}
+
+/** What the form shows above the lines: how many, and the tons and pesos typed so far. */
+export function draftsTotals(drafts: ReadonlyArray<Pick<LineDraft, "tons" | "cost">>): { count: number; tons: number; cost: number } {
+  return {
+    count: drafts.length,
+    tons: round3(drafts.reduce((sum, d) => sum + (parseDecimal(d.tons) ?? 0), 0)),
+    cost: drafts.reduce((sum, d) => sum + costOf(d.cost), 0),
+  };
+}
