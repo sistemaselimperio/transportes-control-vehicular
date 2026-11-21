@@ -9,6 +9,7 @@ const NUMBER = String.raw`-?\d{1,3}(?:\.\d+)?`;
 
 const PIN = new RegExp(`!3d(${NUMBER})!4d(${NUMBER})`);
 const QUERY = new RegExp(`[?&](?:q|query|ll)=(${NUMBER})(?:,|%2C)(${NUMBER})(?:[&#]|$)`, "i");
+const PATH = new RegExp(`/maps/(?:search|place)/(${NUMBER})(?:,|%2C)(?:\\+|%20| )*(${NUMBER})(?:[/?#&]|$)`, "i");
 const VIEWPORT = new RegExp(`@(${NUMBER}),(${NUMBER})(?:[,/]|$)`);
 
 function toCoordinates(match: RegExpExecArray | null): Coordinates | null {
@@ -22,13 +23,19 @@ function toCoordinates(match: RegExpExecArray | null): Coordinates | null {
 
 /**
  * Coordinates found in a pasted Google Maps URL: the pin (`!3dLAT!4dLNG`), a query (`?q=`, `query=`,
- * `ll=`) or the viewport (`@lat,lng,`), in that order. Short links (maps.app.goo.gl) hold none and
- * would need a network call to expand, so they give `null`.
+ * `ll=`), the path (`/maps/search/LAT,+LNG`, where shared short links expand to) or the viewport
+ * (`@lat,lng,`), in that order. Short links (maps.app.goo.gl) hold none and would need a network call
+ * to expand, so they give `null`.
  */
 export function parseMapsCoordinates(url: string): Coordinates | null {
   const text = url.trim();
   if (text === "") return null;
-  return toCoordinates(PIN.exec(text)) ?? toCoordinates(QUERY.exec(text)) ?? toCoordinates(VIEWPORT.exec(text));
+  return (
+    toCoordinates(PIN.exec(text)) ??
+    toCoordinates(QUERY.exec(text)) ??
+    toCoordinates(PATH.exec(text)) ??
+    toCoordinates(VIEWPORT.exec(text))
+  );
 }
 
 /**

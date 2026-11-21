@@ -36,6 +36,31 @@ describe("parseMapsCoordinates", () => {
     expect(parseMapsCoordinates("https://x.test/maps/@-12,34.5,10z")).toEqual({ latitude: -12, longitude: 34.5 });
   });
 
+  it("reads lat,lng in the /maps/search/ path (where a shared short link expands to)", () => {
+    const expanded = "https://www.google.com/maps/search/5.551789,+-73.777044?entry=tts&g_ep=EgoyMDI2MTExNy4wIPu8ASoASAFQAw%3D%3D";
+    expect(parseMapsCoordinates(expanded)).toEqual({ latitude: 5.551789, longitude: -73.777044 });
+    expect(parseMapsCoordinates("https://www.google.com/maps/search/5.5353,-73.3678")).toEqual({
+      latitude: 5.5353,
+      longitude: -73.3678,
+    });
+    expect(parseMapsCoordinates("https://www.google.com/maps/search/5.5353%2C%20-73.3678/")).toEqual({
+      latitude: 5.5353,
+      longitude: -73.3678,
+    });
+  });
+
+  it("reads lat,lng in the /maps/place/ path", () => {
+    expect(parseMapsCoordinates("https://www.google.com/maps/place/5.5353,-73.3678")).toEqual({
+      latitude: 5.5353,
+      longitude: -73.3678,
+    });
+  });
+
+  it("does not take a place name in the path for coordinates", () => {
+    expect(parseMapsCoordinates("https://www.google.com/maps/search/Finca+La+Esperanza")).toBeNull();
+    expect(parseMapsCoordinates("https://www.google.com/maps/place/Calle+5,+3-20")).toBeNull();
+  });
+
   it("cannot read a short link offline", () => {
     expect(parseMapsCoordinates("https://maps.app.goo.gl/AbCdEf123")).toBeNull();
     expect(parseMapsCoordinates("https://goo.gl/maps/AbCdEf123")).toBeNull();
