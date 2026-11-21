@@ -1,19 +1,26 @@
+import { type EnsureReferences, resolveReferenceIds } from "@/modules/orders/application/reference-resolver";
 import { unavailableOrderIds, type OrderStatus } from "@/modules/orders/domain/order-rules";
+import { searchKey } from "@/modules/shared/domain/search-key";
+import { firstDuplicate } from "../domain/load-lines";
 import type { LoadInput } from "./load-schemas";
 
 /** A rule of the loads refused the operation; the message is for the user. */
 export class LoadError extends Error {}
 
-export interface LoadValues extends LoadInput {
+/** What the repository stores: the header with the vehicle link, the lines with their reference ids. */
+export interface LoadValues extends Omit<LoadInput, "lines"> {
   vehicleId: number | null;
+  lines: ReadonlyArray<{ referenceId: number; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
 }
 
 export interface LoadPorts {
   /** A fleet vehicle that has not been sold, by normalized plate. */
   findVehicleByPlate(plate: string): Promise<{ id: number; plate: string } | null>;
   findLoad(id: number): Promise<{ plate: string; vehicleId: number | null } | null>;
-  /** Id of the load holding that SIESA number, ignoring `exceptId`. */
-  findLoadIdBySiesa(siesaNumber: string, exceptId?: number): Promise<number | null>;
+  /** The SIESA numbers among `numbers` already held by a line of another load (ignoring load `exceptId`). */
+  findTakenSiesa(numbers: string[], exceptId?: number): Promise<string[]>;
+  /** The id of every product by `key` (see `searchKey`), creating the ones that do not exist yet. */
+  ensureReferences: EnsureReferences;
   /** The orders among `ids` that exist, with their status and the load they belong to. */
   findOrdersByIds(ids: number[]): Promise<Array<{ id: number; status: OrderStatus; loadId: number | null }>>;
   /**
@@ -31,14 +38,45 @@ export interface LoadPorts {
   deleteLoad(id: number): Promise<boolean>;
 }
 
+/** Fallback for a race the command's own check did not catch. */
 export const SIESA_TAKEN = "Ya existe un cargue con ese número SIESA.";
+export const siesaTaken = (siesa: string) => `Ya existe un cargue con el número SIESA ${siesa}.`;
+const NO_LINES = "Agrega al menos un producto al cargue.";
+const siesaRepeated = (siesa: string) => `El número SIESA ${siesa} está repetido en el cargue.`;
 const GONE = "El cargue ya no existe.";
 const NOT_IN_FLEET = "Elige una placa de la flota.";
 export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya pertenece a otro cargue.";
 
 export function createLoadCommands(ports: LoadPorts) {
-  async function ensureUniqueSiesa(input: LoadInput, exceptId?: number) {
-    if ((await ports.findLoadIdBySiesa(input.siesaNumber, exceptId)) !== null) throw new LoadError(SIESA_TAKEN);
+  /** At least one line, no SIESA repeated inside the load or held by another load. */
+  async function ensureLines(input: LoadInput, exceptId?: number) {
+    if (input.lines.length === 0) throw new LoadError(NO_LINES);
+    const numbers = input.lines.map((l) => l.siesaNumber);
+    const repeated = firstDuplicate(numbers);
+    if (repeated !== null) throw new LoadError(siesaRepeated(repeated));
+    const [taken] = await ports.findTakenSiesa(numbers, exceptId);
+    if (taken !== undefined) throw new LoadError(siesaTaken(taken));
+  }
+
+  /** Swaps each product name for its catalog id, creating the unknown ones; run once every other check passed. */
+  async function prepare(input: LoadInput, owner: { plate: string; vehicleId: number | null }): Promise<LoadValues> {
+    const referenceIds = await resolveReferenceIds(
+      ports.ensureReferences,
+      input.lines.map((l) => l.reference),
+    );
+    return {
+      date: input.date,
+      supplier: input.supplier,
+      plate: owner.plate,
+      vehicleId: owner.vehicleId,
+      notes: input.notes,
+      orderIds: input.orderIds,
+      lines: input.lines.map((l) => {
+        const referenceId = referenceIds.get(searchKey(l.reference));
+        if (referenceId === undefined) throw new LoadError("No se pudo registrar el producto.");
+        return { referenceId, tons: l.tons, cost: l.cost, siesaNumber: l.siesaNumber, orderNumber: l.orderNumber };
+      }),
+    };
   }
 
   /** The checked orders must be pending, or already linked to this same load. */
@@ -52,9 +90,9 @@ export function createLoadCommands(ports: LoadPorts) {
     async create(input: LoadInput) {
       const vehicle = await ports.findVehicleByPlate(input.plate);
       if (!vehicle) throw new LoadError(NOT_IN_FLEET);
-      await ensureUniqueSiesa(input);
+      await ensureLines(input);
       await ensureOrdersAvailable(input.orderIds);
-      if (!(await ports.insertLoad({ ...input, plate: vehicle.plate, vehicleId: vehicle.id }))) {
+      if (!(await ports.insertLoad(await prepare(input, { plate: vehicle.plate, vehicleId: vehicle.id })))) {
         throw new LoadError(ORDERS_UNAVAILABLE);
       }
     },
@@ -63,18 +101,18 @@ export function createLoadCommands(ports: LoadPorts) {
       const stored = await ports.findLoad(id);
       if (!stored) throw new LoadError(GONE);
       const vehicle = await ports.findVehicleByPlate(input.plate);
-      let values: LoadValues;
+      let owner: { plate: string; vehicleId: number | null };
       if (vehicle) {
-        values = { ...input, plate: vehicle.plate, vehicleId: vehicle.id };
+        owner = { plate: vehicle.plate, vehicleId: vehicle.id };
       } else if (stored.plate === input.plate) {
         // The vehicle left the fleet since: the load keeps the plate and link it was saved with.
-        values = { ...input, vehicleId: stored.vehicleId };
+        owner = { plate: input.plate, vehicleId: stored.vehicleId };
       } else {
         throw new LoadError(NOT_IN_FLEET);
       }
-      await ensureUniqueSiesa(input, id);
+      await ensureLines(input, id);
       await ensureOrdersAvailable(input.orderIds, id);
-      const result = await ports.updateLoad(id, values);
+      const result = await ports.updateLoad(id, await prepare(input, owner));
       if (result === "gone") throw new LoadError(GONE);
       if (result === "orders_unavailable") throw new LoadError(ORDERS_UNAVAILABLE);
     },

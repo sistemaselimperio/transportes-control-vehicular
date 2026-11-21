@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { LoadPorts, LoadValues } from "../application/load-commands";
+import { ensureReferences } from "@/modules/orders/infrastructure/reference-repository";
+import { loadTotals, type LoadLineRow } from "../domain/load-lines";
 import type { LinkedOrder, LoadRow } from "../domain/load-rules";
 
 /** The orders each load picked up, by load id, with the clients and fincas of their lines. */
@@ -34,11 +36,33 @@ async function loadLinkedOrders(): Promise<Map<number, LinkedOrder[]>> {
   return byLoad;
 }
 
+/** The product lines of every load, by load id, in the order they were typed. */
+async function loadLines(): Promise<Map<number, LoadLineRow[]>> {
+  const rows = await db
+    .select({
+      id: schema.loadLines.id,
+      loadId: schema.loadLines.loadId,
+      referenceId: schema.loadLines.referenceId,
+      referenceName: schema.orderReferences.name,
+      tons: schema.loadLines.tons,
+      cost: schema.loadLines.cost,
+      siesaNumber: schema.loadLines.siesaNumber,
+      orderNumber: schema.loadLines.orderNumber,
+    })
+    .from(schema.loadLines)
+    .leftJoin(schema.orderReferences, eq(schema.orderReferences.id, schema.loadLines.referenceId))
+    .orderBy(asc(schema.loadLines.loadId), asc(schema.loadLines.position), asc(schema.loadLines.id));
+  const byLoad = new Map<number, LoadLineRow[]>();
+  for (const { loadId, ...line } of rows) byLoad.set(loadId, [...(byLoad.get(loadId) ?? []), line]);
+  return byLoad;
+}
+
 /** Every load, newest day first. */
 export async function loadLoadRows(): Promise<LoadRow[]> {
-  const [rows, linked] = await Promise.all([
+  const [rows, linked, lines] = await Promise.all([
     db.select().from(schema.loads).orderBy(desc(schema.loads.date), desc(schema.loads.id)),
     loadLinkedOrders(),
+    loadLines(),
   ]);
   return rows.map((r) => ({
     id: r.id,
@@ -46,10 +70,8 @@ export async function loadLoadRows(): Promise<LoadRow[]> {
     supplier: r.supplier,
     plate: r.plate,
     vehicleId: r.vehicleId,
-    tons: r.tons,
-    cost: r.cost,
-    siesaNumber: r.siesaNumber,
-    orderNumber: r.orderNumber,
+    ...loadTotals(lines.get(r.id) ?? []),
+    lines: lines.get(r.id) ?? [],
     notes: r.notes,
     orders: linked.get(r.id) ?? [],
   }));
@@ -60,12 +82,19 @@ const toColumns = (v: LoadValues) => ({
   supplier: v.supplier,
   plate: v.plate,
   vehicleId: v.vehicleId,
-  tons: v.tons,
-  cost: v.cost,
-  siesaNumber: v.siesaNumber,
-  orderNumber: v.orderNumber,
   notes: v.notes,
 });
+
+const toLineColumns = (loadId: number, lines: LoadValues["lines"]) =>
+  lines.map((l, position) => ({
+    loadId,
+    referenceId: l.referenceId,
+    tons: l.tons,
+    cost: l.cost,
+    siesaNumber: l.siesaNumber,
+    orderNumber: l.orderNumber,
+    position,
+  }));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -112,14 +141,16 @@ export const loadRepository: LoadPorts = {
     return row ?? null;
   },
 
-  async findLoadIdBySiesa(siesaNumber, exceptId) {
-    const [row] = await db
-      .select({ id: schema.loads.id })
-      .from(schema.loads)
-      .where(and(eq(schema.loads.siesaNumber, siesaNumber), exceptId == null ? undefined : ne(schema.loads.id, exceptId)))
-      .limit(1);
-    return row?.id ?? null;
+  async findTakenSiesa(numbers, exceptId) {
+    if (numbers.length === 0) return [];
+    const rows = await db
+      .select({ siesaNumber: schema.loadLines.siesaNumber })
+      .from(schema.loadLines)
+      .where(and(inArray(schema.loadLines.siesaNumber, numbers), exceptId == null ? undefined : ne(schema.loadLines.loadId, exceptId)));
+    return rows.map((r) => r.siesaNumber);
   },
+
+  ensureReferences,
 
   async findOrdersByIds(ids) {
     if (ids.length === 0) return [];
@@ -134,6 +165,7 @@ export const loadRepository: LoadPorts = {
       await db.transaction(async (tx) => {
         const [load] = await tx.insert(schema.loads).values(toColumns(values)).returning({ id: schema.loads.id });
         if (!load) throw new Error("The load was not stored.");
+        await tx.insert(schema.loadLines).values(toLineColumns(load.id, values.lines));
         await linkOrders(tx, load.id, values.orderIds);
       });
       return true;
@@ -152,6 +184,9 @@ export const loadRepository: LoadPorts = {
           .where(eq(schema.loads.id, id))
           .returning({ id: schema.loads.id });
         if (rows.length !== 1) return "gone" as const;
+        // The lines are rewritten whole: the old ones go first so a kept SIESA number never collides with itself.
+        await tx.delete(schema.loadLines).where(eq(schema.loadLines.loadId, id));
+        await tx.insert(schema.loadLines).values(toLineColumns(id, values.lines));
         // The orders of the load become exactly the checked ones: unchecked orders go back to pending.
         await releaseOrders(tx, id);
         await linkOrders(tx, id, values.orderIds);

@@ -43,6 +43,47 @@ function LinkedOrders({ orders }: { orders: LoadRow["orders"] }) {
   );
 }
 
+/** The products of a load; opening it lists each with its tons, cost and numbers, and the orders it picked up. */
+function LoadDetails({ row }: { row: LoadRow }) {
+  const count = row.lines.length;
+  return (
+    <details className="group">
+      <summary className="cursor-pointer rounded-sm text-sm outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
+        <span className="num">
+          {count} {count === 1 ? "producto" : "productos"}
+        </span>
+      </summary>
+      <div className="mt-2 space-y-3">
+        <ul className="space-y-2">
+          {row.lines.map((l) => (
+            <li key={l.id} className="rounded-lg border bg-background p-2.5 text-xs">
+              <p className="text-sm font-medium">
+                {l.referenceName ?? <span className="font-normal text-muted-foreground">Sin producto</span>}
+              </p>
+              <p className="num text-muted-foreground">
+                {formatDecimal(l.tons, 3)} t · {formatCop(l.cost)}
+              </p>
+              <p className="num text-muted-foreground">
+                SIESA {l.siesaNumber} · Pedido proveedor {l.orderNumber}
+              </p>
+            </li>
+          ))}
+        </ul>
+        {row.orders.length > 0 && (
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {row.orders.map((o) => (
+              <li key={o.id}>
+                <span className="num font-medium text-foreground">Pedido #{o.id}</span>{" "}
+                {o.lines.map((l) => (l.locationName ? `${l.clientName} (${l.locationName})` : l.clientName)).join(", ")}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function RowActions({
   row,
   onEdit,
@@ -58,7 +99,7 @@ function RowActions({
         variant="ghost"
         size="icon"
         className="size-11 md:size-9"
-        aria-label={`Editar cargue ${row.siesaNumber}`}
+        aria-label={`Editar cargue de ${row.supplier} del ${formatDisplayDate(row.date)}`}
         title="Editar"
         onClick={() => onEdit(row)}
       >
@@ -68,7 +109,7 @@ function RowActions({
         variant="ghost"
         size="icon"
         className="size-11 text-destructive md:size-9"
-        aria-label={`Eliminar cargue ${row.siesaNumber}`}
+        aria-label={`Eliminar cargue de ${row.supplier} del ${formatDisplayDate(row.date)}`}
         title="Eliminar"
         onClick={() => onDelete(row)}
       >
@@ -78,7 +119,7 @@ function RowActions({
   );
 }
 
-const HEADERS = ["Fecha", "Proveedor", "Placa", "Toneladas", "Costo", "SIESA", "Pedido proveedor", "Pedidos"] as const;
+const HEADERS = ["Fecha", "Proveedor", "Placa", "Toneladas", "Costo", "Productos", "Pedidos"] as const;
 const NUMERIC = new Set<string>(["Toneladas", "Costo"]);
 
 /** Loads as a table from `md`, as cards on phones. Without `canManage` the rows carry no edit / delete. */
@@ -113,14 +154,12 @@ export function LoadList({
             <p className="num text-sm">
               {formatDecimal(r.tons, 3)} t · {formatCop(r.cost)}
             </p>
-            <p className="num text-sm text-muted-foreground">
-              SIESA {r.siesaNumber} · Pedido proveedor {r.orderNumber}
-            </p>
             {r.orders.length > 0 && (
-              <div className="text-sm">
-                <LinkedOrders orders={r.orders} />
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Pedidos: <LinkedOrders orders={r.orders} />
+              </p>
             )}
+            <LoadDetails row={r} />
             {r.notes && <p className="line-clamp-2 text-sm text-muted-foreground">{r.notes}</p>}
             <div className="border-t pt-2">
               <Plate row={r} />
@@ -166,8 +205,9 @@ export function LoadList({
                   </td>
                   <td className="num px-4 py-3 text-right">{formatDecimal(r.tons, 3)}</td>
                   <td className="num px-4 py-3 text-right whitespace-nowrap">{formatCop(r.cost)}</td>
-                  <td className="num px-4 py-3">{r.siesaNumber}</td>
-                  <td className="num px-4 py-3">{r.orderNumber}</td>
+                  <td className="px-4 py-3 align-top">
+                    <LoadDetails row={r} />
+                  </td>
                   <td className="px-4 py-3 align-top">
                     <LinkedOrders orders={r.orders} />
                   </td>

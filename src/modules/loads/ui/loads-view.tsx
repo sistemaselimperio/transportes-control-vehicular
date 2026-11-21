@@ -24,6 +24,7 @@ export function LoadsView({
   rows,
   plates,
   orders,
+  references,
   kgPerBag,
   presetOrderId,
   canManage,
@@ -32,6 +33,8 @@ export function LoadsView({
   plates: readonly string[];
   /** Orders a load can hold: the pending ones and the loaded ones (each form keeps only its own). */
   orders: readonly OrderRow[];
+  /** The product catalog, for the suggestions of the form. */
+  references: readonly string[];
   kgPerBag: number;
   /** An order to start the new load with, from the "Crear cargue" button of the orders page. */
   presetOrderId: number | null;
@@ -65,7 +68,7 @@ export function LoadsView({
     <section className="space-y-5">
       <PageHeader
         title="Cargues"
-        description="Cargues recibidos de los proveedores, con su costo y número SIESA."
+        description="Cargues recibidos de los proveedores, con los productos, el costo y el número SIESA de cada uno."
         actions={
           canManage && (
             <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
@@ -136,8 +139,8 @@ export function LoadsView({
       <ConfirmDeleteDialog
         open={deleting !== undefined}
         title="Eliminar cargue"
-        description={deleting && `SIESA ${deleting.siesaNumber}`}
-        warning={deleting ? `Se eliminará el cargue SIESA ${deleting.siesaNumber} del ${formatDisplayDate(deleting.date)}.` : ""}
+        description={deleting && `${deleting.supplier} · ${deleting.plate}`}
+        warning={deleting ? `Se eliminará el cargue de ${deleting.supplier} del ${formatDisplayDate(deleting.date)}, con ${deleting.lines.length === 1 ? "su producto" : `sus ${deleting.lines.length} productos`}.` : ""}
         action={() => (deleting ? deleteLoadAction(deleting.id) : Promise.resolve({ ok: false as const, error: "Sin cargue." }))}
         onClose={() => setDeleting(undefined)}
         onDone={flash}
@@ -153,6 +156,7 @@ export function LoadsView({
           load={editing}
           plates={plates}
           orders={orders}
+          references={references}
           kgPerBag={kgPerBag}
           presetOrderId={editing ? null : preset}
           onCancel={() => setOpen(false)}

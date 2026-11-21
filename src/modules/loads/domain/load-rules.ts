@@ -1,4 +1,5 @@
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import type { LoadLineRow } from "./load-lines";
 
 export const LOAD_SUPPLIERS = ["Finca", "Italcol", "Contegral"] as const;
 export type LoadSupplier = (typeof LOAD_SUPPLIERS)[number];
@@ -29,12 +30,12 @@ export interface LoadRow {
   plate: string;
   /** Null once the vehicle was deleted. */
   vehicleId: number | null;
+  /** Sum of the lines. */
   tons: number;
-  /** Whole pesos (COP). */
+  /** Whole pesos (COP): the sum of the lines. */
   cost: number;
-  /** Unique across loads. */
-  siesaNumber: string;
-  orderNumber: string;
+  /** The products of the load, in the order they were typed. */
+  lines: readonly LoadLineRow[];
   notes: string | null;
   /** The orders this load picked up, oldest first. */
   orders: readonly LinkedOrder[];

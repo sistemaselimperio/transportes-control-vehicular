@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { loadIdSchema, loadSchema } from "./load-schemas";
 
+const line = { reference: "  Engorde   40 ", tons: "32,5", cost: "$ 1.500.000", siesaNumber: " FV-100 ", orderNumber: " P-77 " };
+
 const valid = {
   date: "2026-11-18",
   supplier: "Italcol",
   plate: "abc 123",
-  tons: "32,5",
-  cost: "$ 1.500.000",
-  siesaNumber: " FV-100 ",
-  orderNumber: " P-77 ",
   notes: "",
+  lines: JSON.stringify([line]),
+};
+
+const withLines = (lines: unknown[]) => ({ ...valid, lines: JSON.stringify(lines) });
+const firstIssue = (input: unknown) => {
+  const r = loadSchema.safeParse(input);
+  return r.success ? null : r.error.issues[0]?.message;
 };
 
 describe("loadSchema", () => {
@@ -18,46 +23,54 @@ describe("loadSchema", () => {
       date: "2026-11-18",
       supplier: "Italcol",
       plate: "ABC-123",
-      tons: 32.5,
-      cost: 1_500_000,
-      siesaNumber: "FV-100",
-      orderNumber: "P-77",
       notes: null,
       orderIds: [],
+      lines: [{ reference: "Engorde 40", tons: 32.5, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" }],
     });
   });
 
   it("requires a known supplier", () => {
-    const r = loadSchema.safeParse({ ...valid, supplier: "Otro" });
-    expect(!r.success && r.error.issues[0]?.message).toBe("Elige el proveedor.");
+    expect(firstIssue({ ...valid, supplier: "Otro" })).toBe("Elige el proveedor.");
   });
 
   it("requires the plate", () => {
-    const r = loadSchema.safeParse({ ...valid, plate: "" });
-    expect(!r.success && r.error.issues[0]?.message).toBe("Elige la placa del vehículo.");
+    expect(firstIssue({ ...valid, plate: "" })).toBe("Elige la placa del vehículo.");
+  });
+
+  it("requires at least one line", () => {
+    expect(firstIssue({ ...valid, lines: "[]" })).toBe("Agrega al menos un producto al cargue.");
+    expect(firstIssue({ ...valid, lines: "no json" })).toBe("Los productos del cargue no son válidos.");
+  });
+
+  it("requires a product on each line", () => {
+    expect(firstIssue(withLines([{ ...line, reference: "  " }]))).toBe("Elige el producto de cada línea.");
   });
 
   it("requires tons above zero", () => {
     for (const tons of ["", "0", "abc"]) {
-      const r = loadSchema.safeParse({ ...valid, tons });
-      expect(r.success).toBe(false);
-      expect(!r.success && r.error.issues[0]?.message).toBe("Las toneladas deben ser un número mayor que cero.");
+      expect(firstIssue(withLines([{ ...line, tons }]))).toBe("Las toneladas de cada producto deben ser un número mayor que cero.");
     }
   });
 
   it("accepts a zero cost but not a blank or negative one", () => {
-    expect(loadSchema.parse({ ...valid, cost: "0" }).cost).toBe(0);
-    const blank = loadSchema.safeParse({ ...valid, cost: "" });
-    expect(!blank.success && blank.error.issues[0]?.message).toBe("Ingresa el costo en pesos.");
-    expect(loadSchema.safeParse({ ...valid, cost: "-5" }).success).toBe(false);
-    expect(loadSchema.safeParse({ ...valid, cost: "abc" }).success).toBe(false);
+    expect(loadSchema.parse(withLines([{ ...line, cost: "0" }])).lines[0]?.cost).toBe(0);
+    expect(firstIssue(withLines([{ ...line, cost: "" }]))).toBe("Ingresa el costo en pesos de cada producto.");
+    expect(loadSchema.safeParse(withLines([{ ...line, cost: "-5" }])).success).toBe(false);
+    expect(loadSchema.safeParse(withLines([{ ...line, cost: "abc" }])).success).toBe(false);
   });
 
-  it("requires the SIESA and the order numbers", () => {
-    const siesa = loadSchema.safeParse({ ...valid, siesaNumber: "  " });
-    expect(!siesa.success && siesa.error.issues[0]?.message).toBe("Ingresa el número SIESA.");
-    const order = loadSchema.safeParse({ ...valid, orderNumber: "" });
-    expect(!order.success && order.error.issues[0]?.message).toBe("Ingresa el número de pedido.");
+  it("requires the SIESA and the order numbers of each line", () => {
+    expect(firstIssue(withLines([{ ...line, siesaNumber: "  " }]))).toBe("Ingresa el número SIESA de cada producto.");
+    expect(firstIssue(withLines([{ ...line, orderNumber: "" }]))).toBe("Ingresa el número de pedido de cada producto.");
+  });
+
+  it("names a SIESA number repeated inside the same load", () => {
+    const issue = firstIssue(withLines([line, { ...line, reference: "Levante" }]));
+    expect(issue).toBe("El número SIESA FV-100 está repetido en el cargue.");
+  });
+
+  it("allows the same product on two lines with different SIESA numbers", () => {
+    expect(loadSchema.safeParse(withLines([line, { ...line, siesaNumber: "FV-101" }])).success).toBe(true);
   });
 });
 

@@ -594,7 +594,11 @@ export const deliveries = comercial.table(
   ],
 );
 
-/** Supplier loads received at the yard. Not linked to clients. `plate` is a fleet snapshot, like trips. */
+/**
+ * Supplier loads received at the yard: the header of a load (one supplier, one truck). Its products,
+ * with tons, cost and SIESA number each, are the `load_lines`. Not linked to clients. `plate` is a
+ * fleet snapshot, like trips.
+ */
 export const loads = comercial.table(
   "loads",
   {
@@ -603,20 +607,39 @@ export const loads = comercial.table(
     supplier: loadSupplierEnum().notNull(),
     plate: text().notNull(),
     vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
-    tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
-    /** Whole pesos (COP). */
-    cost: numeric({ precision: 14, scale: 2, mode: "number" }).notNull(),
-    siesaNumber: text("siesa_number").notNull().unique(),
-    orderNumber: text("order_number").notNull(),
     notes: text(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  (t) => [index("loads_date_idx").on(t.date), index("loads_supplier_idx").on(t.supplier)],
+);
+
+/**
+ * A product of a load, with its own tons, cost, SIESA number (unique across every line) and the
+ * supplier's order number. `reference_id` is null only for the lines migrated from the single-product
+ * loads; every new or edited line has a product.
+ */
+export const loadLines = comercial.table(
+  "load_lines",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    loadId: integer("load_id")
+      .notNull()
+      .references(() => loads.id, { onDelete: "cascade" }),
+    referenceId: integer("reference_id").references(() => orderReferences.id, { onDelete: "restrict" }),
+    tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
+    /** Whole pesos (COP). */
+    cost: numeric({ precision: 14, scale: 2, mode: "number" }).notNull(),
+    siesaNumber: text("siesa_number").notNull().unique(),
+    /** The supplier's order number. */
+    orderNumber: text("order_number").notNull(),
+    /** Order of the line inside its load. */
+    position: integer().notNull().default(0),
+  },
   (t) => [
-    index("loads_date_idx").on(t.date),
-    index("loads_supplier_idx").on(t.supplier),
-    check("loads_tons_positive", sql`${t.tons} > 0`),
-    check("loads_cost_non_negative", sql`${t.cost} >= 0`),
+    index("load_lines_load_idx").on(t.loadId),
+    check("load_lines_tons_positive", sql`${t.tons} > 0`),
+    check("load_lines_cost_non_negative", sql`${t.cost} >= 0`),
   ],
 );
 

@@ -10,11 +10,14 @@ export function PesosInput({
   name,
   defaultValue,
   required,
+  onValueChange,
 }: {
   id: string;
   name: string;
   defaultValue?: number | null;
   required?: boolean;
+  /** Called with the formatted text on every change, for forms that keep the value in their own state. */
+  onValueChange?: (value: string) => void;
 }) {
   const [value, setValue] = useState(defaultValue == null ? "" : formatPesos(String(defaultValue)));
   return (
@@ -33,7 +36,11 @@ export function PesosInput({
         className="num h-10 pl-7 md:h-9"
         value={value}
         required={required}
-        onChange={(e) => setValue(formatPesos(e.target.value))}
+        onChange={(e) => {
+          const next = formatPesos(e.target.value);
+          setValue(next);
+          onValueChange?.(next);
+        }}
       />
     </div>
   );

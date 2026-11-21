@@ -2,24 +2,26 @@ import { describe, expect, it, vi } from "vitest";
 import { createLoadCommands, LoadError, type LoadPorts } from "./load-commands";
 import type { LoadInput } from "./load-schemas";
 
+const line = { reference: "Engorde 40", tons: 30, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" };
+
 const input = (over: Partial<LoadInput> = {}): LoadInput => ({
   date: "2026-11-18",
   supplier: "Finca",
   plate: "ABC-123",
-  tons: 30,
-  cost: 1_500_000,
-  siesaNumber: "FV-100",
-  orderNumber: "P-77",
   notes: null,
   orderIds: [],
+  lines: [line],
   ...over,
 });
+
+const storedLine = { referenceId: 10, tons: 30, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" };
 
 function ports(over: Partial<LoadPorts> = {}): LoadPorts {
   return {
     findVehicleByPlate: vi.fn(async (plate: string) => (plate === "ABC-123" ? { id: 9, plate: "ABC-123" } : null)),
     findLoad: vi.fn(async () => ({ plate: "ABC-123", vehicleId: 9 })),
-    findLoadIdBySiesa: vi.fn(async () => null),
+    findTakenSiesa: vi.fn(async () => []),
+    ensureReferences: vi.fn(async (refs: ReadonlyArray<{ name: string; key: string }>) => new Map(refs.map((r, i) => [r.key, 10 + i]))),
     findOrdersByIds: vi.fn(async () => []),
     insertLoad: vi.fn(async () => true),
     updateLoad: vi.fn(async () => "ok" as const),
@@ -29,10 +31,28 @@ function ports(over: Partial<LoadPorts> = {}): LoadPorts {
 }
 
 describe("create", () => {
-  it("stores the fleet plate and links the vehicle", async () => {
+  it("stores the fleet plate, links the vehicle and swaps each product for its reference id", async () => {
     const p = ports();
     await createLoadCommands(p).create(input());
-    expect(p.insertLoad).toHaveBeenCalledWith({ ...input(), plate: "ABC-123", vehicleId: 9 });
+    expect(p.ensureReferences).toHaveBeenCalledWith([{ name: "Engorde 40", key: "engorde40" }]);
+    expect(p.insertLoad).toHaveBeenCalledWith({
+      date: "2026-11-18",
+      supplier: "Finca",
+      plate: "ABC-123",
+      vehicleId: 9,
+      notes: null,
+      orderIds: [],
+      lines: [storedLine],
+    });
+  });
+
+  it("reuses one reference for a product typed twice", async () => {
+    const p = ports();
+    await createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "engorde  40", siesaNumber: "FV-101" }] }));
+    expect(p.ensureReferences).toHaveBeenCalledWith([{ name: "Engorde 40", key: "engorde40" }]);
+    expect(p.insertLoad).toHaveBeenCalledWith(
+      expect.objectContaining({ lines: [storedLine, { ...storedLine, siesaNumber: "FV-101" }] }),
+    );
   });
 
   it("refuses a plate outside the fleet", async () => {
@@ -41,30 +61,44 @@ describe("create", () => {
     expect(p.insertLoad).not.toHaveBeenCalled();
   });
 
-  it("refuses a SIESA number already used by another load", async () => {
-    const p = ports({ findLoadIdBySiesa: vi.fn(async () => 5) });
-    await expect(createLoadCommands(p).create(input())).rejects.toThrow("Ya existe un cargue con ese número SIESA.");
+  it("refuses a load without lines", async () => {
+    const p = ports();
+    await expect(createLoadCommands(p).create(input({ lines: [] }))).rejects.toThrow("Agrega al menos un producto al cargue.");
+  });
+
+  it("names the SIESA number already used by another load", async () => {
+    const p = ports({ findTakenSiesa: vi.fn(async () => ["FV-100"]) });
+    await expect(createLoadCommands(p).create(input())).rejects.toThrow("Ya existe un cargue con el número SIESA FV-100.");
+    expect(p.findTakenSiesa).toHaveBeenCalledWith(["FV-100"], undefined);
+    expect(p.ensureReferences).not.toHaveBeenCalled();
     expect(p.insertLoad).not.toHaveBeenCalled();
   });
 
-  it("allows repeating the order number", async () => {
+  it("refuses a SIESA number repeated inside the load", async () => {
     const p = ports();
-    await createLoadCommands(p).create(input({ orderNumber: "P-1" }));
-    await createLoadCommands(p).create(input({ siesaNumber: "FV-101", orderNumber: "P-1" }));
-    expect(p.insertLoad).toHaveBeenCalledTimes(2);
+    await expect(createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "Levante" }] }))).rejects.toThrow(
+      "El número SIESA FV-100 está repetido en el cargue.",
+    );
+    expect(p.insertLoad).not.toHaveBeenCalled();
+  });
+
+  it("allows repeating the supplier order number across lines", async () => {
+    const p = ports();
+    await createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "Levante", siesaNumber: "FV-101" }] }));
+    expect(p.insertLoad).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("update", () => {
-  it("ignores its own SIESA number", async () => {
+  it("ignores its own SIESA numbers", async () => {
     const p = ports();
     await createLoadCommands(p).update(3, input());
-    expect(p.findLoadIdBySiesa).toHaveBeenCalledWith("FV-100", 3);
-    expect(p.updateLoad).toHaveBeenCalledWith(3, { ...input(), plate: "ABC-123", vehicleId: 9 });
+    expect(p.findTakenSiesa).toHaveBeenCalledWith(["FV-100"], 3);
+    expect(p.updateLoad).toHaveBeenCalledWith(3, expect.objectContaining({ plate: "ABC-123", vehicleId: 9, lines: [storedLine] }));
   });
 
   it("refuses a SIESA number held by another load", async () => {
-    const p = ports({ findLoadIdBySiesa: vi.fn(async () => 8) });
+    const p = ports({ findTakenSiesa: vi.fn(async () => ["FV-100"]) });
     await expect(createLoadCommands(p).update(3, input())).rejects.toThrow(LoadError);
   });
 
