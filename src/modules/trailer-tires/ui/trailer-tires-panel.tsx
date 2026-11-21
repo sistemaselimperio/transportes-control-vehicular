@@ -1,7 +1,6 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
@@ -128,7 +127,6 @@ export function TrailerTiresPanel({
   today: IsoDate;
   canEdit: boolean;
 }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<TirePosition | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: "history" });
   const [notice, notify] = useNotice();
@@ -145,7 +143,6 @@ export function TrailerTiresPanel({
   };
   const onResult = (result: ActionResult) => {
     notify(result.ok ? { tone: "ok", text: result.message } : { tone: "error", text: result.error });
-    if (result.ok) router.refresh();
   };
   const done = (message: string) => {
     onResult({ ok: true, message });

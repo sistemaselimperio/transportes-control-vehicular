@@ -9,7 +9,7 @@ import { deleteInspectionAction } from "../application/delete-inspection-action"
 
 /**
  * Inspections managers only: deletes one inspection after an in-app confirmation. `afterDelete` is where to go
- * once it is gone (the list, from the detail page); without it the current page just refreshes.
+ * once it is gone (the list, from the detail page); without it the current page refreshes from the action's revalidation.
  */
 export function DeleteInspectionButton({
   inspectionId,
@@ -43,7 +43,6 @@ export function DeleteInspectionButton({
       }
       setOpen(false);
       if (afterDelete) router.push(afterDelete);
-      else router.refresh();
     });
   }
 

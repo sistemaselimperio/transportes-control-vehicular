@@ -617,12 +617,11 @@ export function EditVehicleForm({
           editBodyFromForm(formValues(fd)),
         );
         if (result.ok) {
-          // The PATCH only expired the server cache; this clears the browser's copy of the fleet screens.
+          // The PATCH only expired the server cache; this action also refreshes the current page and clears the
+          // browser's copy of the fleet screens.
           await expireVehicleViewsAction().catch(() => undefined);
           if (result.plate && result.plate !== values.plate) {
             router.replace(`/flota/${encodeURIComponent(result.plate)}`);
-          } else {
-            router.refresh();
           }
         }
         return result;

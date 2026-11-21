@@ -1,7 +1,6 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { TabBar } from "@/components/app/tab-bar";
@@ -124,7 +123,6 @@ export function TodayView({
   initialQuery: string;
 }) {
   const { kpis, group, attention } = data;
-  const router = useRouter();
   const isDesktop = useIsDesktop();
   const { banner, flash } = useDoneMessage();
   const [kind, setKind] = useState(initialKind);
@@ -184,7 +182,6 @@ export function TodayView({
   function done(message: string) {
     setSheetOpen(false);
     flash(message);
-    router.refresh();
   }
 
   const detail = selected && selectedKind && (

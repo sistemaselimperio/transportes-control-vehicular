@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowLeft, Ban, CircleCheck, ClipboardCheck, Loader2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
@@ -47,9 +46,8 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-/** Runs a save action in a transition; refreshes the page data on success. */
+/** Runs a save action in a transition; the action revalidates the page, so its data refreshes on its own. */
 function useSave() {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<ExitErrors>({});
 
@@ -59,7 +57,6 @@ function useSave() {
       const result = await action();
       if (result.ok) {
         onDone?.();
-        router.refresh();
       } else {
         setErrors(result.errors);
       }
