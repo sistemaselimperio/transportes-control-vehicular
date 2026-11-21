@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { deliveryIdSchema, deliverySchema, destinationSchema, deliveryStatusSchema } from "./delivery-schemas";
+import { deliveryIdSchema, deliverySchema, deliveryStatusSchema } from "./delivery-schemas";
 
 const valid = {
   date: "2026-11-18",
   shift: "2do viaje",
   priority: "urgente",
   clientId: "4",
-  destinationId: "7",
+  destination: "Simijaca (Cundinamarca)",
   quantity: "40",
   weightKg: "2000,5",
   plate: "abc 123",
@@ -21,7 +21,7 @@ describe("deliverySchema", () => {
       priority: "urgente",
       clientId: 4,
       locationId: null,
-      destinationId: 7,
+      destination: "Simijaca (Cundinamarca)",
       quantity: 40,
       weightKg: 2000.5,
       plate: "ABC-123",
@@ -59,11 +59,28 @@ describe("deliverySchema", () => {
     expect(!r.success && r.error.issues[0]?.message).toBe("Elige el turno.");
   });
 
-  it("requires a client and a destination", () => {
+  it("requires a client", () => {
     const client = deliverySchema.safeParse({ ...valid, clientId: "" });
     expect(!client.success && client.error.issues[0]?.message).toBe("Elige el cliente.");
-    const destination = deliverySchema.safeParse({ ...valid, destinationId: "abc" });
-    expect(!destination.success && destination.error.issues[0]?.message).toBe("Elige el destino.");
+  });
+
+  it("accepts a municipality of Boyacá, Cundinamarca or Santander", () => {
+    for (const destination of ["Tunja (Boyacá)", "Villa de San Diego de Ubaté (Cundinamarca)", "Albania (Santander)"]) {
+      expect(deliverySchema.parse({ ...valid, destination }).destination).toBe(destination);
+    }
+  });
+
+  it("rejects a municipality outside those three departments", () => {
+    for (const destination of ["Cúcuta (Norte de Santander)", "Bogotá, D.C.", "Medellín (Antioquia)"]) {
+      const r = deliverySchema.safeParse({ ...valid, destination });
+      expect(!r.success && r.error.issues[0]?.message).toBe("Elige un municipio de Boyacá, Cundinamarca o Santander.");
+    }
+  });
+
+  it("rejects an empty or free-text destination", () => {
+    for (const destination of ["", "   ", undefined, "Simijaca"]) {
+      expect(deliverySchema.safeParse({ ...valid, destination }).success).toBe(false);
+    }
   });
 
   it("requires a positive whole number of bags", () => {
@@ -93,16 +110,6 @@ describe("deliveryStatusSchema", () => {
     expect(deliveryStatusSchema.parse("entregado")).toBe("entregado");
     expect(deliveryStatusSchema.parse("pendiente")).toBe("pendiente");
     expect(deliveryStatusSchema.safeParse("cancelado").success).toBe(false);
-  });
-});
-
-describe("destinationSchema", () => {
-  it("stores the name in title case", () => {
-    expect(destinationSchema.parse({ name: " PUENTE de tierra " }).name).toBe("Puente de Tierra");
-  });
-
-  it("requires a name", () => {
-    expect(destinationSchema.safeParse({ name: "  " }).success).toBe(false);
   });
 });
 

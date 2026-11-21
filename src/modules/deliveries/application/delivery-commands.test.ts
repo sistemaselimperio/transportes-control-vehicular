@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDeliveryCommands, createDestinationCommands, DeliveryError, type DeliveryPorts, type DestinationPorts } from "./delivery-commands";
+import { createDeliveryCommands, DeliveryError, type DeliveryPorts } from "./delivery-commands";
 import type { DeliveryInput } from "./delivery-schemas";
 
 const input = (over: Partial<DeliveryInput> = {}): DeliveryInput => ({
@@ -8,7 +8,7 @@ const input = (over: Partial<DeliveryInput> = {}): DeliveryInput => ({
   priority: "normal",
   clientId: 4,
   locationId: null,
-  destinationId: 7,
+  destination: "Simijaca (Cundinamarca)",
   quantity: 40,
   weightKg: 2000,
   plate: "ABC-123",
@@ -19,7 +19,6 @@ const input = (over: Partial<DeliveryInput> = {}): DeliveryInput => ({
 function ports(over: Partial<DeliveryPorts> = {}): DeliveryPorts {
   return {
     clientExists: vi.fn(async () => true),
-    destinationExists: vi.fn(async () => true),
     locationBelongsToClient: vi.fn(async () => true),
     findVehicleByPlate: vi.fn(async (plate: string) => (plate === "ABC-123" ? { id: 9, plate: "ABC-123" } : null)),
     findDelivery: vi.fn(async () => ({ plate: null, vehicleId: null })),
@@ -50,13 +49,10 @@ describe("create", () => {
     expect(p.insertDelivery).not.toHaveBeenCalled();
   });
 
-  it("refuses a client or destination that does not exist", async () => {
+  it("refuses a client that does not exist", async () => {
     const noClient = ports({ clientExists: vi.fn(async () => false) });
     await expect(createDeliveryCommands(noClient).create(input())).rejects.toThrow("El cliente ya no existe.");
-    const noDestination = ports({ destinationExists: vi.fn(async () => false) });
-    await expect(createDeliveryCommands(noDestination).create(input())).rejects.toThrow("El destino ya no existe.");
     expect(noClient.insertDelivery).not.toHaveBeenCalled();
-    expect(noDestination.insertDelivery).not.toHaveBeenCalled();
   });
 });
 
@@ -132,51 +128,5 @@ describe("remove", () => {
     await expect(createDeliveryCommands(ports({ deleteDelivery: vi.fn(async () => false) })).remove(3)).rejects.toThrow(
       "La entrega ya no existe.",
     );
-  });
-});
-
-function destinationPorts(over: Partial<DestinationPorts> = {}): DestinationPorts {
-  return {
-    findDestinationIdByName: vi.fn(async () => null),
-    insertDestination: vi.fn(async () => undefined),
-    renameDestination: vi.fn(async () => true),
-    countDeliveries: vi.fn(async () => 0),
-    deleteDestination: vi.fn(async () => true),
-    ...over,
-  };
-}
-
-describe("destination commands", () => {
-  it("creates a destination with a free name", async () => {
-    const p = destinationPorts();
-    await createDestinationCommands(p).create({ name: "Susa" });
-    expect(p.insertDestination).toHaveBeenCalledWith("Susa");
-  });
-
-  it("refuses a duplicate name on create and rename", async () => {
-    const p = destinationPorts({ findDestinationIdByName: vi.fn(async () => 2) });
-    await expect(createDestinationCommands(p).create({ name: "Susa" })).rejects.toThrow("Ya existe un destino con ese nombre.");
-    await expect(createDestinationCommands(p).rename(1, { name: "Susa" })).rejects.toThrow(DeliveryError);
-  });
-
-  it("renames ignoring its own name", async () => {
-    const p = destinationPorts();
-    await createDestinationCommands(p).rename(1, { name: "Susa" });
-    expect(p.findDestinationIdByName).toHaveBeenCalledWith("Susa", 1);
-    expect(p.renameDestination).toHaveBeenCalledWith(1, "Susa");
-  });
-
-  it("blocks the delete while deliveries use the destination", async () => {
-    const p = destinationPorts({ countDeliveries: vi.fn(async () => 2) });
-    await expect(createDestinationCommands(p).remove(1)).rejects.toThrow(
-      "No se puede eliminar: el destino tiene 2 entregas registradas.",
-    );
-    expect(p.deleteDestination).not.toHaveBeenCalled();
-  });
-
-  it("deletes an unused destination", async () => {
-    const p = destinationPorts();
-    await createDestinationCommands(p).remove(1);
-    expect(p.deleteDestination).toHaveBeenCalledWith(1);
   });
 });

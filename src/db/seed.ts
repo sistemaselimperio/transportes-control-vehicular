@@ -1,5 +1,5 @@
 /**
- * Idempotent seed: owners, vehicle classes, the delivery destinations of the commercial area and the
+ * Idempotent seed: owners, vehicle classes and the
  * users (rocio: admin, yellow theme; leidy: staff, sky theme; gabriella: assistant, yellow theme;
  * superadmin: superadmin, yellow theme; sandra: dispatcher, esperanza: loader, sky theme).
  * Run with `npm run db:seed` (each user needs its password variable, SEED_ADMIN_PASSWORD,
@@ -41,34 +41,6 @@ const CLASSES = [
   { name: "Montacargas", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
   { name: "Equipo", oilIntervalKm: null, oilIntervalMonths: null, documentsDefaultNotApplicable: true },
 ] as const;
-
-/** Delivery destinations of the commercial area, in the stored title case. Existing ones are never touched. */
-const DESTINATIONS = [
-  "Simijaca",
-  "Saboyá",
-  "San Miguel",
-  "Córdoba",
-  "Chiquinquirá",
-  "Ubaté",
-  "Varela",
-  "Sasa",
-  "Fúquene",
-  "Capellanía",
-  "Fical",
-  "Buenavista",
-  "Neusa",
-  "Puente de Tierra",
-  "Molino",
-  "Susa",
-  "Palestina",
-  "Albania",
-] as const;
-
-async function seedDestinations() {
-  for (const name of DESTINATIONS) {
-    await db.insert(schema.destinations).values({ name }).onConflictDoNothing({ target: schema.destinations.name });
-  }
-}
 
 async function seedOwners() {
   const existing = await db.select().from(schema.owners);
@@ -152,7 +124,6 @@ const seedEsperanza = () =>
 async function main() {
   await seedOwners();
   await seedClasses();
-  await seedDestinations();
   await seedAdmin();
   await seedLeidy();
   await seedGabriella();

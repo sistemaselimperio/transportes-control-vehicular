@@ -56,3 +56,9 @@ export function findMunicipality(stored: string | null): MunicipalityMatch | nul
 export function isMunicipalityLabel(value: string): boolean {
   return byLabel.has(value);
 }
+
+/** True when `value` is a municipality label of one of the given departments (DANE codes). */
+export function isMunicipalityLabelIn(value: string, departmentCodes: readonly string[]): boolean {
+  const match = byLabel.get(value);
+  return match !== undefined && departmentCodes.includes(match.departmentCode);
+}

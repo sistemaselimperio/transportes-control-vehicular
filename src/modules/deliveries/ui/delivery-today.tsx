@@ -289,7 +289,7 @@ export function DeliveryToday({
                                 <span className="flex min-h-5 min-w-0 items-center gap-1">
                                   <MapPin className="size-3.5 shrink-0" aria-hidden />
                                   <span className="min-w-0">
-                                    {[r.locationName && `Finca ${r.locationName}`, r.destinationName].filter(Boolean).join(" · ")}
+                                    {[r.locationName && `Finca ${r.locationName}`, r.destination].filter(Boolean).join(" · ")}
                                   </span>
                                 </span>
                               </p>

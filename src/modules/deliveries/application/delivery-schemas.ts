@@ -1,13 +1,12 @@
-/** Zod schemas that parse the raw form values (strings) of the delivery and destination forms. */
+/** Zod schemas that parse the raw form values (strings) of the delivery form. */
 import { z } from "zod";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
-import { titleCase } from "@/modules/shared/domain/title-case";
+import { isMunicipalityLabelIn } from "@/modules/shared/domain/municipalities";
 import { dateField, textField } from "@/modules/vehicles/application/vehicle-action-schemas";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
-import { DELIVERY_PRIORITIES, DELIVERY_SHIFTS, DELIVERY_STATUSES } from "../domain/delivery-rules";
+import { DELIVERY_DEPARTMENT_CODES, DELIVERY_PRIORITIES, DELIVERY_SHIFTS, DELIVERY_STATUSES } from "../domain/delivery-rules";
 
 export const NOTES_MAX = 500;
-export const DESTINATION_NAME_MAX = 60;
 
 /** A positive integer id coming from a select (a string in the form data). */
 const idField = (message: string) =>
@@ -38,7 +37,12 @@ export const deliverySchema = z.object({
   clientId: idField("Elige el cliente."),
   /** Finca of the client where the delivery goes; checked against the client by the command. */
   locationId: optionalIdField("La finca no es válida."),
-  destinationId: idField("Elige el destino."),
+  /** Municipality label ("Simijaca (Cundinamarca)") of Boyacá, Cundinamarca or Santander. */
+  destination: z
+    .string()
+    .default("")
+    .transform((v) => v.trim())
+    .refine((v) => isMunicipalityLabelIn(v, DELIVERY_DEPARTMENT_CODES), "Elige un municipio de Boyacá, Cundinamarca o Santander."),
   quantity: z
     .string()
     .default("")
@@ -65,16 +69,3 @@ export type DeliveryInput = z.infer<typeof deliverySchema>;
 export const deliveryStatusSchema = z.enum(DELIVERY_STATUSES, "Estado no válido.");
 
 export const deliveryIdSchema = z.number().int().positive();
-
-export const destinationSchema = z.object({
-  name: z
-    .string()
-    .default("")
-    .transform(titleCase)
-    .refine((v) => v !== "", "Ingresa el nombre del destino.")
-    .refine((v) => v.length <= DESTINATION_NAME_MAX, "El nombre del destino no puede pasar de 60 caracteres."),
-});
-
-export type DestinationInput = z.infer<typeof destinationSchema>;
-
-export const destinationIdSchema = z.number().int().positive();

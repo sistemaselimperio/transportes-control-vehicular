@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPinned, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { deleteDeliveryAction } from "../application/delivery-actions";
-import type { DestinationRow } from "../application/delivery-queries";
 import { DELIVERY_TABS, DELIVERY_TAB_LABELS, type DeliveryTab } from "../domain/delivery-tabs";
 import { type ClientAlert, type DeliveryRow } from "../domain/delivery-rules";
 import type { ClientOption } from "./client-picker";
@@ -19,13 +18,11 @@ import { DeliveryCreateForm, DeliveryEditForm } from "./delivery-form";
 import { DeliveryHistory } from "./delivery-history";
 import { DeliverySummary } from "./delivery-summary";
 import { DeliveryToday } from "./delivery-today";
-import { DestinationsManager } from "./destinations-manager";
 
-/** Deliveries page: the four tabs, the edit sheet, the delete confirmation and the destination list. */
+/** Deliveries page: the four tabs, the edit sheet and the delete confirmation. */
 export function DeliveriesView({
   rows,
   clients,
-  destinations,
   plates,
   alerts,
   today,
@@ -34,7 +31,6 @@ export function DeliveriesView({
 }: {
   rows: readonly DeliveryRow[];
   clients: readonly ClientOption[];
-  destinations: readonly DestinationRow[];
   plates: readonly string[];
   alerts: readonly ClientAlert[];
   /** Colombia's current day, read on the server. */
@@ -46,11 +42,10 @@ export function DeliveriesView({
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<DeliveryRow | undefined>();
   const [deleting, setDeleting] = useState<DeliveryRow | undefined>();
-  const [destinationsOpen, setDestinationsOpen] = useState(false);
   const { message, flash } = useFlashMessage();
 
   const todayRows = useMemo(() => rows.filter((r) => r.date === today), [rows, today]);
-  const options = { clients, destinations, plates };
+  const options = { clients, plates };
 
   return (
     <section className="space-y-5">
@@ -59,16 +54,10 @@ export function DeliveriesView({
         description="Entregas de bultos a clientes por vehículo y viaje."
         actions={
           canManage && (
-            <>
-              <Button className="h-11 px-4 md:h-10" onClick={() => setCreating(true)}>
-                <Plus aria-hidden />
-                Registrar entrega
-              </Button>
-              <Button variant="outline" className="h-11 px-4 md:h-10" onClick={() => setDestinationsOpen(true)}>
-                <MapPinned aria-hidden />
-                Destinos
-              </Button>
-            </>
+            <Button className="h-11 px-4 md:h-10" onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              Registrar entrega
+            </Button>
           )
         }
       />
@@ -90,7 +79,7 @@ export function DeliveriesView({
         {tab === "hoy" && <DeliveryToday rows={todayRows} canManage={canManage} onDone={flash} />}
 
         {tab === "historial" && (
-          <DeliveryHistory rows={rows} destinations={destinations} canManage={canManage} onEdit={setEditing} onDelete={setDeleting} />
+          <DeliveryHistory rows={rows} canManage={canManage} onEdit={setEditing} onDelete={setDeleting} />
         )}
 
         {tab === "alertas" && <DeliveryAlerts alerts={alerts} />}
@@ -140,15 +129,6 @@ export function DeliveriesView({
             }}
           />
         )}
-      </SlideOver>
-
-      <SlideOver
-        open={destinationsOpen}
-        onOpenChange={setDestinationsOpen}
-        title="Destinos"
-        description="Lista editable de destinos de entrega."
-      >
-        <DestinationsManager destinations={destinations} onDone={flash} />
       </SlideOver>
     </section>
   );

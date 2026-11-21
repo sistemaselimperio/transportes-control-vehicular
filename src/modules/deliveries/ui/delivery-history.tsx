@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import type { DestinationRow } from "../application/delivery-queries";
 import { formatBags, formatKg, formatTons } from "../domain/delivery-format";
 import {
   DELIVERY_SHIFTS,
@@ -22,7 +21,7 @@ import { DeliveryTable } from "./delivery-table";
 /** Rows drawn at once; the filters and the stats always cover every match. */
 const MAX_ROWS = 300;
 
-const EMPTY_FILTERS: DeliveryFilters = { query: "", destinationId: null, shift: null, from: null, to: null };
+const EMPTY_FILTERS: DeliveryFilters = { query: "", destination: null, shift: null, from: null, to: null };
 const LABEL = "mb-1.5 block text-xs font-medium text-muted-foreground";
 const CONTROL = "h-11 bg-card md:h-9";
 
@@ -38,20 +37,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 /** "Historial": every delivery with filters by client or NIT, destination, trip and date range, plus the stats of the matches. */
 export function DeliveryHistory({
   rows,
-  destinations,
   canManage,
   onEdit,
   onDelete,
 }: {
   rows: readonly DeliveryRow[];
-  destinations: readonly DestinationRow[];
   canManage: boolean;
   onEdit: (row: DeliveryRow) => void;
   onDelete: (row: DeliveryRow) => void;
 }) {
   const [filters, setFilters] = useState<DeliveryFilters>(EMPTY_FILTERS);
   const active =
-    filters.query.trim() !== "" || filters.destinationId !== null || filters.shift !== null || filters.from !== null || filters.to !== null;
+    filters.query.trim() !== "" || filters.destination !== null || filters.shift !== null || filters.from !== null || filters.to !== null;
+  const destinations = useMemo(() => [...new Set(rows.map((r) => r.destination))].sort((a, b) => a.localeCompare(b, "es")), [rows]);
   const shown = useMemo(() => filterDeliveries(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOf(shown), [shown]);
 
@@ -87,13 +85,13 @@ export function DeliveryHistory({
           <NativeSelect
             id="history-destination"
             className={CONTROL}
-            value={filters.destinationId ?? ""}
-            onChange={(e) => setFilters((f) => ({ ...f, destinationId: e.target.value === "" ? null : Number(e.target.value) }))}
+            value={filters.destination ?? ""}
+            onChange={(e) => setFilters((f) => ({ ...f, destination: e.target.value === "" ? null : e.target.value }))}
           >
             <option value="">Todos</option>
             {destinations.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
+              <option key={d} value={d}>
+                {d}
               </option>
             ))}
           </NativeSelect>

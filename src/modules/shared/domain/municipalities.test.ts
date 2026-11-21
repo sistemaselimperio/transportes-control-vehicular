@@ -3,6 +3,7 @@ import {
   DEPARTMENTS,
   findMunicipality,
   isMunicipalityLabel,
+  isMunicipalityLabelIn,
   municipalityLabel,
 } from "./municipalities";
 
@@ -58,5 +59,37 @@ describe("isMunicipalityLabel", () => {
     expect(isMunicipalityLabel("Bogotá, D.C.")).toBe(true);
     expect(isMunicipalityLabel("BOGOTÁ, D.C.")).toBe(false);
     expect(isMunicipalityLabel("Tunja")).toBe(false);
+  });
+});
+
+describe("isMunicipalityLabelIn", () => {
+  const allowed = ["15", "25", "68"];
+
+  it("accepts a label from one of the allowed departments", () => {
+    expect(isMunicipalityLabelIn("Tunja (Boyacá)", allowed)).toBe(true);
+    expect(isMunicipalityLabelIn("Simijaca (Cundinamarca)", allowed)).toBe(true);
+    expect(isMunicipalityLabelIn("Albania (Santander)", allowed)).toBe(true);
+  });
+
+  it("rejects a valid label from another department", () => {
+    expect(isMunicipalityLabelIn("Cúcuta (Norte de Santander)", allowed)).toBe(false);
+    expect(isMunicipalityLabelIn("Bogotá, D.C.", allowed)).toBe(false);
+    expect(isMunicipalityLabelIn("Medellín (Antioquia)", allowed)).toBe(false);
+  });
+
+  it("rejects text that is not a municipality label", () => {
+    expect(isMunicipalityLabelIn("", allowed)).toBe(false);
+    expect(isMunicipalityLabelIn("Simijaca", allowed)).toBe(false);
+  });
+});
+
+describe("labels of the legacy delivery destinations", () => {
+  it.each([
+    "Albania (Santander)",
+    "San Miguel de Sema (Boyacá)",
+    "Simijaca (Cundinamarca)",
+    "Villa de San Diego de Ubaté (Cundinamarca)",
+  ])("%s is a valid municipality label", (label) => {
+    expect(isMunicipalityLabel(label)).toBe(true);
   });
 });

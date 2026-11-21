@@ -1,7 +1,7 @@
 import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listClientRows } from "@/modules/clients/application/client-queries";
-import { listClientsLastDelivery, listDeliveryRows, listDestinationRows } from "@/modules/deliveries/application/delivery-queries";
+import { listClientsLastDelivery, listDeliveryRows } from "@/modules/deliveries/application/delivery-queries";
 import { computeClientAlerts } from "@/modules/deliveries/domain/delivery-rules";
 import { parseDeliveryTab } from "@/modules/deliveries/domain/delivery-tabs";
 import { DeliveriesView } from "@/modules/deliveries/ui/deliveries-view";
@@ -16,10 +16,9 @@ export default async function Page({
   const role = await requireSectionAccess("deliveries");
   // Await the request first: the clock below must be read per request, never while prerendering.
   const { tab } = await searchParams;
-  const [rows, clients, destinations, lastDeliveries, plates] = await Promise.all([
+  const [rows, clients, lastDeliveries, plates] = await Promise.all([
     listDeliveryRows(),
     listClientRows(),
-    listDestinationRows(),
     listClientsLastDelivery(),
     listDispatchPlates(),
   ]);
@@ -33,7 +32,6 @@ export default async function Page({
         nit,
         locations: locations.map((l) => ({ id: l.id, name: l.name })),
       }))}
-      destinations={destinations}
       plates={plates}
       alerts={computeClientAlerts(lastDeliveries, today)}
       today={today}

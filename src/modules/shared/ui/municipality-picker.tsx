@@ -20,6 +20,7 @@ export function MunicipalityPicker({
   departmentLabel = "Departamento",
   municipalityLabelText = "Municipio",
   required,
+  departmentCodes,
 }: {
   idPrefix: string;
   defaultValue?: string | null;
@@ -29,11 +30,15 @@ export function MunicipalityPicker({
   departmentLabel?: string;
   municipalityLabelText?: string;
   required?: boolean;
+  /** Restricts the department list to these DANE codes; every department when omitted. */
+  departmentCodes?: readonly string[];
 }) {
+  const departments = departmentCodes ? DEPARTMENTS.filter((d) => departmentCodes.includes(d.code)) : DEPARTMENTS;
   const initial = findMunicipality(defaultValue ?? null);
-  const [department, setDepartment] = useState(initial?.departmentCode ?? (defaultValue ? "" : DEFAULT_DEPARTMENT));
+  const fallbackDepartment = departments.some((d) => d.code === DEFAULT_DEPARTMENT) ? DEFAULT_DEPARTMENT : (departments[0]?.code ?? "");
+  const [department, setDepartment] = useState(initial?.departmentCode ?? (defaultValue ? "" : fallbackDepartment));
   const [code, setCode] = useState(initial?.code ?? "");
-  const cities = DEPARTMENTS.find((d) => d.code === department)?.cities ?? [];
+  const cities = departments.find((d) => d.code === department)?.cities ?? [];
   const legacy = defaultValue && !initial ? defaultValue : null;
 
   return (
@@ -49,7 +54,7 @@ export function MunicipalityPicker({
           }}
         >
           <option value="">Sin departamento</option>
-          {DEPARTMENTS.map((d) => (
+          {departments.map((d) => (
             <option key={d.code} value={d.code}>
               {d.name}
             </option>

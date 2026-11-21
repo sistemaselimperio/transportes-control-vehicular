@@ -90,7 +90,7 @@ export function DeliveryTable({
                 <p className="font-medium">{r.clientName}</p>
                 {r.locationName && <p className="text-sm text-muted-foreground">Finca {r.locationName}</p>}
                 <p className="text-sm text-muted-foreground">
-                  {r.destinationName} · {r.shift}
+                  {r.destination} · {r.shift}
                 </p>
               </div>
               {canManage && (
@@ -149,7 +149,7 @@ export function DeliveryTable({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{r.destinationName}</td>
+                  <td className="px-4 py-3">{r.destination}</td>
                   <td className="num px-4 py-3 text-right">{formatBags(r.quantity)}</td>
                   <td className="num px-4 py-3 text-right">{formatKg(r.weightKg)}</td>
                   <td className="num px-4 py-3 text-right">{formatTons(r.weightKg)}</td>

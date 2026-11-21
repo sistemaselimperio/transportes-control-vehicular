@@ -553,13 +553,6 @@ export const clientLocations = comercial.table(
   (t) => [uniqueIndex("client_locations_client_name_uq").on(t.clientId, t.nameKey)],
 );
 
-/** Editable list of delivery destinations (title case, unique). */
-export const destinations = comercial.table("destinations", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: text().notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 /**
  * A delivery of bags to a client. `weightKg` is typed by hand and never derived from `quantity`;
  * tons are derived on read (kg / 1000), never stored. `plate` is a snapshot and `vehicleId` a soft
@@ -578,9 +571,8 @@ export const deliveries = comercial.table(
       .references(() => clients.id, { onDelete: "restrict" }),
     /** Optional finca of the client; goes null when the finca is deleted. */
     locationId: integer("location_id").references(() => clientLocations.id, { onDelete: "set null" }),
-    destinationId: integer("destination_id")
-      .notNull()
-      .references(() => destinations.id, { onDelete: "restrict" }),
+    /** Municipality label ("Simijaca (Cundinamarca)") of Boyacá, Cundinamarca or Santander, as trips store theirs. */
+    destination: text().notNull(),
     /** Bags (bultos). */
     quantity: integer().notNull(),
     weightKg: numeric("weight_kg", { precision: 12, scale: 2, mode: "number" }).notNull(),

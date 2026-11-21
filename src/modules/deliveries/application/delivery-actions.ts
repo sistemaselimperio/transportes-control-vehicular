@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Server actions of the deliveries page (deliveries and the editable destination list). Each one
+ * Server actions of the deliveries page (deliveries). Each one
  * re-checks the session and the role, parses the form with zod, runs a command and expires the
  * cached reads that show deliveries.
  */
@@ -10,33 +10,26 @@ import { requireSectionManager } from "@/lib/session";
 import { actionFailure } from "@/modules/shared/application/action-failure";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
-import { deliveryRepository, destinationRepository } from "../infrastructure/delivery-repository";
-import { createDeliveryCommands, createDestinationCommands, DeliveryError } from "./delivery-commands";
+import { deliveryRepository } from "../infrastructure/delivery-repository";
+import { createDeliveryCommands, DeliveryError } from "./delivery-commands";
 import {
   deliveryIdSchema,
   deliverySchema,
   deliveryStatusSchema,
-  destinationIdSchema,
-  destinationSchema,
 } from "./delivery-schemas";
 
 const deliveries = createDeliveryCommands(deliveryRepository);
-const destinations = createDestinationCommands(destinationRepository);
 
 const formValues = (fd: FormData) => Object.fromEntries(fd.entries());
 
-async function run(change: "delivery" | "destination", fn: () => Promise<string>): Promise<ActionResult> {
+async function run(change: "delivery", fn: () => Promise<string>): Promise<ActionResult> {
   try {
     await requireSectionManager("deliveries");
     const message = await fn();
     expireAfterAction({ kind: change });
     return { ok: true, message };
   } catch (e) {
-    return actionFailure(e, {
-      label: change,
-      expected: [DeliveryError],
-      unique: { destinations_name_unique: "Ya existe un destino con ese nombre." },
-    });
+    return actionFailure(e, { label: change, expected: [DeliveryError] });
   }
 }
 
@@ -70,28 +63,5 @@ export async function deleteDeliveryAction(id: number): Promise<ActionResult> {
   return run("delivery", async () => {
     await deliveries.remove(deliveryIdSchema.parse(id));
     return "Entrega eliminada.";
-  });
-}
-
-export async function createDestinationAction(fd: FormData): Promise<ActionResult> {
-  return run("destination", async () => {
-    const input = destinationSchema.parse(formValues(fd));
-    await destinations.create(input);
-    return `Destino ${input.name} creado.`;
-  });
-}
-
-export async function renameDestinationAction(id: number, fd: FormData): Promise<ActionResult> {
-  return run("destination", async () => {
-    const input = destinationSchema.parse(formValues(fd));
-    await destinations.rename(destinationIdSchema.parse(id), input);
-    return `Destino ${input.name} actualizado.`;
-  });
-}
-
-export async function deleteDestinationAction(id: number): Promise<ActionResult> {
-  return run("destination", async () => {
-    await destinations.remove(destinationIdSchema.parse(id));
-    return "Destino eliminado.";
   });
 }

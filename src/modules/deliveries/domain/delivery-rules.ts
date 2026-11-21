@@ -1,6 +1,9 @@
 import { daysBetween, type IsoDate } from "@/modules/shared/domain/dates";
 import { matchesQuery } from "@/modules/shared/domain/search-key";
 
+/** DANE codes of the departments deliveries go to: Boyacá, Cundinamarca and Santander. */
+export const DELIVERY_DEPARTMENT_CODES = ["15", "25", "68"] as const;
+
 export const DELIVERY_SHIFTS = ["1er viaje", "2do viaje", "3er viaje"] as const;
 export type DeliveryShift = (typeof DELIVERY_SHIFTS)[number];
 
@@ -34,8 +37,8 @@ export interface DeliveryRow {
   /** Finca of the client the delivery goes to; null when none was chosen or it was deleted. */
   locationId: number | null;
   locationName: string | null;
-  destinationId: number;
-  destinationName: string;
+  /** Municipality label of the destination, e.g. "Simijaca (Cundinamarca)". */
+  destination: string;
   /** Bags (bultos). */
   quantity: number;
   /** Typed by hand; never derived from `quantity`. */
@@ -117,7 +120,7 @@ export function groupByVehicle<
 export interface DeliveryFilters {
   /** Client name or NIT. */
   query: string;
-  destinationId: number | null;
+  destination: string | null;
   shift: DeliveryShift | null;
   /** Inclusive ISO days. */
   from: IsoDate | null;
@@ -125,10 +128,10 @@ export interface DeliveryFilters {
 }
 
 export function filterDeliveries<
-  T extends Pick<DeliveryRow, "date" | "shift" | "destinationId" | "clientName" | "clientNit">,
+  T extends Pick<DeliveryRow, "date" | "shift" | "destination" | "clientName" | "clientNit">,
 >(rows: readonly T[], filters: DeliveryFilters): T[] {
   return rows.filter((r) => {
-    if (filters.destinationId !== null && r.destinationId !== filters.destinationId) return false;
+    if (filters.destination !== null && r.destination !== filters.destination) return false;
     if (filters.shift !== null && r.shift !== filters.shift) return false;
     if (filters.from !== null && r.date < filters.from) return false;
     if (filters.to !== null && r.date > filters.to) return false;
@@ -137,23 +140,22 @@ export function filterDeliveries<
 }
 
 export interface DestinationSummary extends DeliveryTotals {
-  destinationId: number;
-  destinationName: string;
+  destination: string;
 }
 
 /** Per destination: deliveries, bags, kilograms and tons; the heaviest destination first. */
 export function summarizeByDestination(
-  rows: ReadonlyArray<Pick<DeliveryRow, "destinationId" | "destinationName" | "quantity" | "weightKg">>,
+  rows: ReadonlyArray<Pick<DeliveryRow, "destination" | "quantity" | "weightKg">>,
 ): DestinationSummary[] {
-  const byDestination = new Map<number, { name: string; rows: typeof rows[number][] }>();
+  const byDestination = new Map<string, typeof rows[number][]>();
   for (const r of rows) {
-    const entry = byDestination.get(r.destinationId) ?? { name: r.destinationName, rows: [] };
-    entry.rows.push(r);
-    byDestination.set(r.destinationId, entry);
+    const list = byDestination.get(r.destination) ?? [];
+    list.push(r);
+    byDestination.set(r.destination, list);
   }
   return [...byDestination.entries()]
-    .map(([destinationId, { name, rows: list }]) => ({ destinationId, destinationName: name, ...totalsOf(list) }))
-    .sort((a, b) => b.weightKg - a.weightKg || a.destinationName.localeCompare(b.destinationName, "es"));
+    .map(([destination, list]) => ({ destination, ...totalsOf(list) }))
+    .sort((a, b) => b.weightKg - a.weightKg || a.destination.localeCompare(b.destination, "es"));
 }
 
 export interface ClientLastDelivery {

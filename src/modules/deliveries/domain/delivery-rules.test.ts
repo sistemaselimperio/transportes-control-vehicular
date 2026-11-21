@@ -25,8 +25,7 @@ const row = (over: Partial<DeliveryRow>): DeliveryRow => ({
   clientNit: "9001234567",
   locationId: null,
   locationName: null,
-  destinationId: 1,
-  destinationName: "Susa",
+  destination: "Susa (Cundinamarca)",
   quantity: 10,
   weightKg: 500,
   status: "pendiente",
@@ -119,11 +118,11 @@ describe("groupByVehicle", () => {
 
 describe("filterDeliveries", () => {
   const rows = [
-    row({ id: 1, date: "2026-11-10", clientName: "Agro Ñandú", clientNit: "9001234567", destinationId: 1, shift: "1er viaje" }),
-    row({ id: 2, date: "2026-11-15", clientName: "Lácteos Susa", clientNit: "800555111", destinationId: 2, shift: "2do viaje" }),
-    row({ id: 3, date: "2026-11-20", clientName: "Agro Ñandú", clientNit: "9001234567", destinationId: 2, shift: "3er viaje" }),
+    row({ id: 1, date: "2026-11-10", clientName: "Agro Ñandú", clientNit: "9001234567", destination: "Susa (Cundinamarca)", shift: "1er viaje" }),
+    row({ id: 2, date: "2026-11-15", clientName: "Lácteos Susa", clientNit: "800555111", destination: "Simijaca (Cundinamarca)", shift: "2do viaje" }),
+    row({ id: 3, date: "2026-11-20", clientName: "Agro Ñandú", clientNit: "9001234567", destination: "Simijaca (Cundinamarca)", shift: "3er viaje" }),
   ];
-  const none = { query: "", destinationId: null, shift: null, from: null, to: null };
+  const none = { query: "", destination: null, shift: null, from: null, to: null };
 
   it("keeps everything without filters", () => {
     expect(filterDeliveries(rows, none)).toHaveLength(3);
@@ -135,7 +134,7 @@ describe("filterDeliveries", () => {
   });
 
   it("filters by destination and shift", () => {
-    expect(filterDeliveries(rows, { ...none, destinationId: 2 }).map((r) => r.id)).toEqual([2, 3]);
+    expect(filterDeliveries(rows, { ...none, destination: "Simijaca (Cundinamarca)" }).map((r) => r.id)).toEqual([2, 3]);
     expect(filterDeliveries(rows, { ...none, shift: "2do viaje" }).map((r) => r.id)).toEqual([2]);
   });
 
@@ -149,13 +148,13 @@ describe("filterDeliveries", () => {
 describe("summarizeByDestination", () => {
   it("groups by destination with count, bags, kilograms and tons, heaviest first", () => {
     const summary = summarizeByDestination([
-      row({ id: 1, destinationId: 1, destinationName: "Susa", quantity: 10, weightKg: 500 }),
-      row({ id: 2, destinationId: 2, destinationName: "Ubaté", quantity: 40, weightKg: 2000 }),
-      row({ id: 3, destinationId: 1, destinationName: "Susa", quantity: 5, weightKg: 250 }),
+      row({ id: 1, destination: "Susa", quantity: 10, weightKg: 500 }),
+      row({ id: 2, destination: "Ubaté", quantity: 40, weightKg: 2000 }),
+      row({ id: 3, destination: "Susa", quantity: 5, weightKg: 250 }),
     ]);
     expect(summary).toEqual([
-      { destinationId: 2, destinationName: "Ubaté", count: 1, quantity: 40, weightKg: 2000, tons: 2 },
-      { destinationId: 1, destinationName: "Susa", count: 2, quantity: 15, weightKg: 750, tons: 0.75 },
+      { destination: "Ubaté", count: 1, quantity: 40, weightKg: 2000, tons: 2 },
+      { destination: "Susa", count: 2, quantity: 15, weightKg: 750, tons: 0.75 },
     ]);
   });
 });

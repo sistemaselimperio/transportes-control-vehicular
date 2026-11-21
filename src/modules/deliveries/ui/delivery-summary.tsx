@@ -12,7 +12,7 @@ export function DeliverySummary({ rows, today }: { rows: readonly DeliveryRow[];
   const [to, setTo] = useState<string | null>(today);
 
   const inRange = useMemo(
-    () => filterDeliveries(rows, { query: "", destinationId: null, shift: null, from, to }),
+    () => filterDeliveries(rows, { query: "", destination: null, shift: null, from, to }),
     [rows, from, to],
   );
   const summary = useMemo(() => summarizeByDestination(inRange), [inRange]);
@@ -72,8 +72,8 @@ export function DeliverySummary({ rows, today }: { rows: readonly DeliveryRow[];
               </thead>
               <tbody className="divide-y">
                 {summary.map((s) => (
-                  <tr key={s.destinationId} className="hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium">{s.destinationName}</td>
+                  <tr key={s.destination} className="hover:bg-muted/50">
+                    <td className="px-4 py-3 font-medium">{s.destination}</td>
                     <td className="num px-4 py-3 text-right">{s.count}</td>
                     <td className="num px-4 py-3 text-right">{formatBags(s.quantity)}</td>
                     <td className="num px-4 py-3 text-right">{formatKg(s.weightKg)}</td>

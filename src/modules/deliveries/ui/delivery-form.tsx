@@ -10,16 +10,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
 import { createDeliveryAction, updateDeliveryAction } from "../application/delivery-actions";
 import { NOTES_MAX } from "../application/delivery-schemas";
-import type { DestinationRow } from "../application/delivery-queries";
 import { formatTons } from "../domain/delivery-format";
-import { DELIVERY_PRIORITY_LABELS, DELIVERY_PRIORITIES, DELIVERY_SHIFTS, isSunday, type DeliveryRow } from "../domain/delivery-rules";
+import { DELIVERY_DEPARTMENT_CODES, DELIVERY_PRIORITY_LABELS, DELIVERY_PRIORITIES, DELIVERY_SHIFTS, isSunday, type DeliveryRow } from "../domain/delivery-rules";
+import { MunicipalityPicker } from "@/modules/shared/ui/municipality-picker";
 import { ClientPicker, type ClientOption } from "./client-picker";
 
 const FIELD = "h-10 md:h-9";
 
 export interface DeliveryFormOptions {
   clients: readonly ClientOption[];
-  destinations: readonly DestinationRow[];
   /** Plates of the fleet: the only ones that can be picked. */
   plates: readonly string[];
 }
@@ -117,18 +116,18 @@ function DeliveryFields({
           </NativeSelect>
         </Field>
       )}
-      <Field label="Destino" htmlFor={`${idPrefix}-destination`} required>
-        <NativeSelect id={`${idPrefix}-destination`} name="destinationId" defaultValue={delivery ? String(delivery.destinationId) : ""} required>
-          <option value="" disabled>
-            Elige un destino
-          </option>
-          {options.destinations.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <MunicipalityPicker
+          idPrefix={`${idPrefix}-destination`}
+          name="destination"
+          defaultValue={delivery?.destination}
+          selectClassName={FIELD}
+          departmentCodes={DELIVERY_DEPARTMENT_CODES}
+          departmentLabel="Departamento de destino"
+          municipalityLabelText="Municipio de destino"
+          required
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Cantidad (bultos)" htmlFor={`${idPrefix}-quantity`} required>
           <Input

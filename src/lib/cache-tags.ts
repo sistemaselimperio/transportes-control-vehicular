@@ -26,7 +26,6 @@ export const CACHE_TAGS = {
   /** Commercial area (schema `comercial`). */
   clients: "clients",
   deliveries: "deliveries",
-  destinations: "destinations",
   loads: "loads",
 } as const;
 
@@ -40,7 +39,6 @@ type EntityTag =
   | typeof CACHE_TAGS.inspections
   | typeof CACHE_TAGS.clients
   | typeof CACHE_TAGS.deliveries
-  | typeof CACHE_TAGS.destinations
   | typeof CACHE_TAGS.loads;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
@@ -59,7 +57,6 @@ const {
   files,
   clients,
   deliveries,
-  destinations,
   loads,
 } = CACHE_TAGS;
 
@@ -79,7 +76,6 @@ export type ReadName =
   | "vehicleTrips"
   | "clientRows"
   | "deliveryRows"
-  | "destinationRows"
   | "loadRows";
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
@@ -102,9 +98,8 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   vehicleTrips: [trips, fleet],
   /** Each client row carries its fincas and its number of deliveries. */
   clientRows: [clients, deliveries],
-  /** Rows show the client and destination names; deleting a vehicle unlinks its deliveries. */
-  deliveryRows: [deliveries, clients, destinations, fleet],
-  destinationRows: [destinations, deliveries],
+  /** Rows show the client name; deleting a vehicle unlinks its deliveries. */
+  deliveryRows: [deliveries, clients, fleet],
   /** Deleting a vehicle unlinks its loads. */
   loadRows: [loads, fleet],
 };
@@ -131,7 +126,6 @@ export type Change =
   | { kind: "inspection" }
   | { kind: "client" }
   | { kind: "delivery" }
-  | { kind: "destination" }
   | { kind: "load" }
   | { kind: "vehicle-file"; plate: string };
 
@@ -146,7 +140,6 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   inspection: [inspections],
   client: [clients],
   delivery: [deliveries],
-  destination: [destinations],
   load: [loads],
 };
 

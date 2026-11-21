@@ -183,6 +183,13 @@
       "when": 1795286400000,
       "tag": "0025_split_commercial_role",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795372800000,
+      "tag": "0026_deliveries_destination_municipality",
+      "breakpoints": true
     }
   ]
 }
