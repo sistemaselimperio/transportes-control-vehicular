@@ -10,6 +10,7 @@ import {
   kgToTons,
   ordersTotals,
   orderTotals,
+  productTotals,
   tonsDifference,
   unavailableOrderIds,
   type OrderLineRow,
@@ -140,5 +141,28 @@ describe("unavailableOrderIds", () => {
 
   it("treats a loaded order as taken when creating a load", () => {
     expect(unavailableOrderIds(found, [4], undefined)).toEqual([4]);
+  });
+});
+
+describe("productTotals", () => {
+  const line = (referenceName: string, bags: number) => ({ referenceName, bags });
+
+  it("sums the bags of each reference across the lines, most bags first", () => {
+    expect(productTotals([line("Maxi-Leche 585", 10), line("Ceba 100", 30), line("Maxi-Leche 585", 25)])).toEqual([
+      { referenceName: "Maxi-Leche 585", bags: 35 },
+      { referenceName: "Ceba 100", bags: 30 },
+    ]);
+  });
+
+  it("breaks ties by name and merges spellings that differ only in case or accents", () => {
+    expect(productTotals([line("beta", 5), line("Alfa", 5), line("BETA", 1)])).toEqual([
+      { referenceName: "beta", bags: 6 },
+      { referenceName: "Alfa", bags: 5 },
+    ]);
+    expect(productTotals([line("Zeta", 2), line("Alfa", 2)]).map((p) => p.referenceName)).toEqual(["Alfa", "Zeta"]);
+  });
+
+  it("is empty without lines", () => {
+    expect(productTotals([])).toEqual([]);
   });
 });

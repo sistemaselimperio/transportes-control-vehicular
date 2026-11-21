@@ -1,4 +1,5 @@
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import { searchKey } from "@/modules/shared/domain/search-key";
 
 export const ORDER_STATUSES = ["pendiente", "cargado", "anulado"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -71,6 +72,20 @@ export function ordersTotals(rows: ReadonlyArray<Pick<OrderRow, "lines">>, kgPer
   const bags = rows.reduce((sum, r) => sum + orderTotals(r.lines, kgPerBag).bags, 0);
   const kg = bagsToKg(bags, kgPerBag);
   return { count: rows.length, bags, kg, tons: kgToTons(kg) };
+}
+
+/** Bags per product across some lines (first spelling wins), most bags first, then by name. */
+export function productTotals(
+  lines: ReadonlyArray<Pick<OrderLineRow, "referenceName" | "bags">>,
+): Array<{ referenceName: string; bags: number }> {
+  const byKey = new Map<string, { referenceName: string; bags: number }>();
+  for (const l of lines) {
+    const key = searchKey(l.referenceName);
+    const known = byKey.get(key);
+    if (known) known.bags += l.bags;
+    else byKey.set(key, { referenceName: l.referenceName, bags: l.bags });
+  }
+  return [...byKey.values()].sort((a, b) => b.bags - a.bags || a.referenceName.localeCompare(b.referenceName, "es"));
 }
 
 export const isValidKgPerBag = (value: number): boolean => Number.isFinite(value) && value > 0 && value <= MAX_KG_PER_BAG;
