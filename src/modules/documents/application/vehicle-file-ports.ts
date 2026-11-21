@@ -50,6 +50,8 @@ export interface VehicleFileStorage {
 
 export interface VehicleFileRepository {
   findVehicleId(plate: string): Promise<number | null>;
+  /** Name of the vehicle class of that plate, or null when the vehicle does not exist. */
+  findVehicleClassName(plate: string): Promise<string | null>;
   listByVehicle(vehicleId: number): Promise<VehicleFileMeta[]>;
   insert(file: NewVehicleFile): Promise<void>;
   findMeta(id: string): Promise<(Pick<VehicleFileMeta, "id" | "vehicleId" | "fileName"> & { storagePath: string }) | null>;

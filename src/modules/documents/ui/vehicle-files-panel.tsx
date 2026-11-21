@@ -32,7 +32,7 @@ const CATEGORIES = FILE_GROUPS.flatMap((g) => g.categories);
  * falls in after them.
  */
 const ORDER: readonly FileCategory[] = ["OWNERSHIP_CARD", "TAX", "OTHER", "SOAT", "POLICY", "TECNO"];
-const LAYOUT: Array<{ category: FileCategory; span: string }> = [
+const ALL_LAYOUT: Array<{ category: FileCategory; span: string }> = [
   ...ORDER,
   ...CATEGORIES.filter((c) => !ORDER.includes(c)),
 ].map((category) => ({ category, span: "col-span-1" }));
@@ -49,11 +49,15 @@ export function VehicleFilesPanel({
   plate,
   files,
   readOnly = false,
+  categories,
 }: {
   plate: string;
   files: VehicleFileItem[];
   readOnly?: boolean;
+  /** Categories to show (all by default); a trailer shows only the papers it takes. */
+  categories?: readonly FileCategory[];
 }) {
+  const layout = categories ? ALL_LAYOUT.filter((l) => categories.includes(l.category)) : ALL_LAYOUT;
   const [pending, startTransition] = useTransition();
   const [stage, setStage] = useState<Stage | null>(null);
   /** File id being deleted (spinner) and file id waiting for its inline confirmation. */
@@ -285,7 +289,7 @@ export function VehicleFilesPanel({
   return (
     <div className="@container mt-3 min-w-0">
       <ul className="grid grid-cols-3 gap-2">
-        {LAYOUT.map(renderDoc)}
+        {layout.map(renderDoc)}
       </ul>
       <p className="mt-2 text-xs text-muted-foreground">
         PDF, JPG, PNG o WebP · máx. 4 MB por archivo

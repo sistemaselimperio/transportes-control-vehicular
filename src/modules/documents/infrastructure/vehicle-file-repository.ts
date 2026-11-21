@@ -23,6 +23,15 @@ export const vehicleFileRepository: VehicleFileRepository = {
     return row?.id ?? null;
   },
 
+  async findVehicleClassName(plate) {
+    const [row] = await db
+      .select({ name: schema.vehicleClasses.name })
+      .from(schema.vehicles)
+      .innerJoin(schema.vehicleClasses, eq(schema.vehicleClasses.id, schema.vehicles.classId))
+      .where(eq(schema.vehicles.plate, plate));
+    return row?.name ?? null;
+  },
+
   listByVehicle(vehicleId) {
     return db
       .select(metaColumns)

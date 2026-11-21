@@ -10,6 +10,7 @@ import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import type { DailyReportRow } from "@/modules/inspections/domain/daily-report";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
 import { VehicleFilesPanel } from "@/modules/documents/ui/vehicle-files-panel";
+import { TRAILER_FILE_CATEGORIES } from "@/modules/documents/domain/vehicle-file-rules";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { TireEventRow } from "@/modules/trailer-tires/domain/tire-events";
 import { TrailerTiresPanel } from "@/modules/trailer-tires/ui/trailer-tires-panel";
@@ -306,7 +307,19 @@ export function VehicleDetailView({
             <TrailerHeader r={r} towedByPlate={detail.towing.towedByPlate} />
             {sold && <SoldNotice />}
           </div>
-          {/* Trailers have no technical sheet or documents to track, but their tires and maintenance are kept. */}
+          {/* Trailers have no technical sheet and no expiry tracking: only SOAT, Tecno and the ownership card as files, plus tires and maintenance. */}
+          <Section
+            id="documentos"
+            title="Documentos"
+            note={`${detail.files.length} ${detail.files.length === 1 ? "archivo" : "archivos"}`}
+          >
+            <VehicleFilesPanel
+              plate={r.plate}
+              files={detail.files}
+              readOnly={filesReadOnly}
+              categories={TRAILER_FILE_CATEGORIES}
+            />
+          </Section>
           <TrailerHistorySection
             llantas={<TrailerTiresPanel plate={r.plate} events={tireEvents} today={detail.actions.today} canEdit={canEditTires && !sold} />}
             bitacora={<VehicleLogbookPanel logbook={detail.logbook} tabs={logbookTabsFor({ isTrailer: true })} />}

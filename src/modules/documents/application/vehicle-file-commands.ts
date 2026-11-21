@@ -5,7 +5,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { RuleError } from "@/modules/vehicles/domain/vehicle-rules";
-import { assertCanUpload, type FileCategory } from "../domain/vehicle-file-rules";
+import { isTrailerClass } from "@/modules/vehicles/domain/trailer";
+import { assertCanUpload, assertCategoryAllowed, type FileCategory } from "../domain/vehicle-file-rules";
 import type { VehicleFileContent, VehicleFileRepository, VehicleFileStorage } from "./vehicle-file-ports";
 
 export interface UploadInput {
@@ -25,6 +26,7 @@ export function createVehicleFileCommands(repo: VehicleFileRepository, storage: 
   return {
     async uploadVehicleFile(plate: string, input: UploadInput): Promise<{ message: string }> {
       const vehicleId = await vehicleIdOf(plate);
+      assertCategoryAllowed(input.category, isTrailerClass((await repo.findVehicleClassName(plate)) ?? ""));
       assertCanUpload({
         category: input.category,
         mimeType: input.mimeType,

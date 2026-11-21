@@ -5,7 +5,10 @@ import {
   FILE_CATEGORIES,
   FILE_CATEGORY_KEYS,
   MAX_FILE_BYTES,
+  TRAILER_FILE_CATEGORIES,
+  allowedCategoriesFor,
   assertCanUpload,
+  assertCategoryAllowed,
   formatFileSize,
   pdfPageLimit,
 } from "./vehicle-file-rules";
@@ -68,5 +71,23 @@ describe("formatFileSize", () => {
     expect(formatFileSize(512)).toBe("512 B");
     expect(formatFileSize(250 * 1024)).toBe("250 KB");
     expect(formatFileSize(1.5 * 1024 * 1024)).toBe("1,5 MB");
+  });
+});
+
+describe("trailer file categories", () => {
+  it("limits a trailer to SOAT, Tecno and ownership card", () => {
+    expect(TRAILER_FILE_CATEGORIES).toEqual(["SOAT", "TECNO", "OWNERSHIP_CARD"]);
+    expect(allowedCategoriesFor(true)).toEqual(TRAILER_FILE_CATEGORIES);
+  });
+
+  it("allows every category on a non-trailer", () => {
+    expect(allowedCategoriesFor(false)).toEqual(FILE_CATEGORY_KEYS);
+  });
+
+  it("rejects a category a trailer does not take", () => {
+    expect(() => assertCategoryAllowed("POLICY", true)).toThrow(RuleError);
+    expect(() => assertCategoryAllowed("POLICY", true)).toThrow("Este archivo no aplica a un remolque.");
+    expect(() => assertCategoryAllowed("SOAT", true)).not.toThrow();
+    expect(() => assertCategoryAllowed("POLICY", false)).not.toThrow();
   });
 });

@@ -4,13 +4,15 @@ import { MAX_FILE_BYTES, type FileCategory } from "../domain/vehicle-file-rules"
 import { createVehicleFileCommands } from "./vehicle-file-commands";
 import type { NewVehicleFile, VehicleFileRepository, VehicleFileStorage } from "./vehicle-file-ports";
 
-const PLATES: Record<string, number> = { "AAA-111": 1, "BBB-222": 2 };
+const PLATES: Record<string, number> = { "AAA-111": 1, "BBB-222": 2, "TTT-001": 3 };
+const CLASSES: Record<string, string> = { "AAA-111": "Camión", "BBB-222": "Camión", "TTT-001": "Remolque" };
 
 /** In-memory fake that keeps file rows in a map. */
 function fakeRepo() {
   const files = new Map<string, NewVehicleFile>();
   const repo: VehicleFileRepository = {
     findVehicleId: async (plate) => PLATES[plate] ?? null,
+    findVehicleClassName: async (plate) => CLASSES[plate] ?? null,
     listByVehicle: async () => [],
     insert: async (file) => void files.set(file.id, file),
     findMeta: async (id) => {
@@ -104,6 +106,23 @@ describe("uploadVehicleFile", () => {
   it("rejects an unknown vehicle", async () => {
     const { cmds } = setup();
     await expect(cmds.uploadVehicleFile("ZZZ-999", pdf())).rejects.toThrow(RuleError);
+  });
+
+  it("lets a trailer take SOAT, Tecno and ownership card", async () => {
+    const { cmds, files } = setup();
+    for (const category of ["SOAT", "TECNO", "OWNERSHIP_CARD"] as const) {
+      await cmds.uploadVehicleFile("TTT-001", pdf({ category }));
+    }
+    expect(files.size).toBe(3);
+  });
+
+  it("rejects any other category on a trailer without storing it", async () => {
+    const { cmds, files, objects } = setup();
+    await expect(cmds.uploadVehicleFile("TTT-001", pdf({ category: "POLICY" }))).rejects.toThrow(
+      "Este archivo no aplica a un remolque.",
+    );
+    expect(files.size).toBe(0);
+    expect(objects.size).toBe(0);
   });
 
   it("accepts any number of files in a category", async () => {

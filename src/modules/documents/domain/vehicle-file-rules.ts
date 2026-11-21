@@ -22,6 +22,20 @@ export const FILE_CATEGORY_KEYS = Object.keys(FILE_CATEGORIES) as FileCategory[]
 
 export const isFileCategory = (value: string): value is FileCategory => value in FILE_CATEGORIES;
 
+/** A trailer keeps only these papers: it has no policy, tax, logbook or loose files. */
+export const TRAILER_FILE_CATEGORIES: readonly FileCategory[] = ["SOAT", "TECNO", "OWNERSHIP_CARD"];
+
+/** The categories a vehicle may hold, depending on whether it is a trailer. */
+export function allowedCategoriesFor(isTrailer: boolean): readonly FileCategory[] {
+  return isTrailer ? TRAILER_FILE_CATEGORIES : FILE_CATEGORY_KEYS;
+}
+
+export function assertCategoryAllowed(category: FileCategory, isTrailer: boolean): void {
+  if (!allowedCategoriesFor(isTrailer).includes(category)) {
+    throw new RuleError("Este archivo no aplica a un remolque.");
+  }
+}
+
 export const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
 
 /** Vercel caps a request body at 4.5 MB, so one file must stay below that. */
