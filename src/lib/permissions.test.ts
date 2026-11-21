@@ -138,7 +138,7 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     owners: "locked",
     sales: "locked",
     clients: "manage",
-    deliveries: "locked",
+    deliveries: "read",
     loads: "manage",
     orders: "read",
   },
@@ -314,12 +314,13 @@ describe("commercial sections", () => {
     expect(canManageSection("dispatcher", "loads")).toBe(false);
   });
 
-  it("lets the loader manage clients and loads, only read orders, and not see deliveries", () => {
+  it("lets the loader manage clients and loads, only read orders and deliveries", () => {
     expect(canManageSection("loader", "clients")).toBe(true);
     expect(canManageSection("loader", "loads")).toBe(true);
     expect(canViewSection("loader", "orders")).toBe(true);
     expect(canManageSection("loader", "orders")).toBe(false);
-    expect(canViewSection("loader", "deliveries")).toBe(false);
+    expect(canViewSection("loader", "deliveries")).toBe(true);
+    expect(canManageSection("loader", "deliveries")).toBe(false);
   });
 
   it("lets only the roles that manage orders change the kilograms per bag", () => {

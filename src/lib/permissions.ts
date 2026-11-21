@@ -96,6 +96,7 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
   },
   loader: {
     clients: "manage",
+    deliveries: "read",
     loads: "manage",
     orders: "read",
   },
@@ -194,6 +195,9 @@ export function canUsePettyCash(flag: unknown): boolean {
 export function homePath(role: Role): string {
   if (canViewSection(role, "today")) return "/";
   if (canViewSection(role, "fleet")) return "/flota";
+  // A commercial role lands on the section it works in, even when it can also read the other one.
+  if (canManageSection(role, "deliveries")) return "/entregas";
+  if (canManageSection(role, "loads")) return "/cargues";
   if (canViewSection(role, "deliveries")) return "/entregas";
   if (canViewSection(role, "loads")) return "/cargues";
   return "/clientes";
