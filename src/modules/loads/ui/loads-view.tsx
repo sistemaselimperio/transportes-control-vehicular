@@ -17,6 +17,7 @@ import { deleteLoadAction } from "../application/load-actions";
 import { filterLoads, formatCop, isLoadSupplier, LOAD_SUPPLIERS, totalsOfLoads, type LoadFilters, type LoadRow } from "../domain/load-rules";
 import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
+import { PendingOrders } from "./pending-orders";
 
 /** Loads page: filters, totals, the list, the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
@@ -45,10 +46,18 @@ export function LoadsView({
 
   const shown = useMemo(() => filterLoads(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOfLoads(shown), [shown]);
+  const pending = useMemo(() => orders.filter((o) => o.status === "pendiente"), [orders]);
 
   const openForm = (load?: LoadRow) => {
     setEditing(load);
     setPreset(null);
+    setOpen(true);
+  };
+
+  /** "Crear cargue" on a pending order: a new load with that order already checked. */
+  const createFromOrder = (orderId: number) => {
+    setEditing(undefined);
+    setPreset(orderId);
     setOpen(true);
   };
 
@@ -66,6 +75,8 @@ export function LoadsView({
           )
         }
       />
+
+      <PendingOrders orders={pending} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={createFromOrder} />
 
       <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
         <div>
