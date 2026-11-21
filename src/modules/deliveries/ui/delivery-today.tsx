@@ -295,7 +295,6 @@ export function DeliveryToday({
                               </p>
                             </div>
                           </div>
-                          {r.notes && <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-sm text-muted-foreground">{r.notes}</p>}
                         </div>
                         {/* The action closes the row at the right, where the reading ends. */}
                         {canManage && (

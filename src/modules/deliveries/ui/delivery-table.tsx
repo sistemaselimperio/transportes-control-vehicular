@@ -143,13 +143,15 @@ export function DeliveryTable({
                     <span className="font-medium">{r.clientName}</span>
                     {r.locationName && <span className="block text-xs text-muted-foreground">Finca {r.locationName}</span>}
                     {r.clientNit && <span className="num block text-xs text-muted-foreground">{formatNit(r.clientNit)}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.destination}
                     {r.notes && (
                       <span className="block max-w-64 truncate text-xs text-muted-foreground" title={r.notes}>
                         {r.notes}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{r.destination}</td>
                   <td className="num px-4 py-3 text-right">{formatBags(r.quantity)}</td>
                   <td className="num px-4 py-3 text-right">{formatKg(r.weightKg)}</td>
                   <td className="num px-4 py-3 text-right">{formatTons(r.weightKg)}</td>
