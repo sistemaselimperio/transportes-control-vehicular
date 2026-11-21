@@ -1,6 +1,7 @@
 import { searchKey } from "@/modules/shared/domain/search-key";
 import { canEditOrder, isValidKgPerBag, type OrderStatus } from "../domain/order-rules";
 import type { OrderInput } from "./order-schemas";
+import { type EnsureReferences, resolveReferenceIds } from "./reference-resolver";
 
 /** A rule of the orders refused the operation; the message is for the user. */
 export class OrderError extends Error {}
@@ -18,7 +19,7 @@ export interface OrderPorts {
   /** The client each of the given fincas belongs to; a finca that no longer exists is left out. */
   findLocationOwners(ids: number[]): Promise<Array<{ id: number; clientId: number }>>;
   /** The id of every reference by `key` (see `searchKey`), creating the ones that do not exist yet. */
-  ensureReferences(refs: ReadonlyArray<{ name: string; key: string }>): Promise<Map<string, number>>;
+  ensureReferences: EnsureReferences;
   findOrder(id: number): Promise<{ status: OrderStatus; loadId: number | null } | null>;
   /** Stores the order, pending, with its lines; returns its id. */
   insertOrder(values: OrderValues): Promise<number>;
@@ -50,12 +51,10 @@ export function createOrderCommands(ports: OrderPorts) {
     }
 
     // The first spelling typed for a name wins; the rest of the lines reuse the same reference.
-    const wanted = new Map<string, string>();
-    for (const l of input.lines) {
-      const key = searchKey(l.reference);
-      if (!wanted.has(key)) wanted.set(key, l.reference);
-    }
-    const referenceIds = await ports.ensureReferences([...wanted].map(([key, name]) => ({ name, key })));
+    const referenceIds = await resolveReferenceIds(
+      ports.ensureReferences,
+      input.lines.map((l) => l.reference),
+    );
 
     return {
       deliveryDate: input.deliveryDate,

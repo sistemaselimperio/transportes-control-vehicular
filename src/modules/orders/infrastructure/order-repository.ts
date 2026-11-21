@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { OrderPorts, OrderValues } from "../application/order-commands";
 import { DEFAULT_KG_PER_BAG, isValidKgPerBag, type OrderLineRow, type OrderRow } from "../domain/order-rules";
+import { ensureReferences } from "./reference-repository";
 
 const KG_PER_BAG_KEY = "kg_per_bag";
 
@@ -97,19 +98,7 @@ export const orderRepository: OrderPorts = {
       .where(inArray(schema.clientLocations.id, ids));
   },
 
-  async ensureReferences(refs) {
-    if (refs.length === 0) return new Map();
-    // A concurrent order may create the same name first: the unique key makes the insert a no-op.
-    await db
-      .insert(schema.orderReferences)
-      .values(refs.map((r) => ({ name: r.name, nameKey: r.key })))
-      .onConflictDoNothing({ target: schema.orderReferences.nameKey });
-    const rows = await db
-      .select({ id: schema.orderReferences.id, nameKey: schema.orderReferences.nameKey })
-      .from(schema.orderReferences)
-      .where(inArray(schema.orderReferences.nameKey, refs.map((r) => r.key)));
-    return new Map(rows.map((r) => [r.nameKey, r.id]));
-  },
+  ensureReferences,
 
   async findOrder(id) {
     const [row] = await db
