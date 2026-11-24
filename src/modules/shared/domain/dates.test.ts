@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, daysBetween, formatDisplayDate } from "./dates";
+import { addMonths, daysBetween, formatDisplayDate, formatShortDate } from "./dates";
 
 describe("daysBetween", () => {
   it("returns positive days when target is after origin", () => {
@@ -32,5 +32,13 @@ describe("formatDisplayDate", () => {
   });
   it("returns an empty string for null", () => {
     expect(formatDisplayDate(null)).toBe("");
+  });
+});
+
+describe("formatShortDate", () => {
+  it("shows the day and the abbreviated month", () => {
+    expect(formatShortDate("2026-11-22")).toBe("22 nov");
+    expect(formatShortDate("2026-01-05")).toBe("5 ene");
+    expect(formatShortDate("2026-09-30")).toBe("30 sep");
   });
 });

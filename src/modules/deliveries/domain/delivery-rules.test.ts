@@ -4,7 +4,10 @@ import {
   computeClientAlerts,
   DELIVERY_SHIFTS,
   filterDeliveries,
-  groupByVehicle,
+  deliveryBlockLabel,
+  groupByVehicleBlocks,
+  pendingCount,
+  selectPendingDeliveries,
   shiftLabel,
   isDeliveryShift,
   isSunday,
@@ -94,25 +97,93 @@ describe("shiftLabel", () => {
   });
 });
 
-describe("groupByVehicle", () => {
-  it("groups by plate sorted, null plate last, each with the three trips in order", () => {
-    const groups = groupByVehicle([
-      row({ id: 1, plate: "ZZZ-999", shift: "2do viaje", quantity: 4, weightKg: 200 }),
-      row({ id: 2, plate: null }),
-      row({ id: 3, plate: "ABC-123", shift: "1er viaje" }),
-      row({ id: 4, plate: "ABC-123", shift: "1er viaje", priority: "urgente" }),
-    ]);
-    expect(groups.map((g) => g.plate)).toEqual(["ABC-123", "ZZZ-999", null]);
-    expect(groups[0].totals).toMatchObject({ count: 2, quantity: 20 });
-    expect(groups[0].trips.map((t) => t.shift)).toEqual(["1er viaje", "2do viaje", "3er viaje"]);
-    expect(groups[0].trips[0].rows.map((r) => r.id)).toEqual([4, 3]);
-    expect(groups[0].trips[1].rows).toEqual([]);
-    expect(groups[1].trips[1].totals).toMatchObject({ count: 1, quantity: 4, weightKg: 200 });
+const TODAY = "2026-11-24";
+
+describe("selectPendingDeliveries", () => {
+  it("keeps every pending delivery of any date plus today's delivered ones", () => {
+    const rows = [
+      row({ id: 1, date: "2026-11-20", status: "pendiente" }),
+      row({ id: 2, date: "2026-11-20", status: "entregado" }),
+      row({ id: 3, date: TODAY, status: "pendiente" }),
+      row({ id: 4, date: TODAY, status: "entregado" }),
+      row({ id: 5, date: "2026-12-30", status: "pendiente" }),
+      row({ id: 6, date: "2026-12-30", status: "entregado" }),
+    ];
+    expect(selectPendingDeliveries(rows, TODAY).map((r) => r.id)).toEqual([1, 3, 4, 5]);
   });
 
-  it("omits the no-vehicle group when it has no rows, and returns nothing for no rows", () => {
-    expect(groupByVehicle([row({ plate: "ABC-123" })]).map((g) => g.plate)).toEqual(["ABC-123"]);
-    expect(groupByVehicle([])).toEqual([]);
+  it("is empty when nothing qualifies", () => {
+    expect(selectPendingDeliveries([row({ date: "2026-11-01", status: "entregado" })], TODAY)).toEqual([]);
+    expect(selectPendingDeliveries([], TODAY)).toEqual([]);
+  });
+});
+
+describe("pendingCount", () => {
+  it("counts only pending rows, so today's delivered ones do not add up", () => {
+    const rows = selectPendingDeliveries(
+      [
+        row({ id: 1, date: "2026-11-20" }),
+        row({ id: 2, date: TODAY, status: "entregado" }),
+        row({ id: 3, date: "2026-11-30" }),
+      ],
+      TODAY,
+    );
+    expect(rows).toHaveLength(3);
+    expect(pendingCount(rows)).toBe(2);
+  });
+});
+
+describe("deliveryBlockLabel", () => {
+  it("labels overdue, today and future blocks", () => {
+    expect(deliveryBlockLabel("2026-11-22", "1er viaje", TODAY)).toBe("Atrasada · 22 nov · Viaje 1");
+    expect(deliveryBlockLabel(TODAY, "2do viaje", TODAY)).toBe("Hoy · Viaje 2");
+    expect(deliveryBlockLabel("2026-11-25", "3er viaje", TODAY)).toBe("25 nov · Viaje 3");
+  });
+});
+
+describe("groupByVehicleBlocks", () => {
+  it("groups by plate sorted, null plate last, totals over the rows given", () => {
+    const groups = groupByVehicleBlocks(
+      [
+        row({ id: 1, plate: "ZZZ-999", quantity: 4, weightKg: 200 }),
+        row({ id: 2, plate: null }),
+        row({ id: 3, plate: "ABC-123" }),
+        row({ id: 4, plate: "ABC-123", priority: "urgente" }),
+      ],
+      TODAY,
+    );
+    expect(groups.map((g) => g.plate)).toEqual(["ABC-123", "ZZZ-999", null]);
+    expect(groups[0].totals).toMatchObject({ count: 2, quantity: 20 });
+    expect(groups[1].totals).toMatchObject({ count: 1, quantity: 4, weightKg: 200 });
+  });
+
+  it("orders blocks by date then shift and flags the overdue ones", () => {
+    const [group] = groupByVehicleBlocks(
+      [
+        row({ id: 1, plate: "ABC-123", date: "2026-11-26", shift: "1er viaje" }),
+        row({ id: 2, plate: "ABC-123", date: TODAY, shift: "2do viaje" }),
+        row({ id: 3, plate: "ABC-123", date: TODAY, shift: "1er viaje", status: "entregado" }),
+        row({ id: 4, plate: "ABC-123", date: "2026-11-22", shift: "3er viaje" }),
+        row({ id: 5, plate: "ABC-123", date: "2026-11-22", shift: "1er viaje" }),
+        row({ id: 6, plate: "ABC-123", date: "2026-11-22", shift: "1er viaje", priority: "urgente" }),
+      ],
+      TODAY,
+    );
+    expect(group.blocks.map((b) => [b.date, b.shift, b.overdue])).toEqual([
+      ["2026-11-22", "1er viaje", true],
+      ["2026-11-22", "3er viaje", true],
+      [TODAY, "1er viaje", false],
+      [TODAY, "2do viaje", false],
+      ["2026-11-26", "1er viaje", false],
+    ]);
+    expect(group.blocks[0].rows.map((r) => r.id)).toEqual([6, 5]);
+    expect(group.blocks[0].totals.count).toBe(2);
+  });
+
+  it("never marks a delivered row's block as overdue and handles no rows", () => {
+    const [group] = groupByVehicleBlocks([row({ plate: "A", date: "2026-11-01", status: "entregado" })], TODAY);
+    expect(group.blocks[0].overdue).toBe(false);
+    expect(groupByVehicleBlocks([], TODAY)).toEqual([]);
   });
 });
 

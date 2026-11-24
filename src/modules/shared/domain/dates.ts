@@ -49,3 +49,11 @@ export function formatDisplayDate(iso: IsoDate | null): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+
+const SHORT_MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"] as const;
+
+/** Compact day label: "22 nov". */
+export function formatShortDate(iso: IsoDate): string {
+  const { m, d } = parse(iso);
+  return `${d} ${SHORT_MONTHS[m - 1]}`;
+}

@@ -1,4 +1,4 @@
-import { daysBetween, type IsoDate } from "@/modules/shared/domain/dates";
+import { daysBetween, formatShortDate, type IsoDate } from "@/modules/shared/domain/dates";
 import { matchesQuery } from "@/modules/shared/domain/search-key";
 
 /** DANE codes of the departments deliveries go to: Boyacá, Cundinamarca and Santander. */
@@ -85,8 +85,33 @@ export function sortDeliveries<T extends Pick<DeliveryRow, "id" | "priority">>(r
 /** Display label of a stored shift: "1er viaje" is shown as "Viaje 1". */
 export const shiftLabel = (shift: DeliveryShift): string => `Viaje ${DELIVERY_SHIFTS.indexOf(shift) + 1}`;
 
-export interface TripGroup<T> {
+/** Every pending delivery of any date, plus the ones delivered today. */
+export function selectPendingDeliveries<T extends Pick<DeliveryRow, "date" | "status">>(
+  rows: readonly T[],
+  today: IsoDate,
+): T[] {
+  return rows.filter((r) => r.status === "pendiente" || r.date === today);
+}
+
+/** Pending rows among the given ones (today's delivered rows do not count). */
+export const pendingCount = (rows: ReadonlyArray<Pick<DeliveryRow, "status">>): number =>
+  rows.filter((r) => r.status === "pendiente").length;
+
+/** Overdue: still pending and dated before today. */
+export const isOverdue = (row: Pick<DeliveryRow, "date" | "status">, today: IsoDate): boolean =>
+  row.status === "pendiente" && row.date < today;
+
+/** "Atrasada · 22 nov · Viaje 1", "Hoy · Viaje 2" or "25 nov · Viaje 3". */
+export function deliveryBlockLabel(date: IsoDate, shift: DeliveryShift, today: IsoDate): string {
+  const when = date === today ? "Hoy" : date < today ? `Atrasada · ${formatShortDate(date)}` : formatShortDate(date);
+  return `${when} · ${shiftLabel(shift)}`;
+}
+
+export interface DateShiftBlock<T> {
+  date: IsoDate;
   shift: DeliveryShift;
+  /** Dated before today and still holding a pending row. */
+  overdue: boolean;
   rows: T[];
   totals: DeliveryTotals;
 }
@@ -95,25 +120,38 @@ export interface VehicleGroup<T> {
   /** Null groups the deliveries saved without a vehicle. */
   plate: string | null;
   totals: DeliveryTotals;
-  /** The three trips in order (empty ones included), each with its rows (urgent first). */
-  trips: TripGroup<T>[];
+  /** Non-empty (date, shift) blocks, date ascending then trip order; rows urgent first. */
+  blocks: DateShiftBlock<T>[];
 }
 
-/** Rows per vehicle (plates sorted, the no-vehicle group last and only if it has rows), then per trip. */
-export function groupByVehicle<
-  T extends Pick<DeliveryRow, "id" | "priority" | "shift" | "plate" | "quantity" | "weightKg">,
->(rows: readonly T[]): VehicleGroup<T>[] {
+/** Rows per vehicle (plates sorted, the no-vehicle group last and only if it has rows), then per (date, shift). */
+export function groupByVehicleBlocks<
+  T extends Pick<DeliveryRow, "id" | "priority" | "date" | "shift" | "status" | "plate" | "quantity" | "weightKg">,
+>(rows: readonly T[], today: IsoDate): VehicleGroup<T>[] {
   const byPlate = new Map<string | null, T[]>();
   for (const r of rows) byPlate.set(r.plate, [...(byPlate.get(r.plate) ?? []), r]);
   const plates = [...byPlate.keys()].filter((p): p is string => p !== null).sort((a, b) => a.localeCompare(b, "es"));
   const keys: (string | null)[] = byPlate.has(null) ? [...plates, null] : plates;
   return keys.map((plate) => {
     const own = byPlate.get(plate) ?? [];
-    const trips = DELIVERY_SHIFTS.map((shift) => {
-      const inTrip = sortDeliveries(own.filter((r) => r.shift === shift));
-      return { shift, rows: inTrip, totals: totalsOf(inTrip) };
-    });
-    return { plate, totals: totalsOf(own), trips };
+    const byBlock = new Map<string, T[]>();
+    for (const r of own) {
+      const key = `${r.date}|${DELIVERY_SHIFTS.indexOf(r.shift)}`;
+      byBlock.set(key, [...(byBlock.get(key) ?? []), r]);
+    }
+    const blocks = [...byBlock.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([, list]) => {
+        const sorted = sortDeliveries(list);
+        return {
+          date: sorted[0].date,
+          shift: sorted[0].shift,
+          overdue: sorted.some((r) => isOverdue(r, today)),
+          rows: sorted,
+          totals: totalsOf(sorted),
+        };
+      });
+    return { plate, totals: totalsOf(own), blocks };
   });
 }
 

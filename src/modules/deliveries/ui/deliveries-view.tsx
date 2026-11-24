@@ -11,13 +11,13 @@ import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { deleteDeliveryAction } from "../application/delivery-actions";
 import { DELIVERY_TABS, DELIVERY_TAB_LABELS, type DeliveryTab } from "../domain/delivery-tabs";
-import { type ClientAlert, type DeliveryRow } from "../domain/delivery-rules";
+import { pendingCount, selectPendingDeliveries, type ClientAlert, type DeliveryRow } from "../domain/delivery-rules";
 import type { ClientOption } from "./client-picker";
 import { DeliveryAlerts } from "./delivery-alerts";
 import { DeliveryCreateForm, DeliveryEditForm } from "./delivery-form";
 import { DeliveryHistory } from "./delivery-history";
+import { DeliveryPending } from "./delivery-pending";
 import { DeliverySummary } from "./delivery-summary";
-import { DeliveryToday } from "./delivery-today";
 
 /** Deliveries page: the four tabs, the edit sheet and the delete confirmation. */
 export function DeliveriesView({
@@ -44,7 +44,7 @@ export function DeliveriesView({
   const [deleting, setDeleting] = useState<DeliveryRow | undefined>();
   const { message, flash } = useFlashMessage();
 
-  const todayRows = useMemo(() => rows.filter((r) => r.date === today), [rows, today]);
+  const pendingRows = useMemo(() => selectPendingDeliveries(rows, today), [rows, today]);
   const options = { clients, plates };
 
   return (
@@ -67,7 +67,7 @@ export function DeliveriesView({
         items={DELIVERY_TABS.map((key) => ({
           key,
           label: DELIVERY_TAB_LABELS[key],
-          count: key === "hoy" ? todayRows.length : key === "alertas" ? alerts.length : undefined,
+          count: key === "por-entregar" ? pendingCount(pendingRows) : key === "alertas" ? alerts.length : undefined,
         }))}
         active={tab}
         onSelect={setTab}
@@ -76,7 +76,9 @@ export function DeliveriesView({
       />
 
       <div role="tabpanel" id="delivery-panel" aria-labelledby={`delivery-tab-${tab}`} className="space-y-4">
-        {tab === "hoy" && <DeliveryToday rows={todayRows} canManage={canManage} onDone={flash} />}
+        {tab === "por-entregar" && (
+          <DeliveryPending rows={pendingRows} today={today} canManage={canManage} onDone={flash} />
+        )}
 
         {tab === "historial" && (
           <DeliveryHistory rows={rows} canManage={canManage} onEdit={setEditing} onDelete={setDeleting} />

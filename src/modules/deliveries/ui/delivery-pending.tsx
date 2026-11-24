@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { formatNit } from "@/modules/petty-cash/domain/nit";
 import { setDeliveryStatusAction } from "../application/delivery-actions";
 import { formatBags, formatKg, formatTons } from "../domain/delivery-format";
-import { groupByVehicle, shiftLabel, type DeliveryRow, type DeliveryTotals, type VehicleGroup } from "../domain/delivery-rules";
+import { deliveryBlockLabel, groupByVehicleBlocks, isOverdue, type DeliveryRow, type DeliveryTotals, type VehicleGroup } from "../domain/delivery-rules";
 
 export function TotalsLine({ totals, className }: { totals: DeliveryTotals; className?: string }) {
   return (
@@ -128,7 +128,7 @@ function VehicleStatus({ pending, urgent }: { pending: number; urgent: number })
  * the day's load in one line, and a thin progress bar of delivered over total along the bottom edge.
  */
 function VehicleHead({ group }: { group: VehicleCardGroup }) {
-  const rows = group.trips.flatMap((t) => t.rows);
+  const rows = group.blocks.flatMap((b) => b.rows);
   const delivered = rows.filter((r) => r.status === "entregado").length;
   const pending = rows.length - delivered;
   const urgent = rows.filter((r) => r.priority === "urgente" && r.status === "pendiente").length;
@@ -186,22 +186,28 @@ function VehicleHead({ group }: { group: VehicleCardGroup }) {
   );
 }
 
-/** "Hoy":today's deliveries grouped by vehicle and then by trip, urgent first, with the pendiente / entregado toggle. */
-export function DeliveryToday({
+/**
+ * "Por entregar": every pending delivery plus today's delivered ones, grouped by vehicle and then by
+ * (date, trip) with overdue blocks first and highlighted, urgent first, with the pendiente / entregado toggle.
+ */
+export function DeliveryPending({
   rows,
+  today,
   canManage,
   onDone,
 }: {
-  /** Only the deliveries dated today. */
+  /** Already selected with `selectPendingDeliveries`. */
   rows: readonly DeliveryRow[];
+  /** Colombia's current day. */
+  today: string;
   canManage: boolean;
   onDone: (message: string) => void;
 }) {
-  const groups = groupByVehicle(rows);
+  const groups = groupByVehicleBlocks(rows, today);
 
   if (rows.length === 0) {
     return (
-      <p className="panel px-4 py-8 text-center text-sm text-muted-foreground">Sin entregas para hoy.</p>
+      <p className="panel px-4 py-8 text-center text-sm text-muted-foreground">Sin entregas por entregar.</p>
     );
   }
 
@@ -212,14 +218,14 @@ export function DeliveryToday({
         {groups.map((group) => (
           <section key={group.plate ?? "none"} aria-label={group.plate ? `Vehículo ${group.plate}` : "Sin vehículo"} className="panel">
             <VehicleHead group={group} />
-            {/* Only the trips this vehicle actually has today; empty ones are left out. */}
-            {group.trips.filter((trip) => trip.rows.length > 0).map((trip) => {
+            {/* One block per (date, trip) this vehicle has; empty ones never exist. */}
+            {group.blocks.map((trip) => {
               const tripPending = trip.rows.filter((r) => r.status === "pendiente").length;
               const tripUrgent = trip.rows.some((r) => r.priority === "urgente" && r.status === "pendiente");
               return (
               // Closed by default: the summary keeps the trip's totals and its state (urgent, pending, done) visible.
-              <details key={trip.shift} className="smooth-details group/trip border-b last:border-b-0">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 bg-muted/40 px-4 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+              <details key={`${trip.date}|${trip.shift}`} className="smooth-details group/trip border-b last:border-b-0">
+                <summary className={cn("flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring [&::-webkit-details-marker]:hidden", trip.overdue ? "bg-warn/60 text-warn-foreground hover:bg-warn" : "bg-muted/40 hover:bg-muted/70")}>
                   {/* "+" turns and fades into the "−" underneath when the trip opens. */}
                   <span className="relative size-4 shrink-0 text-muted-foreground" aria-hidden>
                     <Minus className="absolute inset-0 size-4" />
@@ -227,7 +233,7 @@ export function DeliveryToday({
                   </span>
                   <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                     <span className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{shiftLabel(trip.shift)}</span>
+                      <span className="text-sm font-semibold">{deliveryBlockLabel(trip.date, trip.shift, today)}</span>
                       {/* Icons only: the vehicle head above carries the counts in words. */}
                       {tripUrgent && (
                         <span title="Tiene entregas urgentes" className="inline-flex text-destructive">
@@ -247,7 +253,7 @@ export function DeliveryToday({
                         </span>
                       )}
                     </span>
-                    <TotalsLine totals={trip.totals} className="text-xs" />
+                    <TotalsLine totals={trip.totals} className={cn("text-xs", trip.overdue && "text-warn-foreground")} />
                   </span>
                 </summary>
                 <ul className="divide-y">
@@ -256,7 +262,9 @@ export function DeliveryToday({
                         key={r.id}
                         className={cn(
                           "space-y-3 px-4 py-3",
-                          r.priority === "urgente" && r.status === "pendiente" && "border-l-4 border-destructive bg-destructive-faint",
+                          r.priority === "urgente" && r.status === "pendiente"
+                            ? "border-l-4 border-destructive bg-destructive-faint"
+                            : isOverdue(r, today) && "border-l-4 border-warn-foreground bg-warn/20",
                         )}
                       >
                         <div className={cn("min-w-0 space-y-2", r.status === "entregado" && "opacity-60")}>
