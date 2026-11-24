@@ -2,18 +2,21 @@
 
 import { ChevronDown, Plus } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
+import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { orderTotals, ordersTotals, productTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
-import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { bucketPendingOrders, clientNames, daysLate, PENDING_DAYS, pendingDay, type PendingDay } from "../domain/pending-orders";
 
 const STORAGE_KEY = "cargues.pendingOrders.open";
 const CHANGE_EVENT = "cargues:pending-orders-open";
-const MAX_CHIPS = 3;
 
-/** Storage can be blocked or missing (private windows): every access falls back to "collapsed". */
+const tons = (value: number) => formatDecimal(value, 3);
+
+/** Storage can be blocked or missing (private windows): every access falls back to "open". */
 function subscribe(onChange: () => void) {
   window.addEventListener(CHANGE_EVENT, onChange);
   window.addEventListener("storage", onChange);
@@ -23,16 +26,16 @@ function subscribe(onChange: () => void) {
   };
 }
 
+/** Open unless the loader closed it: what is left to load is the first thing to see. */
 function readOpen(): boolean {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "1";
+    return window.localStorage.getItem(STORAGE_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
-// The server does not know the browser's choice: collapsed until hydration.
-const readServerOpen = (): boolean => false;
+const readServerOpen = (): boolean => true;
 
 function writeOpen(open: boolean) {
   try {
@@ -43,20 +46,55 @@ function writeOpen(open: boolean) {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-/** The orders still waiting for a load, so the loader sees what to pick up without opening the form. */
+/** Only a late or a today order carries colour: a dot, and the same hue on its day. */
+const DOT: Record<PendingDay, string> = {
+  atrasado: "bg-destructive",
+  hoy: "bg-amber-500",
+  manana: "bg-transparent",
+  despues: "bg-transparent",
+};
+const DAY_TEXT: Record<PendingDay, string> = {
+  atrasado: "font-medium text-destructive",
+  hoy: "font-medium text-warn-foreground",
+  manana: "text-foreground",
+  despues: "text-foreground",
+};
+
+function dayLabel(date: string, today: string): string {
+  switch (pendingDay(date, today)) {
+    case "atrasado":
+      return `${formatShortDate(date)} · hace ${daysLate(date, today)} d`;
+    case "hoy":
+      return "Hoy";
+    case "manana":
+      return "Mañana";
+    case "despues":
+      return formatShortDate(date);
+  }
+}
+
+/**
+ * The orders still waiting for a load, one compact line each in delivery order (late first): a status
+ * dot, the number, the day and window, the clients, the bags and "Cargue". A line opens its detail.
+ */
 export function PendingOrders({
   orders,
+  today,
   kgPerBag,
   canManage,
   onCreateLoad,
 }: {
   /** Pending orders only. */
   orders: readonly OrderRow[];
+  /** Colombia's current day. */
+  today: string;
   kgPerBag: number;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
 }) {
   const totals = ordersTotals(orders, kgPerBag);
+  const buckets = bucketPendingOrders(orders, today);
+  const sorted = PENDING_DAYS.flatMap((d) => buckets[d]);
   const storedOpen = useSyncExternalStore(subscribe, readOpen, readServerOpen);
   // Where storage is unavailable the toggle still works for this visit.
   const [sessionOpen, setSessionOpen] = useState<boolean | null>(null);
@@ -70,117 +108,146 @@ export function PendingOrders({
   }
 
   return (
-    <section aria-labelledby="pending-orders-title" className="space-y-2">
+    <section aria-labelledby="pending-orders-title" className="panel">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="flex min-h-11 w-full cursor-pointer flex-wrap items-center justify-between gap-x-2 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground md:min-h-9"
+        className={cn(
+          "flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 px-4 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground",
+          open && "border-b",
+        )}
       >
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-2">
           <ChevronDown
             aria-hidden
-            className={cn("size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", !open && "-rotate-90")}
+            className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", !open && "-rotate-90")}
           />
-          <span id="pending-orders-title" className="text-base font-semibold">
+          <h2 id="pending-orders-title" className="text-base font-semibold">
             Pedidos pendientes
-          </span>
+          </h2>
+          <span className="num text-base font-semibold text-muted-foreground">{totals.count}</span>
         </span>
         <span className="num text-sm text-muted-foreground">
-          {totals.count} {totals.count === 1 ? "pedido" : "pedidos"} · {totals.bags} bultos · {formatDecimal(totals.tons, 3)} t
+          {totals.bags} bultos · {tons(totals.tons)} t
         </span>
       </button>
+
       <div id={bodyId} hidden={!open}>
         {orders.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">No hay pedidos pendientes.</p>
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay pedidos pendientes: todo lo pedido ya tiene cargue.</p>
         ) : (
-          <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {orders.map((o) => (
-              <PendingOrderCard key={o.id} order={o} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={onCreateLoad} />
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y">
+              {sorted.map((o) => (
+                <OrderLine key={o.id} order={o} today={today} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={onCreateLoad} />
+              ))}
+            </ul>
+            {(buckets.atrasado.length > 0 || buckets.hoy.length > 0) && (
+              <p className="flex flex-wrap gap-x-4 gap-y-1 border-t px-4 py-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="size-2 rounded-full bg-destructive" />
+                  Atrasado
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="size-2 rounded-full bg-amber-500" />
+                  Para hoy
+                </span>
+              </p>
+            )}
+          </>
         )}
       </div>
     </section>
   );
 }
 
-function PendingOrderCard({
+/** One order on one line; the line itself opens its products in a modal. */
+function OrderLine({
   order: o,
+  today,
   kgPerBag,
   canManage,
   onCreateLoad,
 }: {
   order: OrderRow;
+  today: string;
   kgPerBag: number;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
 }) {
   const [detail, setDetail] = useState(false);
   const t = orderTotals(o.lines, kgPerBag);
-  const products = productTotals(o.lines);
-  const shown = products.slice(0, MAX_CHIPS);
-  const more = products.length - shown.length;
-  const detailId = `pending-order-${o.id}-detail`;
+  const names = clientNames(o);
+  const when = pendingDay(o.deliveryDate, today);
+  const whenText = [dayLabel(o.deliveryDate, today), o.timeWindow].filter(Boolean).join(" · ");
+
   return (
-    <li className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium">Pedido #{o.id}</p>
-          <p className="text-xs text-muted-foreground">
-            Entrega {formatDisplayDate(o.deliveryDate)}
-            {o.timeWindow && ` · ${o.timeWindow}`}
-          </p>
-        </div>
-        <p className="num shrink-0 text-sm">
-          {t.bags} bultos · {formatDecimal(t.tons, 3)} t
-        </p>
-      </div>
-      {products.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Productos del pedido">
-          {shown.map((p) => (
-            <li key={p.referenceId} className="num rounded-full border bg-muted/50 px-2 py-0.5 text-xs">
-              {productLabel({ code: p.referenceCode, name: p.referenceName })} <span className="text-muted-foreground">{p.bags}</span>
-            </li>
-          ))}
-          {more > 0 && <li className="rounded-full px-2 py-0.5 text-xs text-muted-foreground">+{more} más</li>}
-        </ul>
-      )}
-      {o.note && <p className="text-xs text-muted-foreground">{o.note}</p>}
-      {detail && (
-        <ul id={detailId} className="space-y-0.5 text-sm">
-          {o.lines.map((l) => (
-            <li key={l.id} className="flex justify-between gap-2">
-              <span className="min-w-0 truncate">
-                {l.clientName}
-                {l.locationName && <span className="text-muted-foreground"> · {l.locationName}</span>}
-                <span className="text-muted-foreground"> · {productLabel({ code: l.referenceCode, name: l.referenceName })}</span>
-              </span>
-              <span className="num shrink-0">{l.bags}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-auto flex flex-wrap items-center gap-2">
-        <Button
+    <li>
+      <div className="flex items-center gap-2 pr-3">
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          className="h-10 md:h-8"
-          aria-expanded={detail}
-          aria-controls={detailId}
-          onClick={() => setDetail((v) => !v)}
+          aria-haspopup="dialog"
+          onClick={() => setDetail(true)}
+          className="grid min-h-14 min-w-0 flex-1 cursor-pointer grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 py-2 pl-4 text-left text-sm transition-colors hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground md:grid-cols-[0.5rem_3.5rem_10rem_minmax(0,1fr)_4.5rem] md:py-0"
         >
-          {detail ? "Ocultar detalle" : "Ver detalle"}
-        </Button>
+          {/* The dot keeps its slot even when transparent, so every number starts on one edge. */}
+          <span aria-hidden className={cn("size-2 rounded-full max-md:row-span-2", DOT[when])} />
+          <span className="flex min-w-0 items-baseline gap-2 md:contents">
+            <span className="num font-semibold">#{o.id}</span>
+            <span className="min-w-0 truncate">
+              <span className={DAY_TEXT[when]}>{dayLabel(o.deliveryDate, today)}</span>
+              {o.timeWindow && <span className="text-muted-foreground"> · {o.timeWindow}</span>}
+            </span>
+          </span>
+          <span className="num text-right font-semibold md:order-last">
+            {t.bags}
+            <span className="font-normal text-muted-foreground md:sr-only"> bultos</span>
+          </span>
+          <span className="col-start-2 min-w-0 truncate text-muted-foreground md:col-start-auto md:text-foreground" title={names.join(", ")}>
+            {names.join(", ") || "Sin clientes"}
+          </span>
+        </button>
         {canManage && (
-          <Button variant="outline" size="sm" className="h-10 md:h-8" onClick={() => onCreateLoad(o.id)}>
+          <Button
+            variant="outline"
+            className="h-11 shrink-0 px-3 md:h-8"
+            onClick={() => onCreateLoad(o.id)}
+            aria-label={`Crear cargue con el pedido ${o.id}`}
+          >
             <Plus aria-hidden />
-            Crear cargue
+            Cargue
           </Button>
         )}
       </div>
+
+      <SlideOver
+        open={detail}
+        onOpenChange={setDetail}
+        title={`Pedido #${o.id}`}
+        description={`${whenText} · ${t.bags} bultos · ${tons(t.tons)} t`}
+      >
+        <OrderDetail order={o} />
+      </SlideOver>
     </li>
+  );
+}
+
+/** The order's products only, one line each with its bags summed across the clients. */
+function OrderDetail({ order: o }: { order: OrderRow }) {
+  const products = productTotals(o.lines);
+  return (
+    <div className="space-y-4">
+      <ul className="divide-y text-sm">
+        {products.map((p) => (
+          <li key={p.referenceId} className="flex items-baseline justify-between gap-3 py-2">
+            <span className="min-w-0">{productLabel({ code: p.referenceCode, name: p.referenceName })}</span>
+            <span className="num shrink-0 font-semibold">{p.bags}</span>
+          </li>
+        ))}
+      </ul>
+      {o.note && <p className="text-sm text-warn-foreground">{o.note}</p>}
+    </div>
   );
 }

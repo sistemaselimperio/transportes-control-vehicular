@@ -29,6 +29,7 @@ export function LoadsView({
   kgPerBag,
   presetOrderId,
   canManage,
+  today,
 }: {
   rows: readonly LoadRow[];
   plates: readonly string[];
@@ -40,6 +41,8 @@ export function LoadsView({
   /** An order to start the new load with, from the "Crear cargue" button of the orders page. */
   presetOrderId: number | null;
   canManage: boolean;
+  /** Colombia's current day, read on the server. */
+  today: string;
 }) {
   const [open, setOpen] = useState(presetOrderId !== null);
   const [preset, setPreset] = useState<number | null>(presetOrderId);
@@ -80,7 +83,7 @@ export function LoadsView({
         }
       />
 
-      <PendingOrders orders={pending} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={createFromOrder} />
+      <PendingOrders orders={pending} today={today} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={createFromOrder} />
 
       <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
         <div>

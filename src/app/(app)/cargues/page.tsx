@@ -3,6 +3,7 @@ import { requireSectionAccess } from "@/lib/session";
 import { listLoadRows } from "@/modules/loads/application/load-queries";
 import { LoadsView } from "@/modules/loads/ui/loads-view";
 import { getKgPerBag, listCatalogProducts, listOrderRows } from "@/modules/orders/application/order-queries";
+import { todayInBogota } from "@/modules/shared/domain/dates";
 import { listDispatchPlates } from "@/modules/vehicles/application/vehicle-queries";
 
 export default async function Page({
@@ -35,6 +36,7 @@ export default async function Page({
       kgPerBag={kgPerBag}
       presetOrderId={presetOrderId}
       canManage={canManage}
+      today={todayInBogota()}
     />
   );
 }
