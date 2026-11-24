@@ -1,6 +1,7 @@
 /** Zod schemas that parse the raw form values (strings) of each vehicle action. */
 import { z } from "zod";
 import { oilItemsField } from "@/modules/maintenance/application/oil-items-schema";
+import { CAPACITY_ERROR, parseCapacityTons } from "../domain/capacity";
 import { isPlaceholderDriverName, PLACEHOLDER_DRIVER_MESSAGE } from "@/modules/drivers/domain/placeholder-name";
 
 const VALID_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +32,18 @@ export const intField = (label: string, max = 2_000_000_000) =>
     .refine((v) => v === "" || /^\d{1,10}$/.test(v), `${label} debe ser un número entero.`)
     .transform((v) => (v === "" ? null : Number(v)))
     .refine((v) => v === null || v <= max, `${label} es demasiado grande.`);
+
+/** Optional capacity in tons ("34", "8,5 t"): blank means "not provided", anything else must be a positive number. */
+export const capacityField = z
+  .string()
+  .default("")
+  .transform((v) => v.trim())
+  .transform((v, ctx) => {
+    if (v === "") return null;
+    const tons = parseCapacityTons(v);
+    if (tons === null) ctx.addIssue({ code: "custom", message: CAPACITY_ERROR });
+    return tons;
+  });
 
 /** Optional ISO calendar date: blank means "not provided". */
 const optionalDateField = (label: string) =>
@@ -87,11 +100,13 @@ export const technicalDataSchema = z.object({
   serialNumber: textField,
   bodyType: textField,
   fuelType: textField,
-  capacity: textField,
+  capacity: capacityField,
   engineDisplacement: intField("El cilindraje", 99_999),
   grossWeightKg: intField("El peso bruto", 9_999_999),
   color: textField,
 });
+
+export const capacitySchema = z.object({ capacity: capacityField });
 
 export const statusSchema = z.object({
   status: z.enum(["ACTIVE", "IDLE", "IN_WORKSHOP"], "Elige el estado."),

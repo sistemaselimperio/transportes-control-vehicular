@@ -4,6 +4,7 @@
  */
 import { formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
 import { progressOf, type Progress } from "@/modules/shared/domain/progress";
+import { formatCapacityTons } from "./capacity";
 import { formatKm } from "./vehicle-row";
 import { RuleError } from "./vehicle-rules";
 
@@ -15,8 +16,8 @@ export interface VehicleTechnicalData {
   serialNumber: string | null;
   bodyType: string | null;
   fuelType: string | null;
-  /** Free text with its unit, e.g. "34 t" or "40 pasajeros". */
-  capacity: string | null;
+  /** Total cargo capacity in tons (decimals allowed, > 0). */
+  capacity: number | null;
   /** Engine displacement in cc. */
   engineDisplacement: number | null;
   grossWeightKg: number | null;
@@ -63,7 +64,7 @@ export function technicalRows(data: VehicleTechnicalData): Array<{ label: string
     { label: "Número de serie", value: text(data.serialNumber) },
     { label: "Tipo de carrocería", value: text(data.bodyType) },
     { label: "Cilindraje", value: unit(data.engineDisplacement, "cc") },
-    { label: "Capacidad", value: text(data.capacity) },
+    { label: "Capacidad", value: data.capacity == null ? "—" : formatCapacityTons(data.capacity) },
     { label: "Peso bruto vehicular", value: unit(data.grossWeightKg, "kg") },
     { label: "Color", value: text(data.color) },
   ];

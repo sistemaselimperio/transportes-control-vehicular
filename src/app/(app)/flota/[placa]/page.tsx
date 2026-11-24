@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { currentDay } from "@/lib/current-day";
-import { canAssignDrivers, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canViewSection } from "@/lib/permissions";
+import { canAssignDrivers, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canViewSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listTrailerTireEvents } from "@/modules/trailer-tires/infrastructure/tire-event-repository";
 import { isTrailerClass } from "@/modules/vehicles/domain/trailer";
@@ -46,7 +46,7 @@ export default async function Page({
       readOnly={!canEditVehicles(role)}
       filesReadOnly={!canManageVehicleFiles(role)}
       canOpenLogbook={canViewSection(role, "logbook")}
-      allowed={canAssignDrivers(role) ? ["driver"] : []}
+      allowed={[...(canAssignDrivers(role) ? (["driver"] as const) : []), ...(canEditVehicleCapacity(role) ? (["capacity"] as const) : [])]}
       denied={canTransferVehicles(role) ? [] : ["owner", "sell"]}
       inspections={inspections}
       dailyReports={dailyReports}

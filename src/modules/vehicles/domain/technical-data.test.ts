@@ -63,6 +63,17 @@ describe("technicalGroups", () => {
   });
 });
 
+describe("technicalRows capacity", () => {
+  const capacityOf = (capacity: number | null) =>
+    technicalRows({ ...EMPTY_TECHNICAL_DATA, capacity }).find((r) => r.label === "Capacidad")?.value;
+
+  it("shows tons, or a dash when unknown", () => {
+    expect(capacityOf(34)).toBe("34 t");
+    expect(capacityOf(8.5)).toBe("8,5 t");
+    expect(capacityOf(null)).toBe("—");
+  });
+});
+
 describe("technicalProgress", () => {
   const full = {
     registrationDate: "2020-01-15",
@@ -72,7 +83,7 @@ describe("technicalProgress", () => {
     serialNumber: "S1",
     bodyType: "Furgón",
     fuelType: "Diésel",
-    capacity: "34 t",
+    capacity: 34,
     engineDisplacement: 12000,
     grossWeightKg: 34000,
     color: "BLANCO",
@@ -95,7 +106,7 @@ describe("technicalProgress", () => {
   });
 
   it("counts the same fields the vehicle file shows", () => {
-    const data = { ...EMPTY_TECHNICAL_DATA, chassisNumber: "C1", capacity: "34 t" };
+    const data = { ...EMPTY_TECHNICAL_DATA, chassisNumber: "C1", capacity: 34 };
     expect(technicalProgress(data).known).toBe(technicalGroups(data).reduce((n, g) => n + g.known, 0));
   });
 });

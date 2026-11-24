@@ -391,6 +391,31 @@ describe("renewDocument and updateTax", () => {
   });
 });
 
+describe("updateCapacity", () => {
+  it("updates only the capacity", async () => {
+    const updates: unknown[] = [];
+    const { repo } = fakeRepo([snapshot()]);
+    repo.updateVehicle = async (id, fields) => void updates.push({ id, fields });
+    const result = await createVehicleCommands(repo, () => TODAY).updateCapacity("AAA-111", 8.5);
+    expect(updates).toEqual([{ id: 1, fields: { capacity: 8.5 } }]);
+    expect(result.message).toMatch(/capacidad/i);
+  });
+
+  it("clears the capacity with null", async () => {
+    const updates: unknown[] = [];
+    const { repo } = fakeRepo([snapshot()]);
+    repo.updateVehicle = async (id, fields) => void updates.push({ id, fields });
+    await createVehicleCommands(repo, () => TODAY).updateCapacity("AAA-111", null);
+    expect(updates).toEqual([{ id: 1, fields: { capacity: null } }]);
+  });
+
+  it("rejects a sold vehicle, an unknown plate and a non positive capacity", async () => {
+    await expect(commands([snapshot({ status: "SOLD" })]).updateCapacity("AAA-111", 5)).rejects.toThrow(RuleError);
+    await expect(commands([]).updateCapacity("ZZZ-999", 5)).rejects.toThrow(/no existe/i);
+    await expect(commands([snapshot()]).updateCapacity("AAA-111", 0)).rejects.toThrow(/toneladas/i);
+  });
+});
+
 describe("updateTechnicalData", () => {
   const data = {
     registrationDate: "2020-09-28",
@@ -400,7 +425,7 @@ describe("updateTechnicalData", () => {
     serialNumber: "727121",
     bodyType: "SRS",
     fuelType: "DIESEL",
-    capacity: null,
+    capacity: 34,
     engineDisplacement: 14900,
     grossWeightKg: 52000,
     color: "BLANCO",
@@ -425,5 +450,8 @@ describe("updateTechnicalData", () => {
     await expect(
       commands([snapshot()]).updateTechnicalData("AAA-111", { ...data, modelYear: 1800 }),
     ).rejects.toThrow(/modelo/i);
+    await expect(
+      commands([snapshot()]).updateTechnicalData("AAA-111", { ...data, capacity: -1 }),
+    ).rejects.toThrow(/toneladas/i);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAssignDrivers,
   canDeleteVehicles,
+  canEditVehicleCapacity,
   canEditVehicles,
   canManageVehicleFiles,
   canTransferVehicles,
@@ -175,6 +176,26 @@ describe("canAssignDrivers", () => {
 
   it("lets the assistant change a vehicle's driver because it edits vehicles", () => {
     expect(canAssignDrivers("assistant")).toBe(true);
+  });
+});
+
+describe("canEditVehicleCapacity", () => {
+  it("lets staff edit a vehicle's capacity even though it only reads the fleet", () => {
+    expect(canEditVehicleCapacity("staff")).toBe(true);
+    expect(canEditVehicles("staff")).toBe(false);
+  });
+
+  it("lets everyone who edits vehicles edit the capacity too", () => {
+    for (const role of ROLES) {
+      if (canEditVehicles(role)) expect(canEditVehicleCapacity(role)).toBe(true);
+    }
+    expect(canEditVehicleCapacity("admin")).toBe(true);
+    expect(canEditVehicleCapacity("assistant")).toBe(true);
+    expect(canEditVehicleCapacity("superadmin")).toBe(true);
+  });
+
+  it.each<Role>(["dispatcher", "loader"])("denies %s", (role) => {
+    expect(canEditVehicleCapacity(role)).toBe(false);
   });
 });
 

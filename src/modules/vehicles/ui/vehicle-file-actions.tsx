@@ -12,6 +12,7 @@ import {
   Pencil,
   Receipt,
   UserRound,
+  Weight,
   Wrench,
 } from "lucide-react";
 import {
@@ -33,6 +34,7 @@ import type { VehicleActionContext, VehicleDetail } from "../application/vehicle
 import {
   OilChangeForm,
   RenewDocumentForm,
+  CapacityForm,
   TechnicalDataForm,
   UpdateKmForm,
   UpdateTaxForm,
@@ -44,6 +46,7 @@ import { AssignDriverForm, SellForm, TransferOwnerForm } from "./vehicle-people-
 export type ActionKey =
   | "edit"
   | "technical"
+  | "capacity"
   | "document"
   | "tax"
   | "oil"
@@ -59,6 +62,7 @@ const ACTIONS: Record<
 > = {
   edit: { label: "Editar datos", title: "Editar datos del vehículo", icon: Pencil },
   technical: { label: "Editar datos técnicos", title: "Editar datos técnicos", icon: Wrench },
+  capacity: { label: "Capacidad", title: "Editar capacidad", icon: Weight },
   document: { label: "Renovar documento", title: "Renovar documento", icon: CalendarClock },
   tax: { label: "Impuesto", title: "Actualizar impuesto", icon: Receipt },
   oil: { label: "Cambio de aceite", title: "Registrar cambio de aceite", icon: Droplets },
@@ -120,7 +124,7 @@ export function FileActions({
   current: { owner: string | null; driver: string | null };
   /** The user cannot change anything: every action control is hidden. */
   readOnly?: boolean;
-  /** Actions still open to a read-only user (staff may change the driver). */
+  /** Actions still open to a read-only user (staff may change the driver and the capacity). */
   allowed?: readonly ActionKey[];
   /** Actions hidden even from a user who can edit (the assistant cannot sell or transfer). */
   denied?: readonly ActionKey[];
@@ -198,6 +202,7 @@ export function FileActions({
           />
         )}
         {active === "technical" && <TechnicalDataForm {...common} values={technical} />}
+        {active === "capacity" && <CapacityForm {...common} current={technical.capacity} />}
         {active === "document" && <RenewDocumentForm {...common} />}
         {active === "tax" && <UpdateTaxForm {...common} />}
         {active === "oil" && <OilChangeForm {...common} />}

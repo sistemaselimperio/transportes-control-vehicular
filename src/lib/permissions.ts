@@ -28,6 +28,7 @@
  * Fleet writes are finer than the matrix: `canEditVehicles`, `canDeleteVehicles` and
  * `canManageVehicleFiles` and `canTransferVehicles` (sell, transfer owner) say who may do each one.
  * Changing a vehicle's driver (`canAssignDrivers`) is open to whoever manages drivers or edits vehicles.
+ * Editing only a vehicle's capacity (`canEditVehicleCapacity`) is open to staff and to whoever edits vehicles.
  *
  * The public pre-operational form (/preoperacional) is outside every section.
  */
@@ -166,6 +167,11 @@ export function canTransferVehicles(role: Role): boolean {
 /** Change which driver a vehicle has: open to anyone who sees the fleet and either manages drivers or edits vehicles. */
 export function canAssignDrivers(role: Role): boolean {
   return canViewSection(role, "fleet") && (canManageDrivers(role) || canEditVehicles(role));
+}
+
+/** Edit only a vehicle's capacity (tons): staff, which otherwise only reads the fleet, and whoever edits vehicles. */
+export function canEditVehicleCapacity(role: Role): boolean {
+  return role === "staff" || canEditVehicles(role);
 }
 
 /** Create vehicles and edit everything on a vehicle's file. The assistant does it with only read access to the fleet. */

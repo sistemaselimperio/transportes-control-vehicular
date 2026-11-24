@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignDriverSchema,
+  capacitySchema,
   oilChangeSchema,
   renewDocumentSchema,
   sellSchema,
@@ -121,5 +122,25 @@ describe("technicalDataSchema", () => {
   it("rejects an invalid date or non numeric values", () => {
     expect(() => technicalDataSchema.parse({ registrationDate: "2020-13-45" })).toThrow(/fecha/);
     expect(() => technicalDataSchema.parse({ engineDisplacement: "14x" })).toThrow(/entero/);
+  });
+});
+
+describe("capacity in tons", () => {
+  it("reads tons typed with a comma, a point or a unit", () => {
+    expect(capacitySchema.parse({ capacity: "34" })).toEqual({ capacity: 34 });
+    expect(capacitySchema.parse({ capacity: "8,5 t" })).toEqual({ capacity: 8.5 });
+    expect(technicalDataSchema.parse({ capacity: " 12.25 ton " }).capacity).toBe(12.25);
+  });
+
+  it("clears the capacity when left blank", () => {
+    expect(capacitySchema.parse({ capacity: "  " })).toEqual({ capacity: null });
+    expect(capacitySchema.parse({})).toEqual({ capacity: null });
+  });
+
+  it("rejects text, zero and negatives", () => {
+    for (const bad of ["abc", "0", "-2", "40 pasajeros"]) {
+      expect(() => capacitySchema.parse({ capacity: bad })).toThrow(/toneladas/);
+      expect(() => technicalDataSchema.parse({ capacity: bad })).toThrow(/toneladas/);
+    }
   });
 });

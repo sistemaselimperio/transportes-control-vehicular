@@ -10,6 +10,7 @@ import { planOilChange } from "@/modules/maintenance/domain/plan-oil-change";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { normalizePlate } from "../domain/plate";
 import { assertCanAnchorTrailer } from "../domain/trailer";
+import { assertCapacityTons } from "../domain/capacity";
 import { assertModelYear, type VehicleTechnicalData } from "../domain/technical-data";
 import {
   assertCanAssignDriver,
@@ -268,8 +269,18 @@ export function createVehicleCommands(
       const vehicle = await loadOne(plate);
       assertEditable(vehicle.status);
       assertModelYear(data.modelYear, today());
+      assertCapacityTons(data.capacity);
       await repo.updateVehicle(vehicle.id, data);
       return { message: "Datos técnicos actualizados." };
+    },
+
+    /** Only the capacity in tons; null clears it. */
+    async updateCapacity(plate: string, capacity: number | null): Promise<CommandResult> {
+      const vehicle = await loadOne(plate);
+      assertEditable(vehicle.status);
+      assertCapacityTons(capacity);
+      await repo.updateVehicle(vehicle.id, { capacity });
+      return { message: "Capacidad actualizada." };
     },
 
     async renewDocument(plate: string, doc: DocumentRecord): Promise<CommandResult> {

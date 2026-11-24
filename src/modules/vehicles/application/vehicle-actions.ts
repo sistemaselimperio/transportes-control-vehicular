@@ -9,13 +9,14 @@ import type { ZodType } from "zod";
 import { ZodError } from "zod";
 import { expireAfterAction } from "@/lib/cache-invalidation";
 import { ForbiddenError } from "@/lib/permissions";
-import { requireDriverAssigner, requireVehicleDeleter, requireVehicleEditor, requireVehicleTransferer } from "@/lib/session";
+import { requireCapacityEditor, requireDriverAssigner, requireVehicleDeleter, requireVehicleEditor, requireVehicleTransferer } from "@/lib/session";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { RuleError } from "../domain/vehicle-rules";
 import { vehicleCommandRepository } from "../infrastructure/vehicle-command-repository";
 import { getVehicleActionContext, type VehicleActionContext } from "./vehicle-queries";
 import {
   assignDriverSchema,
+  capacitySchema,
   oilChangeSchema,
   oilChangeIdSchema,
   plateSchema,
@@ -141,6 +142,14 @@ export async function updateTechnicalDataAction(plate: string, fd: FormData): Pr
   return run(async () =>
     commands.updateTechnicalData(parse(plateSchema, plate), parse(technicalDataSchema, formValues(fd))),
   );
+}
+
+/** Capacity in tons: open to staff too, so it has its own guard instead of the vehicle editor's. */
+export async function updateCapacityAction(plate: string, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const v = parse(capacitySchema, formValues(fd));
+    return commands.updateCapacity(parse(plateSchema, plate), v.capacity);
+  }, requireCapacityEditor);
 }
 
 export async function updateKmAction(plate: string, fd: FormData): Promise<ActionResult> {

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canDeleteVehicles, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -62,6 +62,13 @@ export async function requireVehicleTransferer() {
 export async function requireDriverAssigner() {
   const session = await requireSession();
   if (!canAssignDrivers(parseRole(session.user.role))) throw new ForbiddenError();
+  return session;
+}
+
+/** Changing only a vehicle's capacity: staff and whoever edits vehicles. Throws `ForbiddenError` otherwise. */
+export async function requireCapacityEditor() {
+  const session = await requireSession();
+  if (!canEditVehicleCapacity(parseRole(session.user.role))) throw new ForbiddenError();
   return session;
 }
 

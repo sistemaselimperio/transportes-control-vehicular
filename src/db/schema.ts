@@ -143,7 +143,8 @@ export const vehicles = transportes.table(
     serialNumber: text("serial_number"),
     bodyType: text("body_type"),
     fuelType: text("fuel_type"),
-    capacity: text(),
+    /** Total cargo capacity in tons. */
+    capacity: numeric("capacity", { precision: 8, scale: 2, mode: "number" }),
     engineDisplacement: integer("engine_displacement"),
     grossWeightKg: integer("gross_weight_kg"),
     color: text(),

@@ -14,6 +14,7 @@ import {
   updateKmAction,
   updateOilChangeAction,
   updateTaxAction,
+  updateCapacityAction,
   updateTechnicalDataAction,
 } from "../application/vehicle-actions";
 import type { VehicleActionContext } from "../application/vehicle-queries";
@@ -323,13 +324,14 @@ export function TechnicalFields({ values }: { values: VehicleTechnicalData }) {
               ))}
             </datalist>
           </Field>
-          <Field label="Capacidad" htmlFor="tech-capacity">
+          <Field label="Capacidad (t)" htmlFor="tech-capacity">
             <Input
               id="tech-capacity"
               name="capacity"
+              inputMode="decimal"
               className={FIELD}
-              defaultValue={text("capacity")}
-              placeholder="34 t, 40 pasajeros…"
+              defaultValue={capacityInputValue(values.capacity)}
+              placeholder="34"
             />
           </Field>
           <Field label="Cilindraje (cc)" htmlFor="tech-displacement">
@@ -355,6 +357,41 @@ export function TechnicalFields({ values }: { values: VehicleTechnicalData }) {
           </Field>
         </div>
     </>
+  );
+}
+
+/** The capacity as typed in a form: tons with a decimal comma, blank when unknown. */
+const capacityInputValue = (tons: number | null) => (tons == null ? "" : String(tons).replace(".", ","));
+
+/** Edits only the capacity in tons (open to staff); blank clears it. */
+export function CapacityForm({
+  plate,
+  current,
+  onDone,
+  onCancel,
+}: Omit<FormProps, "ctx"> & { current: number | null }) {
+  return (
+    <ActionForm
+      action={(fd) => updateCapacityAction(plate, fd)}
+      submitLabel="Guardar capacidad"
+      onDone={onDone}
+      onCancel={onCancel}
+    >
+      <p className="text-sm text-muted-foreground">
+        Capacidad total de carga del vehículo en toneladas. Déjala vacía si no se conoce.
+      </p>
+      <Field label="Capacidad (t)" htmlFor="capacity-tons">
+        <Input
+          id="capacity-tons"
+          name="capacity"
+          inputMode="decimal"
+          className={FIELD}
+          defaultValue={capacityInputValue(current)}
+          placeholder="34"
+          autoFocus
+        />
+      </Field>
+    </ActionForm>
   );
 }
 

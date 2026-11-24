@@ -351,7 +351,7 @@ export function VehicleDetailView({
           {sold && <SoldNotice />}
         </div>
 
-        <Section id="datos-tecnicos" title="Datos técnicos">
+        <Section id="datos-tecnicos" title="Datos técnicos" actions={<ActionButtons keys={["capacity"]} />}>
           <TechnicalSheet r={r} />
         </Section>
 

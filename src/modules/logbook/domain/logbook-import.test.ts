@@ -305,11 +305,23 @@ describe("parseLogbookWorkbook: DATOS GENERALES", () => {
     expect(result.technical).toEqual({
       bodyType: "FURGON",
       fuelType: "DIESEL",
-      capacity: "34 t",
+      capacity: 34,
       grossWeightKg: 52000,
     });
     const peso = parseLogbookWorkbook([generalSheet([[1, { B: "PESO", C: 8000 }]])], TECH_CTX);
     expect(peso.technical).toEqual({ grossWeightKg: 8000 });
+  });
+
+  it("converts the capacity only when it has an explicit ton unit", () => {
+    const capacityOf = (value: string | number) =>
+      parseLogbookWorkbook([generalSheet([[1, { B: "CAPACIDAD", C: value }]])], TECH_CTX);
+    expect(capacityOf("8,5 toneladas").technical).toEqual({ capacity: 8.5 });
+    expect(capacityOf("34 TON").technical).toEqual({ capacity: 34 });
+    for (const legacy of ["2", 2, "40 pasajeros", "mucha"]) {
+      const result = capacityOf(legacy);
+      expect(result.technical).toEqual({});
+      expect(result.issues).toEqual([]);
+    }
   });
 
   it("accepts the registration date as an Excel serial or as text", () => {

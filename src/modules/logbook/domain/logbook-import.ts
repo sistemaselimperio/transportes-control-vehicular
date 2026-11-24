@@ -14,6 +14,7 @@ import {
 } from "@/modules/import-export/domain/cell-parsers";
 import type { RawRow, RawSheet } from "@/modules/import-export/domain/types";
 import { formatDisplayDate, todayInBogota, type IsoDate } from "@/modules/shared/domain/dates";
+import { parseLegacyCapacityTons } from "@/modules/vehicles/domain/capacity";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import {
   assertModelYear,
@@ -265,6 +266,11 @@ function parseTechnicalValue(key: TechnicalKey, v: CellValue, today: IsoDate): P
     case "grossWeightKg": {
       const parsed = parseMoney(v, key === "grossWeightKg" ? "Peso" : "Cilindraje");
       return parsed.value === 0 ? { value: null, error: null } : parsed;
+    }
+    case "capacity": {
+      // Old sheets mixed occupants and tons: only an explicit ton unit converts, the rest is dropped.
+      const tons = typeof v === "number" ? null : parseLegacyCapacityTons(cellText(v));
+      return { value: tons, error: null };
     }
     default:
       return { value: identifierText(v), error: null };
