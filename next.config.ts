@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Only for the self-hosted Docker image (Dokploy); on Vercel NEXT_OUTPUT is unset and the default output stays.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   // Shared reads opt in with `'use cache'` (in-memory, no remote handler); see src/lib/cache-tags.ts.
   cacheComponents: true,
   // Kept at the pre-existing prefetch behavior; flipping it is a separate decision.
