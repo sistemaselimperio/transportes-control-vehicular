@@ -312,11 +312,13 @@ describe("parseLogbookWorkbook: DATOS GENERALES", () => {
     expect(peso.technical).toEqual({ grossWeightKg: 8000 });
   });
 
-  it("converts the capacity only when it has an explicit ton unit", () => {
+  it("converts the capacity from tons or kilos and drops occupant counts", () => {
     const capacityOf = (value: string | number) =>
       parseLogbookWorkbook([generalSheet([[1, { B: "CAPACIDAD", C: value }]])], TECH_CTX);
     expect(capacityOf("8,5 toneladas").technical).toEqual({ capacity: 8.5 });
     expect(capacityOf("34 TON").technical).toEqual({ capacity: 34 });
+    expect(capacityOf("15000 KILO").technical).toEqual({ capacity: 15 });
+    expect(capacityOf(12000).technical).toEqual({ capacity: 12 });
     for (const legacy of ["2", 2, "40 pasajeros", "mucha"]) {
       const result = capacityOf(legacy);
       expect(result.technical).toEqual({});

@@ -10,12 +10,21 @@ export const MAX_CAPACITY_TONS = 999_999.99;
 export const CAPACITY_ERROR = "La capacidad debe ser un número de toneladas mayor que 0.";
 
 const TON_UNIT = "(?:t|ton|tons|tonelada|toneladas)";
+const KILO_UNIT = "(?:kg|kgs|kilo|kilos|kilogramo|kilogramos)";
 const LOOSE = new RegExp(String.raw`^(\d+(?:[.,]\d+)?)\s*${TON_UNIT}?\.?$`, "i");
-const STRICT = new RegExp(String.raw`^(\d+(?:[.,]\d+)?)\s*${TON_UNIT}\.?$`, "i");
+const LEGACY_TONS = new RegExp(String.raw`^(\d+(?:[.,]\d+)?)\s*${TON_UNIT}\.?$`, "i");
+const LEGACY_KILOS = new RegExp(String.raw`^(\d+(?:[.,]\d+)?)\s*${KILO_UNIT}\.?$`, "i");
+const BARE_NUMBER = /^(\d+(?:[.,]\d+)?)$/;
 
-function toTons(match: RegExpMatchArray | null): number | null {
-  if (!match) return null;
-  const tons = Math.round(Number(match[1]!.replace(",", ".")) * 100) / 100;
+/** Below this, a bare legacy number was an occupant count, not kilos. */
+const MIN_LEGACY_KILOS = 100;
+
+function amount(match: RegExpMatchArray): number {
+  return Number(match[1]!.replace(",", "."));
+}
+
+function toTons(value: number): number | null {
+  const tons = Math.round(value * 100) / 100;
   return tons > 0 && tons <= MAX_CAPACITY_TONS ? tons : null;
 }
 
@@ -24,15 +33,24 @@ function toTons(match: RegExpMatchArray | null): number | null {
  * optional. Null when blank, not a positive number or out of range.
  */
 export function parseCapacityTons(raw: string): number | null {
-  return toTons(raw.trim().match(LOOSE));
+  const match = raw.trim().match(LOOSE);
+  return match ? toTons(amount(match)) : null;
 }
 
 /**
- * Tons from a legacy free-text capacity (the old column, the logbook sheet). Stricter than the form:
- * only a value with an explicit ton unit converts, because a bare number was an occupant count.
+ * Tons from a legacy capacity (the old free-text column, the logbook sheet), which recorded kilos:
+ * "34 t" stays 34; "15000 KILO" and a bare 15000 become 15. A bare number under 100 was an occupant
+ * count and anything else is unreadable: both are null. Mirrors migration 0030.
  */
-export function parseLegacyCapacityTons(raw: string): number | null {
-  return toTons(raw.trim().match(STRICT));
+export function parseLegacyCapacityTons(raw: string | number): number | null {
+  const text = String(raw).trim();
+  const tons = text.match(LEGACY_TONS);
+  if (tons) return toTons(amount(tons));
+  const kilos = text.match(LEGACY_KILOS);
+  if (kilos) return toTons(amount(kilos) / 1000);
+  const bare = text.match(BARE_NUMBER);
+  if (bare && amount(bare) >= MIN_LEGACY_KILOS) return toTons(amount(bare) / 1000);
+  return null;
 }
 
 /** "34 t", "8,5 t". */

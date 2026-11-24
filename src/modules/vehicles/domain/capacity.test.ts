@@ -34,11 +34,30 @@ describe("parseLegacyCapacityTons", () => {
     ["10 Tons", 10],
     ["12 TONELADAS", 12],
     ["1 tonelada", 1],
-  ])("converts %j with an explicit unit", (raw, tons) => {
+  ])("converts %j with an explicit ton unit", (raw, tons) => {
     expect(parseLegacyCapacityTons(raw)).toBe(tons);
   });
 
-  it.each(["2", "34", "8.5", "40 pasajeros", "5 personas", "", "abc", "0 t"])("drops %j", (raw) => {
+  it.each([
+    ["15000 KILO", 15],
+    ["8000 kilos", 8],
+    ["3975 kg", 3.98],
+    ["12000 KGS", 12],
+    ["2500 kilogramos", 2.5],
+  ])("converts %j from kilos to tons", (raw, tons) => {
+    expect(parseLegacyCapacityTons(raw)).toBe(tons);
+  });
+
+  it.each([
+    ["35000", 35],
+    ["7990", 7.99],
+    ["100", 0.1],
+    [14000, 14],
+  ] as const)("reads the bare number %j as kilos", (raw, tons) => {
+    expect(parseLegacyCapacityTons(raw)).toBe(tons);
+  });
+
+  it.each(["2", 2, "34", 99, "8.5", "40 pasajeros", "5 personas", "ESTACAS", "", "abc", "0 t", "0 kg"])("drops %j", (raw) => {
     expect(parseLegacyCapacityTons(raw)).toBeNull();
   });
 });

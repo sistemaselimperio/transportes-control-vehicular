@@ -268,8 +268,8 @@ function parseTechnicalValue(key: TechnicalKey, v: CellValue, today: IsoDate): P
       return parsed.value === 0 ? { value: null, error: null } : parsed;
     }
     case "capacity": {
-      // Old sheets mixed occupants and tons: only an explicit ton unit converts, the rest is dropped.
-      const tons = typeof v === "number" ? null : parseLegacyCapacityTons(cellText(v));
+      // Old sheets mixed occupants and kilos: tons or kilos convert, occupant counts are dropped.
+      const tons = parseLegacyCapacityTons(typeof v === "number" ? v : cellText(v));
       return { value: tons, error: null };
     }
     default:
