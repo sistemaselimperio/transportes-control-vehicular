@@ -1,6 +1,6 @@
 import type { FindCatalogProducts } from "../domain/catalog";
 import { canEditOrder, isValidKgPerBag, type OrderStatus } from "../domain/order-rules";
-import type { OrderInput } from "./order-schemas";
+import { DUPLICATE_PRODUCT, type OrderInput } from "./order-schemas";
 
 /** A rule of the orders refused the operation; the message is for the user. */
 export class OrderError extends Error {}
@@ -34,12 +34,17 @@ const NOT_EDITABLE = "Solo se pueden modificar los pedidos pendientes.";
 const NOT_ANNULLABLE = "Solo se pueden anular los pedidos pendientes.";
 const CLIENT_GONE = "Un cliente del pedido ya no existe.";
 const FOREIGN_LOCATION = "La finca elegida no pertenece al cliente.";
+const MANY_CLIENTS = "Un pedido solo puede tener un cliente.";
+const MANY_LOCATIONS = "Un pedido solo puede tener una finca.";
 const PRODUCT_GONE = "Un producto del pedido ya no está en el catálogo.";
 
 export function createOrderCommands(ports: OrderPorts) {
   /** Checks the lines against the clients, the fincas and the product catalog. */
   async function prepare(input: OrderInput): Promise<OrderValues> {
     const clientIds = [...new Set(input.lines.map((l) => l.clientId))];
+    if (clientIds.length > 1) throw new OrderError(MANY_CLIENTS);
+    if (new Set(input.lines.map((l) => l.locationId)).size > 1) throw new OrderError(MANY_LOCATIONS);
+    if (new Set(input.lines.map((l) => l.referenceId)).size !== input.lines.length) throw new OrderError(DUPLICATE_PRODUCT);
     const existing = new Set(await ports.findExistingClientIds(clientIds));
     if (clientIds.some((id) => !existing.has(id))) throw new OrderError(CLIENT_GONE);
 

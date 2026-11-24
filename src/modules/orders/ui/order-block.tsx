@@ -39,8 +39,11 @@ export function OrderStatusPill({ status }: { status: OrderStatus }) {
   );
 }
 
-const HEADERS = ["Cliente", "Finca", "Referencia", "Bultos", "Kg", "Toneladas"] as const;
+const HEADERS = ["Referencia", "Bultos", "Kg", "Toneladas"] as const;
 const NUMERIC = new Set<string>(["Bultos", "Kg", "Toneladas"]);
+
+/** The distinct values of a list, in order of appearance. */
+const distinct = (values: ReadonlyArray<string | null>): string[] => [...new Set(values.filter((v): v is string => v !== null))];
 
 /**
  * One order as a block, like the Excel template: header, a table of lines and its total. Weights are
@@ -64,6 +67,9 @@ export function OrderBlock({
 }) {
   const totals = orderTotals(order.lines, kgPerBag);
   const editable = canEditOrder(order.status);
+  // An order has one client and, optionally, one finca: they are shown once, in the header.
+  const clientNames = distinct(order.lines.map((l) => l.clientName)).join(", ");
+  const locationNames = distinct(order.lines.map((l) => l.locationName)).join(", ");
 
   return (
     <article
@@ -76,6 +82,10 @@ export function OrderBlock({
             <h2 className="text-base font-semibold tracking-tight">Pedido #{order.id}</h2>
             <OrderStatusPill status={order.status} />
           </div>
+          <p className="text-sm font-medium">
+            {clientNames}
+            {locationNames && <span className="font-normal text-muted-foreground"> · Finca {locationNames}</span>}
+          </p>
           <p className="num text-sm text-muted-foreground">
             Entrega {formatDisplayDate(order.deliveryDate)}
             {order.timeWindow && ` · ${order.timeWindow}`}
@@ -123,7 +133,7 @@ export function OrderBlock({
       </header>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[34rem] text-sm">
+        <table className="w-full min-w-[26rem] text-sm">
           <thead className="text-left">
             <tr className="border-b">
               {HEADERS.map((h) => (
@@ -138,8 +148,6 @@ export function OrderBlock({
               const kg = bagsToKg(line.bags, kgPerBag);
               return (
                 <tr key={line.id}>
-                  <td className="px-4 py-2.5 font-medium">{line.clientName}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{line.locationName ?? "—"}</td>
                   <td className="px-4 py-2.5">{productLabel({ code: line.referenceCode, name: line.referenceName })}</td>
                   <td className="num px-4 py-2.5 text-right">{formatDecimal(line.bags, 0)}</td>
                   <td className="num px-4 py-2.5 text-right">{formatDecimal(kg, 2)}</td>
@@ -150,7 +158,7 @@ export function OrderBlock({
           </tbody>
           <tfoot>
             <tr className="border-t bg-muted/50 font-semibold">
-              <th scope="row" colSpan={3} className="px-4 py-2.5 text-left">
+              <th scope="row" colSpan={1} className="px-4 py-2.5 text-left">
                 Total del pedido
               </th>
               <td className="num px-4 py-2.5 text-right">{formatDecimal(totals.bags, 0)}</td>

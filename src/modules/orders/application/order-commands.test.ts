@@ -31,8 +31,7 @@ describe("create", () => {
       input({
         lines: [
           { clientId: 3, locationId: 7, referenceId: 10, bags: 50 },
-          { clientId: 3, locationId: null, referenceId: 11, bags: 10 },
-          { clientId: 4, locationId: null, referenceId: 10, bags: 5 },
+          { clientId: 3, locationId: 7, referenceId: 11, bags: 10 },
         ],
       }),
     );
@@ -43,10 +42,55 @@ describe("create", () => {
       note: null,
       lines: [
         { clientId: 3, locationId: 7, referenceId: 10, bags: 50 },
-        { clientId: 3, locationId: null, referenceId: 11, bags: 10 },
-        { clientId: 4, locationId: null, referenceId: 10, bags: 5 },
+        { clientId: 3, locationId: 7, referenceId: 11, bags: 10 },
       ],
     });
+  });
+
+  it("refuses lines of more than one client", async () => {
+    const p = ports();
+    await expect(
+      createOrderCommands(p).create(
+        input({
+          lines: [
+            { clientId: 3, locationId: null, referenceId: 10, bags: 1 },
+            { clientId: 4, locationId: null, referenceId: 11, bags: 1 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow("Un pedido solo puede tener un cliente.");
+    expect(p.insertOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses lines of more than one finca", async () => {
+    const p = ports();
+    await expect(
+      createOrderCommands(p).create(
+        input({
+          lines: [
+            { clientId: 3, locationId: 7, referenceId: 10, bags: 1 },
+            { clientId: 3, locationId: null, referenceId: 11, bags: 1 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow("Un pedido solo puede tener una finca.");
+    expect(p.insertOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses the same product twice", async () => {
+    const p = ports();
+    await expect(
+      createOrderCommands(p).update(
+        5,
+        input({
+          lines: [
+            { clientId: 3, locationId: 7, referenceId: 10, bags: 1 },
+            { clientId: 3, locationId: 7, referenceId: 10, bags: 2 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow("Un producto no puede repetirse en el pedido.");
+    expect(p.replaceOrder).not.toHaveBeenCalled();
   });
 
   it("refuses a product that is not in the catalog", async () => {

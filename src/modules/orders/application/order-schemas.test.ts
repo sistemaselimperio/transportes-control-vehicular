@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { kgPerBagSchema, orderIdSchema, orderSchema } from "./order-schemas";
+import { kgPerBagSchema, MAX_LINES, orderIdSchema, orderSchema } from "./order-schemas";
 
-const lines = [{ clientId: 3, locationId: 7, referenceId: 12, bags: 50 }];
-const valid = { deliveryDate: "2026-11-20", timeWindow: " 7–11 a.m. ", note: "", lines: JSON.stringify(lines) };
+const payload = { clientId: 3, locationId: 7, lines: [{ referenceId: 12, bags: 50 }] };
+const form = (over: object = {}) => JSON.stringify({ ...payload, ...over });
+const valid = { deliveryDate: "2026-11-20", timeWindow: " 7–11 a.m. ", note: "", order: form() };
 
 describe("orderSchema", () => {
-  it("parses a valid form", () => {
+  it("parses a valid form and writes the client and finca into every line", () => {
     expect(orderSchema.parse(valid)).toEqual({
       deliveryDate: "2026-11-20",
       timeWindow: "7–11 a.m.",
       note: null,
       lines: [{ clientId: 3, locationId: 7, referenceId: 12, bags: 50 }],
     });
+    const two = orderSchema.parse({ ...valid, order: form({ lines: [{ referenceId: 1, bags: 2 }, { referenceId: 2, bags: 3 }] }) });
+    expect(two.lines.map((l) => [l.clientId, l.locationId, l.referenceId])).toEqual([
+      [3, 7, 1],
+      [3, 7, 2],
+    ]);
   });
 
   it("requires a valid delivery date", () => {
@@ -19,28 +25,46 @@ describe("orderSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("requires at least one line", () => {
-    const r = orderSchema.safeParse({ ...valid, lines: "[]" });
-    expect(!r.success && r.error.issues[0]?.message).toBe("Agrega al menos una línea al pedido.");
+  it("requires at least one product", () => {
+    const r = orderSchema.safeParse({ ...valid, order: form({ lines: [] }) });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Agrega al menos un producto al pedido.");
   });
 
-  it("rejects lines that are not valid JSON", () => {
-    const r = orderSchema.safeParse({ ...valid, lines: "{oops" });
-    expect(!r.success && r.error.issues[0]?.message).toBe("Las líneas del pedido no son válidas.");
+  it("rejects a payload that is not valid JSON", () => {
+    const r = orderSchema.safeParse({ ...valid, order: "{oops" });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Los datos del pedido no son válidos.");
   });
 
-  it("requires a client, a catalog product and positive whole bags on every line", () => {
-    const bad = (over: object) => orderSchema.safeParse({ ...valid, lines: JSON.stringify([{ ...lines[0], ...over }]) });
-    expect(bad({ clientId: null }).success).toBe(false);
+  it("requires the client", () => {
+    for (const clientId of [null, 0, "3", undefined]) {
+      const r = orderSchema.safeParse({ ...valid, order: form({ clientId }) });
+      expect(r.success).toBe(false);
+    }
+    const r = orderSchema.safeParse({ ...valid, order: form({ clientId: null }) });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Elige el cliente del pedido.");
+  });
+
+  it("requires a catalog product and positive whole bags on every line", () => {
+    const bad = (over: object) => orderSchema.safeParse({ ...valid, order: form({ lines: [{ ...payload.lines[0], ...over }] }) });
     for (const referenceId of [null, 0, -1, 1.5, "12", undefined]) expect(bad({ referenceId }).success).toBe(false);
     for (const bags of [0, -3, 1.5, null]) expect(bad({ bags }).success).toBe(false);
   });
 
   it("makes the finca optional", () => {
-    const r = orderSchema.parse({ ...valid, lines: JSON.stringify([{ ...lines[0], locationId: null }]) });
+    const r = orderSchema.parse({ ...valid, order: form({ locationId: null }) });
     expect(r.lines[0]?.locationId).toBeNull();
-    const omitted = orderSchema.parse({ ...valid, lines: JSON.stringify([{ clientId: 3, referenceId: 5, bags: 1 }]) });
+    const omitted = orderSchema.parse({ ...valid, order: JSON.stringify({ clientId: 3, lines: payload.lines }) });
     expect(omitted.lines[0]?.locationId).toBeNull();
+  });
+
+  it("rejects the same product twice", () => {
+    const r = orderSchema.safeParse({ ...valid, order: form({ lines: [{ referenceId: 1, bags: 2 }, { referenceId: 1, bags: 3 }] }) });
+    expect(!r.success && r.error.issues[0]?.message).toBe("Un producto no puede repetirse en el pedido.");
+  });
+
+  it("caps the lines", () => {
+    const many = Array.from({ length: MAX_LINES + 1 }, (_, i) => ({ referenceId: i + 1, bags: 1 }));
+    expect(orderSchema.safeParse({ ...valid, order: form({ lines: many }) }).success).toBe(false);
   });
 
   it("caps the note and the time window", () => {
