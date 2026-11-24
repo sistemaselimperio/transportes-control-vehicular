@@ -1,4 +1,4 @@
-import type { OrderRow } from "@/modules/orders/domain/order-rules";
+import type { OrderRow } from "./order-rules";
 import { daysBetween, type IsoDate } from "@/modules/shared/domain/dates";
 
 /** How a delivery day reads against today. */
@@ -33,4 +33,19 @@ export function clientNames(order: Pick<OrderRow, "lines">): string[] {
   const seen = new Map<number, string>();
   for (const l of order.lines) if (!seen.has(l.clientId)) seen.set(l.clientId, l.clientName);
   return [...seen.values()];
+}
+
+const STATUS_RANK = { pendiente: 0, cargado: 1, anulado: 2 } as const;
+
+/**
+ * The orders page's reading order: what is still to do first (pending, oldest delivery day first),
+ * then the history (loaded, then annulled), newest first. Ties keep the order number.
+ */
+export function sortOrdersForList<T extends Pick<OrderRow, "id" | "status" | "deliveryDate">>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byStatus = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+    if (byStatus !== 0) return byStatus;
+    const byDate = a.deliveryDate < b.deliveryDate ? -1 : a.deliveryDate > b.deliveryDate ? 1 : 0;
+    return (a.status === "pendiente" ? byDate : -byDate) || a.id - b.id;
+  });
 }

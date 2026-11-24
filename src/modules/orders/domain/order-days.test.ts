@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { OrderLineRow, OrderRow } from "@/modules/orders/domain/order-rules";
-import { bucketPendingOrders, clientNames, daysLate } from "./pending-orders";
+import type { OrderLineRow, OrderRow } from "./order-rules";
+import { bucketPendingOrders, clientNames, daysLate, sortOrdersForList } from "./order-days";
 
 const line = (over: Partial<OrderLineRow>): OrderLineRow => ({
   id: 1,
@@ -72,5 +72,19 @@ describe("clientNames", () => {
       ],
     });
     expect(clientNames(o)).toEqual(["Finca El Roble", "Agro Ñandú"]);
+  });
+});
+
+describe("sortOrdersForList", () => {
+  it("puts pending orders first by delivery day, then loaded and annulled ones newest first", () => {
+    const rows = [
+      order({ id: 1, status: "cargado", deliveryDate: "2026-11-20" }),
+      order({ id: 2, status: "pendiente", deliveryDate: "2026-11-26" }),
+      order({ id: 3, status: "anulado", deliveryDate: "2026-11-25" }),
+      order({ id: 4, status: "pendiente", deliveryDate: "2026-11-21" }),
+      order({ id: 5, status: "cargado", deliveryDate: "2026-11-23" }),
+      order({ id: 6, status: "pendiente", deliveryDate: "2026-11-21" }),
+    ];
+    expect(sortOrdersForList(rows).map((o) => o.id)).toEqual([4, 6, 2, 5, 1, 3]);
   });
 });

@@ -9,7 +9,7 @@ import { productLabel } from "@/modules/orders/domain/catalog";
 import { orderTotals, ordersTotals, productTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { bucketPendingOrders, clientNames, daysLate, PENDING_DAYS, pendingDay, type PendingDay } from "../domain/pending-orders";
+import { bucketPendingOrders, clientNames, daysLate, PENDING_DAYS, pendingDay, type PendingDay } from "@/modules/orders/domain/order-days";
 
 const STORAGE_KEY = "cargues.pendingOrders.open";
 const CHANGE_EVENT = "cargues:pending-orders-open";

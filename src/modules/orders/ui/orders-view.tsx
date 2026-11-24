@@ -25,10 +25,11 @@ import {
 } from "../domain/order-rules";
 import { AnnulOrderDialog } from "./annul-order-dialog";
 import { KgPerBagField } from "./kg-per-bag-field";
-import { OrderBlock } from "./order-block";
+import { sortOrdersForList } from "../domain/order-days";
+import { OrderLine } from "./order-line";
 import { OrderForm } from "./order-form";
 
-/** Orders page: the kg-per-bag setting, filters, one block per order, a general total and the sheets. */
+/** Orders page: the kg-per-bag setting, filters, one compact line per order, a general total and the sheets. */
 export function OrdersView({
   rows,
   clients,
@@ -37,6 +38,7 @@ export function OrdersView({
   canManage,
   canSetKgPerBag,
   canCreateLoad,
+  today,
 }: {
   rows: readonly OrderRow[];
   clients: readonly ClientOption[];
@@ -46,6 +48,8 @@ export function OrdersView({
   canSetKgPerBag: boolean;
   /** The user manages loads: pending orders offer "Crear cargue". */
   canCreateLoad: boolean;
+  /** Colombia's current day, read on the server. */
+  today: string;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<OrderRow | undefined>();
@@ -53,7 +57,7 @@ export function OrdersView({
   const [filters, setFilters] = useState<OrderFilters>({ statuses: DEFAULT_STATUS_FILTER, from: null, to: null });
   const { message, flash } = useFlashMessage();
 
-  const shown = useMemo(() => filterOrders(rows, filters), [rows, filters]);
+  const shown = useMemo(() => sortOrdersForList(filterOrders(rows, filters)), [rows, filters]);
   const totals = useMemo(() => ordersTotals(shown, kgPerBag), [shown, kgPerBag]);
 
   const openForm = (order?: OrderRow) => {
@@ -142,25 +146,28 @@ export function OrdersView({
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">No hay pedidos para este filtro.</p>
       ) : (
-        <div className="space-y-4">
-          {shown.map((order) => (
-            <OrderBlock
-              key={order.id}
-              order={order}
-              kgPerBag={kgPerBag}
-              canManage={canManage}
-              canCreateLoad={canCreateLoad}
-              onEdit={openForm}
-              onAnnul={setAnnulling}
-            />
-          ))}
-          <div className="panel flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-3 text-sm font-semibold">
-            <span>Total general · {totals.count} pedidos</span>
-            <span className="num">
+        <section aria-label="Lista de pedidos" className="panel">
+          <ul className="divide-y">
+            {shown.map((order) => (
+              <OrderLine
+                key={order.id}
+                order={order}
+                today={today}
+                kgPerBag={kgPerBag}
+                canManage={canManage}
+                canCreateLoad={canCreateLoad}
+                onEdit={openForm}
+                onAnnul={setAnnulling}
+              />
+            ))}
+          </ul>
+          <p className="num flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-t bg-muted/40 px-4 py-3 text-sm font-semibold">
+            <span>Total · {totals.count} {totals.count === 1 ? "pedido" : "pedidos"}</span>
+            <span>
               {formatDecimal(totals.bags, 0)} bultos · {formatDecimal(totals.kg, 2)} kg · {formatDecimal(totals.tons, 3)} t
             </span>
-          </div>
-        </div>
+          </p>
+        </section>
       )}
 
       <FlashMessage message={message} />
