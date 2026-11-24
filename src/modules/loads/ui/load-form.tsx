@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
 import { PesosInput } from "@/components/app/pesos-input";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { productLabel, productsOfSupplier, type CatalogProduct } from "@/modules/orders/domain/catalog";
 import { orderTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
+import { ProductPicker } from "@/modules/orders/ui/product-picker";
 import { formatDisplayDate, todayInBogota } from "@/modules/shared/domain/dates";
 import { formatDecimal, parseDecimal } from "@/modules/shared/domain/decimal";
-import { searchKey } from "@/modules/shared/domain/search-key";
 import { createLoadAction, updateLoadAction } from "../application/load-actions";
-import { MAX_LINES, NOTES_MAX, PRODUCT_MAX, REFERENCE_MAX } from "../application/load-schemas";
+import { MAX_LINES, NOTES_MAX, REFERENCE_MAX } from "../application/load-schemas";
 import {
   costOf,
   draftsTotals,
@@ -24,24 +25,21 @@ import {
   suggestLines,
   type LineDraft,
 } from "../domain/load-lines";
-import { formatCop, LOAD_SUPPLIERS, type LoadRow } from "../domain/load-rules";
+import { formatCop, isLoadSupplier, LOAD_SUPPLIERS, type LoadRow, type LoadSupplier } from "../domain/load-rules";
 
 const FIELD = "h-10 md:h-9";
 
 /** "+1,5", "-0,5" or "0": a difference with its sign. */
 const formatSigned = (value: number): string => `${value > 0 ? "+" : ""}${formatDecimal(value, 3)}`;
 
-const emptyLine = (key: number): LineDraft => ({ key, reference: "", tons: "", cost: "", siesaNumber: "", orderNumber: "", auto: false });
+const emptyLine = (key: number): LineDraft => ({ key, referenceId: null, reference: "", tons: "", cost: "", siesaNumber: "", orderNumber: "", auto: false });
 
 const nextKey = (drafts: readonly LineDraft[]): number => Math.max(-1, ...drafts.map((d) => d.key)) + 1;
 
-/** The line to open for editing: the first one that is not complete yet. */
-const firstIncompleteKey = (drafts: readonly LineDraft[]): number | null => drafts.find((d) => !isDraftComplete(d))?.key ?? null;
-
-/** The JSON the server action parses: what was typed, as text. */
+/** The JSON the server action parses: the chosen product, and the rest as typed text. */
 const serializeLines = (drafts: readonly LineDraft[]): string =>
   JSON.stringify(
-    drafts.map((d) => ({ reference: d.reference, tons: d.tons, cost: d.cost, siesaNumber: d.siesaNumber, orderNumber: d.orderNumber })),
+    drafts.map((d) => ({ referenceId: d.referenceId, tons: d.tons, cost: d.cost, siesaNumber: d.siesaNumber, orderNumber: d.orderNumber })),
   );
 
 /** Creates a load, or edits `load` when given. */
@@ -60,19 +58,25 @@ export function LoadForm({
   plates: readonly string[];
   /** Pending orders, plus those already linked to a load; only the pending ones and this load's own are offered. */
   orders: readonly OrderRow[];
-  /** The product catalog (shared with the orders): suggestions, never a limit. */
-  references: readonly string[];
+  /** The product catalog (shared with the orders): a line can only carry a product of the load supplier. */
+  references: readonly CatalogProduct[];
   kgPerBag: number;
   /** A pending order checked from the start (the "Crear cargue" shortcut of the orders page). */
   presetOrderId?: number | null;
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
-  const listId = useId();
   // The form mounts only while the side sheet is open, so "today" is read on the client at that moment.
   const [today] = useState(() => todayInBogota());
   // The stored plate stays selectable when its vehicle left the fleet.
   const plateOptions = load && !plates.includes(load.plate) ? [load.plate, ...plates] : plates;
+  // The products offered are those of the chosen supplier; the server also refuses any other.
+  const [supplier, setSupplier] = useState<LoadSupplier | "">(load?.supplier ?? "");
+  const catalog = productsOfSupplier(references, supplier === "" ? null : supplier);
+  const validIds = new Set(catalog.map((p) => p.id));
+  const isReady = (d: LineDraft): boolean => isDraftComplete(d) && d.referenceId !== null && validIds.has(d.referenceId);
+  /** The line to open for editing: the first one that is not ready yet. */
+  const firstIncompleteKey = (drafts: readonly LineDraft[]): number | null => drafts.find((d) => !isReady(d))?.key ?? null;
   const available = orders.filter((o) => o.status === "pendiente" || (load !== undefined && o.loadId === load.id));
   const suggestionsOf = (ids: ReadonlySet<number>) => suggestLines(available.filter((o) => ids.has(o.id)), kgPerBag);
 
@@ -84,26 +88,24 @@ export function LoadForm({
     if (load) {
       return load.lines.map((l, key) => ({
         key,
-        reference: l.referenceName ?? "",
+        referenceId: l.referenceId,
+        reference: l.referenceName === null ? "" : productLabel({ code: l.referenceCode, name: l.referenceName }),
         tons: String(l.tons),
         cost: String(l.cost),
         siesaNumber: l.siesaNumber,
         orderNumber: l.orderNumber,
         auto: false,
-        legacy: l.referenceId === null,
       }));
     }
     return checked.size > 0 ? reconcileDrafts([], suggestionsOf(checked), 0) : [emptyLine(0)];
   });
   // At most one line is open; a line that is not complete starts open.
   const [openKey, setOpenKey] = useState<number | null>(() => firstIncompleteKey(lines));
-  const knownKeys = new Set(references.map(searchKey));
-
   const suggestions = suggestionsOf(checked);
   const comparison = orderedVersusLoaded(lines, suggestions);
-  const compared = (reference: string) => comparison.find((c) => searchKey(c.referenceName) === searchKey(reference));
-  const firstLineOf = (reference: string) => lines.find((l) => searchKey(l.reference) === searchKey(reference));
-  const uncovered = comparison.filter((c) => firstLineOf(c.referenceName) === undefined);
+  const compared = (referenceId: number | null) => comparison.find((c) => c.referenceId === referenceId);
+  const firstLineOf = (referenceId: number | null) => lines.find((l) => l.referenceId === referenceId);
+  const uncovered = comparison.filter((c) => firstLineOf(c.referenceId) === undefined);
 
   function toggle(id: number, on: boolean) {
     const next = new Set(checked);
@@ -152,7 +154,13 @@ export function LoadForm({
           <Input id="load-date" name="date" type="date" className={FIELD} defaultValue={load?.date ?? today} required />
         </Field>
         <Field label="Proveedor" htmlFor="load-supplier" required>
-          <NativeSelect id="load-supplier" name="supplier" defaultValue={load?.supplier ?? ""} required>
+          <NativeSelect
+            id="load-supplier"
+            name="supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(isLoadSupplier(e.target.value) ? e.target.value : "")}
+            required
+          >
             <option value="" disabled>
               Elige un proveedor
             </option>
@@ -212,23 +220,20 @@ export function LoadForm({
         )}
       </fieldset>
 
-      <datalist id={listId}>
-        {references.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-
       <fieldset className="space-y-3">
         <legend className="text-sm font-medium">Productos</legend>
         <p className="num text-sm text-muted-foreground" aria-live="polite">
           {totals.count} {totals.count === 1 ? "producto" : "productos"} · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
         </p>
         {lines.map((line, index) => {
-          const typed = line.reference.trim();
-          const vs = compared(line.reference);
-          const showsDifference = vs !== undefined && firstLineOf(line.reference)?.key === line.key;
+          const typed = line.referenceId === null ? "" : line.reference.trim();
+          const vs = compared(line.referenceId);
+          const showsDifference = vs !== undefined && firstLineOf(line.referenceId)?.key === line.key;
           const open = openKey === line.key;
-          const complete = isDraftComplete(line);
+          const complete = isReady(line);
+          // A stored product that is no longer pickable here: of another supplier, or a legacy one without code.
+          const outside = line.referenceId !== null && !validIds.has(line.referenceId);
+          const foreign = outside && references.some((p) => p.id === line.referenceId);
           const tons = parseDecimal(line.tons) ?? 0;
           const cost = costOf(line.cost);
           const summary = [
@@ -290,21 +295,24 @@ export function LoadForm({
                     htmlFor={`load-product-${line.key}`}
                     required
                     hint={
-                      typed === "" && line.legacy
-                        ? "Sin producto: elige uno para poder guardar."
-                        : typed !== "" && !knownKeys.has(searchKey(typed))
-                          ? "Producto nuevo: se creará al guardar."
-                          : undefined
+                      foreign
+                        ? `Este producto no es de ${supplier === "" ? "este proveedor" : supplier}: elige otro.`
+                        : outside
+                          ? "Este producto no está en el catálogo: elige uno."
+                          : supplier === ""
+                            ? "Elige primero el proveedor."
+                            : undefined
                     }
                   >
-                    <Input
+                    <ProductPicker
                       id={`load-product-${line.key}`}
-                      list={listId}
-                      className={FIELD}
-                      value={line.reference}
-                      maxLength={PRODUCT_MAX}
-                      autoComplete="off"
-                      onChange={(e) => patch(line.key, { reference: e.target.value })}
+                      products={catalog}
+                      value={line.referenceId}
+                      initialText={line.reference}
+                      emptyText={supplier === "" ? "Elige primero el proveedor." : `${supplier} no tiene productos.`}
+                      onChange={(referenceId, product) =>
+                        patch(line.key, { referenceId, reference: product ? productLabel(product) : "" })
+                      }
                     />
                   </Field>
                   <Field label="Toneladas" htmlFor={`load-tons-${line.key}`} required>
@@ -371,8 +379,8 @@ export function LoadForm({
         {uncovered.length > 0 && (
           <ul className="num space-y-0.5 text-xs text-muted-foreground" aria-live="polite">
             {uncovered.map((c) => (
-              <li key={c.referenceName}>
-                {c.referenceName}: pedido {formatDecimal(c.ordered, 3)} t · sin cargar
+              <li key={c.referenceId}>
+                {c.label}: pedido {formatDecimal(c.ordered, 3)} t · sin cargar
               </li>
             ))}
           </ul>

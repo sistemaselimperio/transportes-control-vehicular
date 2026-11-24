@@ -1,7 +1,7 @@
 import { canManageSection, canSetKgPerBag } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listClientRows } from "@/modules/clients/application/client-queries";
-import { getKgPerBag, listOrderReferences, listOrderRows } from "@/modules/orders/application/order-queries";
+import { getKgPerBag, listCatalogProducts, listOrderRows } from "@/modules/orders/application/order-queries";
 import { OrdersView } from "@/modules/orders/ui/orders-view";
 
 export default async function Page() {
@@ -9,7 +9,7 @@ export default async function Page() {
   const [rows, clients, references, kgPerBag] = await Promise.all([
     listOrderRows(),
     listClientRows(),
-    listOrderReferences(),
+    listCatalogProducts(),
     getKgPerBag(),
   ]);
   return (

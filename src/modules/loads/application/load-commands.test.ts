@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createLoadCommands, LoadError, type LoadPorts } from "./load-commands";
 import type { LoadInput } from "./load-schemas";
 
-const line = { reference: "Engorde 40", tons: 30, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" };
+const line = { referenceId: 10, tons: 30, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" };
 
 const input = (over: Partial<LoadInput> = {}): LoadInput => ({
   date: "2026-11-18",
@@ -21,7 +21,14 @@ function ports(over: Partial<LoadPorts> = {}): LoadPorts {
     findVehicleByPlate: vi.fn(async (plate: string) => (plate === "ABC-123" ? { id: 9, plate: "ABC-123" } : null)),
     findLoad: vi.fn(async () => ({ plate: "ABC-123", vehicleId: 9 })),
     findTakenSiesa: vi.fn(async () => []),
-    ensureReferences: vi.fn(async (refs: ReadonlyArray<{ name: string; key: string }>) => new Map(refs.map((r, i) => [r.key, 10 + i]))),
+    // Ids 10-19 are Finca products; 20-29 are Contegral's; every other id is not in the catalog.
+    findCatalogProducts: vi.fn(async (ids: number[]) =>
+      ids.flatMap((id) =>
+        id >= 10 && id < 30
+          ? [{ id, code: `C${id}`, name: `Producto ${id}`, supplier: id < 20 ? ("Finca" as const) : ("Contegral" as const) }]
+          : [],
+      ),
+    ),
     findOrdersByIds: vi.fn(async () => []),
     insertLoad: vi.fn(async () => true),
     updateLoad: vi.fn(async () => "ok" as const),
@@ -31,10 +38,10 @@ function ports(over: Partial<LoadPorts> = {}): LoadPorts {
 }
 
 describe("create", () => {
-  it("stores the fleet plate, links the vehicle and swaps each product for its reference id", async () => {
+  it("stores the fleet plate, links the vehicle and checks the catalog products", async () => {
     const p = ports();
     await createLoadCommands(p).create(input());
-    expect(p.ensureReferences).toHaveBeenCalledWith([{ name: "Engorde 40", key: "engorde40" }]);
+    expect(p.findCatalogProducts).toHaveBeenCalledWith([10]);
     expect(p.insertLoad).toHaveBeenCalledWith({
       date: "2026-11-18",
       supplier: "Finca",
@@ -46,13 +53,29 @@ describe("create", () => {
     });
   });
 
-  it("reuses one reference for a product typed twice", async () => {
+  it("looks a product up once when two lines carry it", async () => {
     const p = ports();
-    await createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "engorde  40", siesaNumber: "FV-101" }] }));
-    expect(p.ensureReferences).toHaveBeenCalledWith([{ name: "Engorde 40", key: "engorde40" }]);
+    await createLoadCommands(p).create(input({ lines: [line, { ...line, siesaNumber: "FV-101" }] }));
+    expect(p.findCatalogProducts).toHaveBeenCalledWith([10]);
     expect(p.insertLoad).toHaveBeenCalledWith(
       expect.objectContaining({ lines: [storedLine, { ...storedLine, siesaNumber: "FV-101" }] }),
     );
+  });
+
+  it("refuses a product that is not in the catalog", async () => {
+    const p = ports();
+    await expect(createLoadCommands(p).create(input({ lines: [{ ...line, referenceId: 99 }] }))).rejects.toThrow(
+      "Un producto del cargue ya no está en el catálogo.",
+    );
+    expect(p.insertLoad).not.toHaveBeenCalled();
+  });
+
+  it("refuses a product of another supplier, naming it", async () => {
+    const p = ports();
+    await expect(createLoadCommands(p).create(input({ lines: [{ ...line, referenceId: 21 }] }))).rejects.toThrow(
+      "El producto C21 · Producto 21 no es del proveedor Finca.",
+    );
+    expect(p.insertLoad).not.toHaveBeenCalled();
   });
 
   it("refuses a plate outside the fleet", async () => {
@@ -70,13 +93,13 @@ describe("create", () => {
     const p = ports({ findTakenSiesa: vi.fn(async () => ["FV-100"]) });
     await expect(createLoadCommands(p).create(input())).rejects.toThrow("Ya existe un cargue con el número SIESA FV-100.");
     expect(p.findTakenSiesa).toHaveBeenCalledWith(["FV-100"], undefined);
-    expect(p.ensureReferences).not.toHaveBeenCalled();
+    expect(p.findCatalogProducts).not.toHaveBeenCalled();
     expect(p.insertLoad).not.toHaveBeenCalled();
   });
 
   it("refuses a SIESA number repeated inside the load", async () => {
     const p = ports();
-    await expect(createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "Levante" }] }))).rejects.toThrow(
+    await expect(createLoadCommands(p).create(input({ lines: [line, { ...line, referenceId: 11 }] }))).rejects.toThrow(
       "El número SIESA FV-100 está repetido en el cargue.",
     );
     expect(p.insertLoad).not.toHaveBeenCalled();
@@ -84,7 +107,7 @@ describe("create", () => {
 
   it("allows repeating the supplier order number across lines", async () => {
     const p = ports();
-    await createLoadCommands(p).create(input({ lines: [line, { ...line, reference: "Levante", siesaNumber: "FV-101" }] }));
+    await createLoadCommands(p).create(input({ lines: [line, { ...line, referenceId: 11, siesaNumber: "FV-101" }] }));
     expect(p.insertLoad).toHaveBeenCalledTimes(1);
   });
 });
@@ -95,6 +118,17 @@ describe("update", () => {
     await createLoadCommands(p).update(3, input());
     expect(p.findTakenSiesa).toHaveBeenCalledWith(["FV-100"], 3);
     expect(p.updateLoad).toHaveBeenCalledWith(3, expect.objectContaining({ plate: "ABC-123", vehicleId: 9, lines: [storedLine] }));
+  });
+
+  it("refuses a line whose product is of another supplier or was left outside the catalog", async () => {
+    const p = ports();
+    await expect(createLoadCommands(p).update(3, input({ supplier: "Contegral" }))).rejects.toThrow(
+      "El producto C10 · Producto 10 no es del proveedor Contegral.",
+    );
+    await expect(createLoadCommands(p).update(3, input({ lines: [{ ...line, referenceId: 5 }] }))).rejects.toThrow(
+      "Un producto del cargue ya no está en el catálogo.",
+    );
+    expect(p.updateLoad).not.toHaveBeenCalled();
   });
 
   it("refuses a SIESA number held by another load", async () => {

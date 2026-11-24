@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { LoadPorts, LoadValues } from "../application/load-commands";
-import { ensureReferences } from "@/modules/orders/infrastructure/reference-repository";
+import { findCatalogProducts } from "@/modules/orders/infrastructure/reference-repository";
 import { loadTotals, type LoadLineRow } from "../domain/load-lines";
 import type { LinkedOrder, LoadRow } from "../domain/load-rules";
 
@@ -44,6 +44,7 @@ async function loadLines(): Promise<Map<number, LoadLineRow[]>> {
       loadId: schema.loadLines.loadId,
       referenceId: schema.loadLines.referenceId,
       referenceName: schema.orderReferences.name,
+      referenceCode: schema.orderReferences.code,
       tons: schema.loadLines.tons,
       cost: schema.loadLines.cost,
       siesaNumber: schema.loadLines.siesaNumber,
@@ -150,7 +151,7 @@ export const loadRepository: LoadPorts = {
     return rows.map((r) => r.siesaNumber);
   },
 
-  ensureReferences,
+  findCatalogProducts,
 
   async findOrdersByIds(ids) {
     if (ids.length === 0) return [];

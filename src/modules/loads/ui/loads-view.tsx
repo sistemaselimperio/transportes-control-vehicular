@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
+import type { CatalogProduct } from "@/modules/orders/domain/catalog";
 import type { OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { deleteLoadAction } from "../application/load-actions";
@@ -34,7 +35,7 @@ export function LoadsView({
   /** Orders a load can hold: the pending ones and the loaded ones (each form keeps only its own). */
   orders: readonly OrderRow[];
   /** The product catalog, for the suggestions of the form. */
-  references: readonly string[];
+  references: readonly CatalogProduct[];
   kgPerBag: number;
   /** An order to start the new load with, from the "Crear cargue" button of the orders page. */
   presetOrderId: number | null;

@@ -1,27 +1,22 @@
 /** Zod schemas that parse the raw values of the order form and of the kg-per-bag field. */
 import { z } from "zod";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
-import { collapseWhitespace } from "@/modules/shared/domain/search-key";
 import { dateField, textField } from "@/modules/vehicles/application/vehicle-action-schemas";
 import { isValidKgPerBag } from "../domain/order-rules";
 
 export const NOTE_MAX = 500;
 export const TIME_WINDOW_MAX = 40;
-export const REFERENCE_MAX = 80;
 export const MAX_LINES = 100;
 
 const LINES_INVALID = "Las líneas del pedido no son válidas.";
+const PRODUCT_MISSING = "Elige la referencia de cada línea.";
 
 export const orderLineSchema = z.object({
   clientId: z.number(LINES_INVALID).int(LINES_INVALID).positive("Elige el cliente de cada línea."),
   /** Optional finca; the command checks that it belongs to the client. */
   locationId: z.number().int().positive().nullish().transform((v) => v ?? null),
-  /** The reference by name: an unknown one is created by the command. */
-  reference: z
-    .string("Escribe la referencia de cada línea.")
-    .transform(collapseWhitespace)
-    .refine((v) => v !== "", "Escribe la referencia de cada línea.")
-    .refine((v) => v.length <= REFERENCE_MAX, "La referencia no puede pasar de 80 caracteres."),
+  /** The catalog product; the command checks that it exists. */
+  referenceId: z.number(PRODUCT_MISSING).int(PRODUCT_MISSING).positive(PRODUCT_MISSING),
   bags: z
     .number("Los bultos de cada línea deben ser un número entero mayor que cero.")
     .int("Los bultos de cada línea deben ser un número entero mayor que cero.")

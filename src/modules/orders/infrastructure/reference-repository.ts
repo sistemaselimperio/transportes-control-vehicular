@@ -1,18 +1,37 @@
-import { inArray } from "drizzle-orm";
+import { and, asc, inArray, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db";
-import type { EnsureReferences } from "../application/reference-resolver";
+import type { CatalogProduct, FindCatalogProducts } from "../domain/catalog";
 
-/** The id of every reference by key, creating the unknown ones; shared by the orders and the loads. */
-export const ensureReferences: EnsureReferences = async (refs) => {
-  if (refs.length === 0) return new Map();
-  // A concurrent write may create the same name first: the unique key makes the insert a no-op.
-  await db
-    .insert(schema.orderReferences)
-    .values(refs.map((r) => ({ name: r.name, nameKey: r.key })))
-    .onConflictDoNothing({ target: schema.orderReferences.nameKey });
+const catalogColumns = {
+  id: schema.orderReferences.id,
+  code: schema.orderReferences.code,
+  name: schema.orderReferences.name,
+  supplier: schema.orderReferences.supplier,
+};
+
+/** Legacy products (typed inline before the catalog) have no code and supplier: they are never part of it. */
+const isCatalog = isNotNull(schema.orderReferences.code);
+
+function toProducts(rows: Array<{ id: number; code: string | null; name: string; supplier: CatalogProduct["supplier"] | null }>): CatalogProduct[] {
+  return rows.flatMap((r) => (r.code === null || r.supplier === null ? [] : [{ id: r.id, code: r.code, name: r.name, supplier: r.supplier }]));
+}
+
+/** The whole catalog, by supplier and code; shared by the orders and the loads. */
+export async function loadCatalogProducts(): Promise<CatalogProduct[]> {
   const rows = await db
-    .select({ id: schema.orderReferences.id, nameKey: schema.orderReferences.nameKey })
+    .select(catalogColumns)
     .from(schema.orderReferences)
-    .where(inArray(schema.orderReferences.nameKey, refs.map((r) => r.key)));
-  return new Map(rows.map((r) => [r.nameKey, r.id]));
+    .where(and(isCatalog, isNotNull(schema.orderReferences.supplier)))
+    .orderBy(asc(schema.orderReferences.supplier), asc(schema.orderReferences.code));
+  return toProducts(rows);
+}
+
+/** The catalog products among `ids`; legacy products and unknown ids are left out. */
+export const findCatalogProducts: FindCatalogProducts = async (ids) => {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select(catalogColumns)
+    .from(schema.orderReferences)
+    .where(and(inArray(schema.orderReferences.id, ids), isCatalog));
+  return toProducts(rows);
 };

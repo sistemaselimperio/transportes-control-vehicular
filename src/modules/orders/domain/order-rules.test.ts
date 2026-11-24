@@ -25,6 +25,7 @@ const line = (over: Partial<OrderLineRow> = {}): OrderLineRow => ({
   locationName: null,
   referenceId: 1,
   referenceName: "Engorde",
+  referenceCode: "114040",
   bags: 50,
   ...over,
 });
@@ -145,21 +146,26 @@ describe("unavailableOrderIds", () => {
 });
 
 describe("productTotals", () => {
-  const line = (referenceName: string, bags: number) => ({ referenceName, bags });
+  const line = (referenceId: number, referenceName: string, bags: number) => ({
+    referenceId,
+    referenceName,
+    referenceCode: null,
+    bags,
+  });
 
-  it("sums the bags of each reference across the lines, most bags first", () => {
-    expect(productTotals([line("Maxi-Leche 585", 10), line("Ceba 100", 30), line("Maxi-Leche 585", 25)])).toEqual([
-      { referenceName: "Maxi-Leche 585", bags: 35 },
-      { referenceName: "Ceba 100", bags: 30 },
+  it("sums the bags of each product across the lines, most bags first", () => {
+    expect(productTotals([line(1, "Maxi-Leche 585", 10), line(2, "Ceba 100", 30), line(1, "Maxi-Leche 585", 25)])).toEqual([
+      { referenceId: 1, referenceName: "Maxi-Leche 585", referenceCode: null, bags: 35 },
+      { referenceId: 2, referenceName: "Ceba 100", referenceCode: null, bags: 30 },
     ]);
   });
 
-  it("breaks ties by name and merges spellings that differ only in case or accents", () => {
-    expect(productTotals([line("beta", 5), line("Alfa", 5), line("BETA", 1)])).toEqual([
-      { referenceName: "beta", bags: 6 },
-      { referenceName: "Alfa", bags: 5 },
+  it("breaks ties by name and keeps apart products that share a name", () => {
+    expect(productTotals([line(1, "Zeta", 2), line(2, "Alfa", 2)]).map((p) => p.referenceName)).toEqual(["Alfa", "Zeta"]);
+    expect(productTotals([line(1, "Terneras Nodriza", 3), line(2, "Terneras Nodriza", 4)]).map((p) => [p.referenceId, p.bags])).toEqual([
+      [2, 4],
+      [1, 3],
     ]);
-    expect(productTotals([line("Zeta", 2), line("Alfa", 2)]).map((p) => p.referenceName)).toEqual(["Alfa", "Zeta"]);
   });
 
   it("is empty without lines", () => {

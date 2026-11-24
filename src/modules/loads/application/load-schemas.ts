@@ -1,7 +1,6 @@
 /** Zod schema that parses the raw form values (strings) of the load form. */
 import { z } from "zod";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
-import { collapseWhitespace } from "@/modules/shared/domain/search-key";
 import { dateField, textField } from "@/modules/vehicles/application/vehicle-action-schemas";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
 import { firstDuplicate } from "../domain/load-lines";
@@ -9,7 +8,6 @@ import { LOAD_SUPPLIERS } from "../domain/load-rules";
 
 export const NOTES_MAX = 500;
 export const REFERENCE_MAX = 40;
-export const PRODUCT_MAX = 80;
 export const MAX_LINES = 50;
 
 const LINES_INVALID = "Los productos del cargue no son válidos.";
@@ -30,16 +28,13 @@ const orderIdsField = z
   .refine((ids) => ids.every((v) => /^\d{1,10}$/.test(v.trim()) && Number(v) > 0), "Alguno de los pedidos elegidos no es válido.")
   .transform((ids) => [...new Set(ids.map((v) => Number(v)))]);
 
+const PRODUCT_MISSING = "Elige el producto de cada línea.";
 const TONS_INVALID = "Las toneladas de cada producto deben ser un número mayor que cero.";
 
 /** One product of the load; the form sends every value as text. */
 export const loadLineSchema = z.object({
-  /** The product by name: an unknown one is created by the command. */
-  reference: z
-    .string("Elige el producto de cada línea.")
-    .transform(collapseWhitespace)
-    .refine((v) => v !== "", "Elige el producto de cada línea.")
-    .refine((v) => v.length <= PRODUCT_MAX, "El producto no puede pasar de 80 caracteres."),
+  /** The catalog product; the command checks that it exists and belongs to the load's supplier. */
+  referenceId: z.number(PRODUCT_MISSING).int(PRODUCT_MISSING).positive(PRODUCT_MISSING),
   tons: z
     .string(TONS_INVALID)
     .transform((v) => parseDecimal(v))

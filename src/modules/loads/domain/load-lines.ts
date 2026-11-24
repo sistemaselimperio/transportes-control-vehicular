@@ -1,6 +1,6 @@
+import { productLabel } from "@/modules/orders/domain/catalog";
 import { bagsToKg, kgToTons } from "@/modules/orders/domain/order-rules";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
-import { searchKey } from "@/modules/shared/domain/search-key";
 
 /** One product of a load, with its own cost, SIESA number and supplier order number. */
 export interface LoadLineRow {
@@ -8,6 +8,8 @@ export interface LoadLineRow {
   /** Null only for lines migrated from the single-product loads: they must get a product when edited. */
   referenceId: number | null;
   referenceName: string | null;
+  /** Null for lines without a product and for products typed inline before the catalog existed. */
+  referenceCode: string | null;
   tons: number;
   /** Whole pesos (COP). */
   cost: number;
@@ -40,30 +42,38 @@ export function firstDuplicate(values: readonly string[]): string | null {
 
 /** What the checked orders ask for of one product. */
 export interface SuggestedLine {
+  referenceId: number;
   referenceName: string;
+  referenceCode: string | null;
   tons: number;
 }
 
-/** One suggestion per reference across the orders (first spelling wins), tons = bags x kg per bag / 1000. */
-export function suggestLines(
-  orders: ReadonlyArray<{ lines: ReadonlyArray<{ referenceName: string; bags: number }> }>,
-  kgPerBag: number,
-): SuggestedLine[] {
-  const bagsByKey = new Map<string, { referenceName: string; bags: number }>();
+interface OrderedProduct {
+  referenceId: number;
+  referenceName: string;
+  referenceCode: string | null;
+  bags: number;
+}
+
+/** One suggestion per product across the orders, tons = bags x kg per bag / 1000. */
+export function suggestLines(orders: ReadonlyArray<{ lines: readonly OrderedProduct[] }>, kgPerBag: number): SuggestedLine[] {
+  const byId = new Map<number, OrderedProduct>();
   for (const order of orders) {
     for (const l of order.lines) {
-      const key = searchKey(l.referenceName);
-      const known = bagsByKey.get(key);
+      const known = byId.get(l.referenceId);
       if (known) known.bags += l.bags;
-      else bagsByKey.set(key, { referenceName: l.referenceName, bags: l.bags });
+      else byId.set(l.referenceId, { referenceId: l.referenceId, referenceName: l.referenceName, referenceCode: l.referenceCode, bags: l.bags });
     }
   }
-  return [...bagsByKey.values()].map((s) => ({ referenceName: s.referenceName, tons: round3(kgToTons(bagsToKg(s.bags, kgPerBag))) }));
+  return [...byId.values()].map(({ bags, ...product }) => ({ ...product, tons: round3(kgToTons(bagsToKg(bags, kgPerBag))) }));
 }
 
 /** A product line while the form is being filled: everything is text until it is sent. */
 export interface LineDraft {
   key: number;
+  /** The catalog product, or null while none is chosen. */
+  referenceId: number | null;
+  /** The product as last known ("code · name"); what a stored product outside the catalog shows. */
   reference: string;
   tons: string;
   cost: string;
@@ -71,38 +81,46 @@ export interface LineDraft {
   orderNumber: string;
   /** Suggested from the checked orders and not touched since: it follows them. */
   auto: boolean;
-  /** Stored without a product (migrated): it must get one before the load can be saved. */
-  legacy?: boolean;
 }
 
 const tonsText = (tons: number): string => String(round3(tons));
 
 /**
- * The drafts after the checked orders changed. A reference that stays keeps what the user entered
- * (an untouched suggestion only follows the new tons); new references get a suggested line; a
- * suggested line the user never touched disappears with its reference. Manual lines always stay.
+ * The drafts after the checked orders changed. A product that stays keeps what the user entered
+ * (an untouched suggestion only follows the new tons); new products get a suggested line; a
+ * suggested line the user never touched disappears with its product. Manual lines always stay.
  */
 export function reconcileDrafts(drafts: readonly LineDraft[], suggestions: readonly SuggestedLine[], nextKey: number): LineDraft[] {
-  const byKey = new Map(suggestions.map((s) => [searchKey(s.referenceName), s]));
-  const present = new Set<string>();
+  const byId = new Map(suggestions.map((s) => [s.referenceId, s]));
+  const present = new Set<number>();
   const kept: LineDraft[] = [];
   for (const d of drafts) {
-    const key = searchKey(d.reference);
-    const suggestion = byKey.get(key);
+    const suggestion = d.referenceId === null ? undefined : byId.get(d.referenceId);
     if (d.auto && !suggestion) continue;
-    if (suggestion) present.add(key);
+    if (suggestion) present.add(suggestion.referenceId);
     kept.push(d.auto && suggestion ? { ...d, tons: tonsText(suggestion.tons) } : d);
   }
   let key = nextKey;
   for (const s of suggestions) {
-    if (present.has(searchKey(s.referenceName))) continue;
-    kept.push({ key: key++, reference: s.referenceName, tons: tonsText(s.tons), cost: "", siesaNumber: "", orderNumber: "", auto: true });
+    if (present.has(s.referenceId)) continue;
+    kept.push({
+      key: key++,
+      referenceId: s.referenceId,
+      reference: productLabel({ code: s.referenceCode, name: s.referenceName }),
+      tons: tonsText(s.tons),
+      cost: "",
+      siesaNumber: "",
+      orderNumber: "",
+      auto: true,
+    });
   }
   return kept;
 }
 
 export interface OrderedVersusLoaded {
-  referenceName: string;
+  referenceId: number;
+  /** "code · name" of the product. */
+  label: string;
   ordered: number;
   loaded: number;
   /** Loaded minus ordered, rounded to the kilo. */
@@ -111,15 +129,18 @@ export interface OrderedVersusLoaded {
 
 /** Per ordered product, the tons asked for by the orders against the tons typed on the lines. */
 export function orderedVersusLoaded(
-  drafts: ReadonlyArray<Pick<LineDraft, "reference" | "tons">>,
+  drafts: ReadonlyArray<Pick<LineDraft, "referenceId" | "tons">>,
   suggestions: readonly SuggestedLine[],
 ): OrderedVersusLoaded[] {
   return suggestions.map((s) => {
-    const key = searchKey(s.referenceName);
-    const loaded = round3(
-      drafts.filter((d) => searchKey(d.reference) === key).reduce((sum, d) => sum + (parseDecimal(d.tons) ?? 0), 0),
-    );
-    return { referenceName: s.referenceName, ordered: s.tons, loaded, difference: round3(loaded - s.tons) };
+    const loaded = round3(drafts.filter((d) => d.referenceId === s.referenceId).reduce((sum, d) => sum + (parseDecimal(d.tons) ?? 0), 0));
+    return {
+      referenceId: s.referenceId,
+      label: productLabel({ code: s.referenceCode, name: s.referenceName }),
+      ordered: s.tons,
+      loaded,
+      difference: round3(loaded - s.tons),
+    };
   });
 }
 
@@ -127,9 +148,9 @@ export function orderedVersusLoaded(
 export const costOf = (text: string): number => Number(text.replace(/\D/g, "")) || 0;
 
 /** A line the server would accept: product, tons > 0, cost > 0, SIESA and supplier order filled. */
-export function isDraftComplete(d: Pick<LineDraft, "reference" | "tons" | "cost" | "siesaNumber" | "orderNumber">): boolean {
+export function isDraftComplete(d: Pick<LineDraft, "referenceId" | "tons" | "cost" | "siesaNumber" | "orderNumber">): boolean {
   return (
-    d.reference.trim() !== "" &&
+    d.referenceId !== null &&
     (parseDecimal(d.tons) ?? 0) > 0 &&
     costOf(d.cost) > 0 &&
     d.siesaNumber.trim() !== "" &&

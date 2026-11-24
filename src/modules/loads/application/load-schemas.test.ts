@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadIdSchema, loadSchema } from "./load-schemas";
 
-const line = { reference: "  Engorde   40 ", tons: "32,5", cost: "$ 1.500.000", siesaNumber: " FV-100 ", orderNumber: " P-77 " };
+const line = { referenceId: 10, tons: "32,5", cost: "$ 1.500.000", siesaNumber: " FV-100 ", orderNumber: " P-77 " };
 
 const valid = {
   date: "2026-11-18",
@@ -25,7 +25,7 @@ describe("loadSchema", () => {
       plate: "ABC-123",
       notes: null,
       orderIds: [],
-      lines: [{ reference: "Engorde 40", tons: 32.5, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" }],
+      lines: [{ referenceId: 10, tons: 32.5, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" }],
     });
   });
 
@@ -43,7 +43,9 @@ describe("loadSchema", () => {
   });
 
   it("requires a product on each line", () => {
-    expect(firstIssue(withLines([{ ...line, reference: "  " }]))).toBe("Elige el producto de cada línea.");
+    for (const referenceId of [null, undefined, 0, 1.5, "10"]) {
+      expect(firstIssue(withLines([{ ...line, referenceId }]))).toBe("Elige el producto de cada línea.");
+    }
   });
 
   it("requires tons above zero", () => {
@@ -65,7 +67,7 @@ describe("loadSchema", () => {
   });
 
   it("names a SIESA number repeated inside the same load", () => {
-    const issue = firstIssue(withLines([line, { ...line, reference: "Levante" }]));
+    const issue = firstIssue(withLines([line, { ...line, referenceId: 11 }]));
     expect(issue).toBe("El número SIESA FV-100 está repetido en el cargue.");
   });
 

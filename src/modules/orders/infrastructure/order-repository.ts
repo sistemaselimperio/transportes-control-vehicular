@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { OrderPorts, OrderValues } from "../application/order-commands";
 import { DEFAULT_KG_PER_BAG, isValidKgPerBag, type OrderLineRow, type OrderRow } from "../domain/order-rules";
-import { ensureReferences } from "./reference-repository";
+import { findCatalogProducts } from "./reference-repository";
 
 const KG_PER_BAG_KEY = "kg_per_bag";
 
@@ -24,6 +24,7 @@ export async function loadOrderRows(): Promise<OrderRow[]> {
       locationName: schema.clientLocations.name,
       referenceId: schema.orderLines.referenceId,
       referenceName: schema.orderReferences.name,
+      referenceCode: schema.orderReferences.code,
       bags: schema.orderLines.bags,
     })
     .from(schema.orderLines)
@@ -48,12 +49,6 @@ export async function loadOrderRows(): Promise<OrderRow[]> {
     loadId: o.loadId,
     lines: byOrder.get(o.id) ?? [],
   }));
-}
-
-/** Names of the reference catalog, alphabetically. */
-export async function loadReferenceNames(): Promise<string[]> {
-  const rows = await db.select({ name: schema.orderReferences.name }).from(schema.orderReferences).orderBy(asc(schema.orderReferences.nameKey));
-  return rows.map((r) => r.name);
 }
 
 /** The global kilograms per bag; the default while nobody has set it. */
@@ -98,7 +93,7 @@ export const orderRepository: OrderPorts = {
       .where(inArray(schema.clientLocations.id, ids));
   },
 
-  ensureReferences,
+  findCatalogProducts,
 
   async findOrder(id) {
     const [row] = await db

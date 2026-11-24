@@ -650,17 +650,30 @@ export const comercialSettings = comercial.table("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Catalog of the references (products) of the concentrate orders; created inline from the order form. */
+/**
+ * Catalog of the products of the concentrate orders and loads. A catalog product has a supplier and the
+ * supplier's own code, unique together (names repeat, and so do codes across suppliers). Rows without
+ * `code`/`supplier` are legacy products typed inline before the catalog: they keep showing on the old
+ * orders and loads that point to them but are never offered again.
+ */
 export const orderReferences = comercial.table(
   "order_references",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     name: text().notNull(),
-    /** `searchKey(name)`: the unique, case/accent/space-insensitive identity of the name. */
-    nameKey: text("name_key").notNull(),
+    code: text(),
+    supplier: loadSupplierEnum(),
+    /**
+     * Deprecated: identity of the products typed inline before the catalog. Kept nullable and unique only
+     * so the previous deployment keeps working until this one is live; drop it in a later migration.
+     */
+    nameKey: text("name_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("order_references_name_key_uq").on(t.nameKey)],
+  (t) => [
+    uniqueIndex("order_references_supplier_code_uq").on(t.supplier, t.code),
+    uniqueIndex("order_references_name_key_uq").on(t.nameKey),
+  ],
 );
 
 /**

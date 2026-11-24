@@ -2,7 +2,7 @@ import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listLoadRows } from "@/modules/loads/application/load-queries";
 import { LoadsView } from "@/modules/loads/ui/loads-view";
-import { getKgPerBag, listOrderReferences, listOrderRows } from "@/modules/orders/application/order-queries";
+import { getKgPerBag, listCatalogProducts, listOrderRows } from "@/modules/orders/application/order-queries";
 import { listDispatchPlates } from "@/modules/vehicles/application/vehicle-queries";
 
 export default async function Page({
@@ -17,7 +17,7 @@ export default async function Page({
     listLoadRows(),
     listDispatchPlates(),
     listOrderRows(),
-    listOrderReferences(),
+    listCatalogProducts(),
     getKgPerBag(),
   ]);
   const canManage = canManageSection(role, "loads");

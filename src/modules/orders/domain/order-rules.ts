@@ -1,5 +1,4 @@
 import type { IsoDate } from "@/modules/shared/domain/dates";
-import { searchKey } from "@/modules/shared/domain/search-key";
 
 export const ORDER_STATUSES = ["pendiente", "cargado", "anulado"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -28,6 +27,8 @@ export interface OrderLineRow {
   locationName: string | null;
   referenceId: number;
   referenceName: string;
+  /** Null for a product typed inline before the catalog existed. */
+  referenceCode: string | null;
   bags: number;
 }
 
@@ -74,18 +75,17 @@ export function ordersTotals(rows: ReadonlyArray<Pick<OrderRow, "lines">>, kgPer
   return { count: rows.length, bags, kg, tons: kgToTons(kg) };
 }
 
-/** Bags per product across some lines (first spelling wins), most bags first, then by name. */
+/** Bags per product (by catalog id) across some lines, most bags first, then by name. */
 export function productTotals(
-  lines: ReadonlyArray<Pick<OrderLineRow, "referenceName" | "bags">>,
-): Array<{ referenceName: string; bags: number }> {
-  const byKey = new Map<string, { referenceName: string; bags: number }>();
+  lines: ReadonlyArray<Pick<OrderLineRow, "referenceId" | "referenceName" | "referenceCode" | "bags">>,
+): Array<Pick<OrderLineRow, "referenceId" | "referenceName" | "referenceCode" | "bags">> {
+  const byId = new Map<number, { referenceId: number; referenceName: string; referenceCode: string | null; bags: number }>();
   for (const l of lines) {
-    const key = searchKey(l.referenceName);
-    const known = byKey.get(key);
+    const known = byId.get(l.referenceId);
     if (known) known.bags += l.bags;
-    else byKey.set(key, { referenceName: l.referenceName, bags: l.bags });
+    else byId.set(l.referenceId, { referenceId: l.referenceId, referenceName: l.referenceName, referenceCode: l.referenceCode, bags: l.bags });
   }
-  return [...byKey.values()].sort((a, b) => b.bags - a.bags || a.referenceName.localeCompare(b.referenceName, "es"));
+  return [...byId.values()].sort((a, b) => b.bags - a.bags || a.referenceName.localeCompare(b.referenceName, "es"));
 }
 
 export const isValidKgPerBag = (value: number): boolean => Number.isFinite(value) && value > 0 && value <= MAX_KG_PER_BAG;

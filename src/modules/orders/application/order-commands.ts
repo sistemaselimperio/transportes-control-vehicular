@@ -1,7 +1,6 @@
-import { searchKey } from "@/modules/shared/domain/search-key";
+import type { FindCatalogProducts } from "../domain/catalog";
 import { canEditOrder, isValidKgPerBag, type OrderStatus } from "../domain/order-rules";
 import type { OrderInput } from "./order-schemas";
-import { type EnsureReferences, resolveReferenceIds } from "./reference-resolver";
 
 /** A rule of the orders refused the operation; the message is for the user. */
 export class OrderError extends Error {}
@@ -18,8 +17,8 @@ export interface OrderPorts {
   findExistingClientIds(ids: number[]): Promise<number[]>;
   /** The client each of the given fincas belongs to; a finca that no longer exists is left out. */
   findLocationOwners(ids: number[]): Promise<Array<{ id: number; clientId: number }>>;
-  /** The id of every reference by `key` (see `searchKey`), creating the ones that do not exist yet. */
-  ensureReferences: EnsureReferences;
+  /** The catalog products among `ids` (those with a code), legacy and missing ones are left out. */
+  findCatalogProducts: FindCatalogProducts;
   findOrder(id: number): Promise<{ status: OrderStatus; loadId: number | null } | null>;
   /** Stores the order, pending, with its lines; returns its id. */
   insertOrder(values: OrderValues): Promise<number>;
@@ -35,9 +34,10 @@ const NOT_EDITABLE = "Solo se pueden modificar los pedidos pendientes.";
 const NOT_ANNULLABLE = "Solo se pueden anular los pedidos pendientes.";
 const CLIENT_GONE = "Un cliente del pedido ya no existe.";
 const FOREIGN_LOCATION = "La finca elegida no pertenece al cliente.";
+const PRODUCT_GONE = "Un producto del pedido ya no está en el catálogo.";
 
 export function createOrderCommands(ports: OrderPorts) {
-  /** Checks the lines against the clients and fincas and swaps each reference name for its id. */
+  /** Checks the lines against the clients, the fincas and the product catalog. */
   async function prepare(input: OrderInput): Promise<OrderValues> {
     const clientIds = [...new Set(input.lines.map((l) => l.clientId))];
     const existing = new Set(await ports.findExistingClientIds(clientIds));
@@ -50,21 +50,15 @@ export function createOrderCommands(ports: OrderPorts) {
       if (foreign) throw new OrderError(FOREIGN_LOCATION);
     }
 
-    // The first spelling typed for a name wins; the rest of the lines reuse the same reference.
-    const referenceIds = await resolveReferenceIds(
-      ports.ensureReferences,
-      input.lines.map((l) => l.reference),
-    );
+    const referenceIds = [...new Set(input.lines.map((l) => l.referenceId))];
+    const inCatalog = new Set((await ports.findCatalogProducts(referenceIds)).map((p) => p.id));
+    if (referenceIds.some((id) => !inCatalog.has(id))) throw new OrderError(PRODUCT_GONE);
 
     return {
       deliveryDate: input.deliveryDate,
       timeWindow: input.timeWindow,
       note: input.note,
-      lines: input.lines.map((l) => {
-        const referenceId = referenceIds.get(searchKey(l.reference));
-        if (referenceId === undefined) throw new OrderError("No se pudo registrar la referencia.");
-        return { clientId: l.clientId, locationId: l.locationId, referenceId, bags: l.bags };
-      }),
+      lines: input.lines.map((l) => ({ clientId: l.clientId, locationId: l.locationId, referenceId: l.referenceId, bags: l.bags })),
     };
   }
 

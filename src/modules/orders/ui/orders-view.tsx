@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { ClientOption } from "@/modules/deliveries/ui/client-picker";
+import type { CatalogProduct } from "../domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import {
@@ -39,7 +40,7 @@ export function OrdersView({
 }: {
   rows: readonly OrderRow[];
   clients: readonly ClientOption[];
-  references: readonly string[];
+  references: readonly CatalogProduct[];
   kgPerBag: number;
   canManage: boolean;
   canSetKgPerBag: boolean;

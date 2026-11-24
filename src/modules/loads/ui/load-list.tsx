@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PlateText } from "@/components/app/plate-text";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { productLabel } from "@/modules/orders/domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { formatCop, summarizeLinkedOrders, type LoadRow } from "../domain/load-rules";
@@ -58,7 +59,7 @@ function LoadDetails({ row }: { row: LoadRow }) {
           {row.lines.map((l) => (
             <li key={l.id} className="rounded-lg border bg-background p-2.5 text-xs">
               <p className="text-sm font-medium">
-                {l.referenceName ?? <span className="font-normal text-muted-foreground">Sin producto</span>}
+                {l.referenceName !== null ? productLabel({ code: l.referenceCode, name: l.referenceName }) : <span className="font-normal text-muted-foreground">Sin producto</span>}
               </p>
               <p className="num text-muted-foreground">
                 {formatDecimal(l.tons, 3)} t · {formatCop(l.cost)}

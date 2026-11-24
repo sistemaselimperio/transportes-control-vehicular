@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ClientPicker, type ClientOption } from "@/modules/deliveries/ui/client-picker";
 import { todayInBogota } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { searchKey } from "@/modules/shared/domain/search-key";
 import { createOrderAction, updateOrderAction } from "../application/order-actions";
-import { MAX_LINES, NOTE_MAX, REFERENCE_MAX, TIME_WINDOW_MAX } from "../application/order-schemas";
+import { MAX_LINES, NOTE_MAX, TIME_WINDOW_MAX } from "../application/order-schemas";
+import { productLabel, type CatalogProduct } from "../domain/catalog";
 import { bagsToKg, kgToTons, orderTotals, type OrderRow } from "../domain/order-rules";
+import { ProductPicker } from "./product-picker";
 
 const FIELD = "h-10 md:h-9";
 
@@ -22,11 +23,14 @@ interface LineDraft {
   key: number;
   clientId: number | null;
   locationId: string;
-  reference: string;
+  /** The catalog product, or null while none is chosen. */
+  referenceId: number | null;
+  /** What a stored product that is not in the catalog (legacy) is called; the field starts with it. */
+  legacyText: string;
   bags: string;
 }
 
-const emptyLine = (key: number): LineDraft => ({ key, clientId: null, locationId: "", reference: "", bags: "" });
+const emptyLine = (key: number): LineDraft => ({ key, clientId: null, locationId: "", referenceId: null, legacyText: "", bags: "" });
 
 /** The bags of a draft: a positive whole number, or 0 while it is blank or invalid. */
 const bagsOf = (draft: LineDraft): number => (/^\d{1,9}$/.test(draft.bags.trim()) ? Number(draft.bags) : 0);
@@ -37,7 +41,7 @@ function serializeLines(drafts: readonly LineDraft[]): string {
     drafts.map((d) => ({
       clientId: d.clientId,
       locationId: d.locationId === "" ? null : Number(d.locationId),
-      reference: d.reference,
+      referenceId: d.referenceId,
       bags: /^\d{1,9}$/.test(d.bags.trim()) ? Number(d.bags) : null,
     })),
   );
@@ -49,7 +53,8 @@ function draftsOf(order: OrderRow | undefined): LineDraft[] {
     key: index,
     clientId: l.clientId,
     locationId: l.locationId === null ? "" : String(l.locationId),
-    reference: l.referenceName,
+    referenceId: l.referenceId,
+    legacyText: productLabel({ code: l.referenceCode, name: l.referenceName }),
     bags: String(l.bags),
   }));
 }
@@ -65,17 +70,16 @@ export function OrderForm({
 }: {
   order?: OrderRow;
   clients: readonly ClientOption[];
-  /** The catalog of references typed before: suggestions, never a limit. */
-  references: readonly string[];
+  /** The product catalog (every supplier): a line can only carry one of these. */
+  references: readonly CatalogProduct[];
   kgPerBag: number;
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
-  const listId = useId();
   // The form mounts only while the side sheet is open, so "today" is read on the client at that moment.
   const [today] = useState(() => todayInBogota());
   const [lines, setLines] = useState<LineDraft[]>(() => draftsOf(order));
-  const knownKeys = new Set(references.map(searchKey));
+  const inCatalog = new Set(references.map((p) => p.id));
 
   const patch = (key: number, change: Partial<LineDraft>) =>
     setLines((all) => all.map((l) => (l.key === key ? { ...l, ...change } : l)));
@@ -87,6 +91,11 @@ export function OrderForm({
   return (
     <ActionForm
       action={(fd) => {
+        // A line stored with a legacy product (typed before the catalog) must be given a catalog one.
+        const missing = lines.findIndex((l) => l.referenceId === null || !inCatalog.has(l.referenceId));
+        if (missing !== -1) {
+          return Promise.resolve({ ok: false as const, error: `Elige la referencia de la línea ${missing + 1} del catálogo.` });
+        }
         fd.set("lines", serializeLines(lines));
         return order ? updateOrderAction(order.id, fd) : createOrderAction(fd);
       }}
@@ -113,19 +122,13 @@ export function OrderForm({
         <Textarea id="order-note" name="note" rows={2} maxLength={NOTE_MAX} defaultValue={order?.note ?? ""} />
       </Field>
 
-      <datalist id={listId}>
-        {references.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-
       <fieldset className="space-y-3">
         <legend className="text-sm font-medium">Líneas del pedido</legend>
         {lines.map((line, index) => {
           const client = clients.find((c) => c.id === line.clientId);
           const locations = client?.locations ?? [];
           const bags = bagsOf(line);
-          const typed = line.reference.trim();
+          const legacy = line.referenceId !== null && !inCatalog.has(line.referenceId);
           return (
             <div key={line.key} className="space-y-3 rounded-xl border bg-card p-3">
               <div className="flex items-center justify-between gap-2">
@@ -174,16 +177,15 @@ export function OrderForm({
                   label="Referencia"
                   htmlFor={`order-reference-${line.key}`}
                   required
-                  hint={typed !== "" && !knownKeys.has(searchKey(typed)) ? "Referencia nueva: se creará al guardar." : undefined}
+                  hint={legacy ? "Esta referencia no está en el catálogo: elige una." : undefined}
                 >
-                  <Input
+                  <ProductPicker
                     id={`order-reference-${line.key}`}
-                    list={listId}
-                    className={FIELD}
-                    value={line.reference}
-                    maxLength={REFERENCE_MAX}
-                    autoComplete="off"
-                    onChange={(e) => patch(line.key, { reference: e.target.value })}
+                    products={references}
+                    value={line.referenceId}
+                    initialText={line.legacyText}
+                    showSupplier
+                    onChange={(referenceId) => patch(line.key, { referenceId })}
                   />
                 </Field>
                 <Field label="Bultos" htmlFor={`order-bags-${line.key}`} required>

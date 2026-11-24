@@ -4,6 +4,7 @@ import { ChevronDown, Plus } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { productLabel } from "@/modules/orders/domain/catalog";
 import { orderTotals, ordersTotals, productTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
@@ -139,8 +140,8 @@ function PendingOrderCard({
       {products.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Productos del pedido">
           {shown.map((p) => (
-            <li key={p.referenceName} className="num rounded-full border bg-muted/50 px-2 py-0.5 text-xs">
-              {p.referenceName} <span className="text-muted-foreground">{p.bags}</span>
+            <li key={p.referenceId} className="num rounded-full border bg-muted/50 px-2 py-0.5 text-xs">
+              {productLabel({ code: p.referenceCode, name: p.referenceName })} <span className="text-muted-foreground">{p.bags}</span>
             </li>
           ))}
           {more > 0 && <li className="rounded-full px-2 py-0.5 text-xs text-muted-foreground">+{more} más</li>}
@@ -154,7 +155,7 @@ function PendingOrderCard({
               <span className="min-w-0 truncate">
                 {l.clientName}
                 {l.locationName && <span className="text-muted-foreground"> · {l.locationName}</span>}
-                <span className="text-muted-foreground"> · {l.referenceName}</span>
+                <span className="text-muted-foreground"> · {productLabel({ code: l.referenceCode, name: l.referenceName })}</span>
               </span>
               <span className="num shrink-0">{l.bags}</span>
             </li>

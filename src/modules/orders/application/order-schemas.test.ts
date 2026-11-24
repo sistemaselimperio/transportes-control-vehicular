@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { kgPerBagSchema, orderIdSchema, orderSchema } from "./order-schemas";
 
-const lines = [{ clientId: 3, locationId: 7, reference: "  Engorde   40 ", bags: 50 }];
+const lines = [{ clientId: 3, locationId: 7, referenceId: 12, bags: 50 }];
 const valid = { deliveryDate: "2026-11-20", timeWindow: " 7–11 a.m. ", note: "", lines: JSON.stringify(lines) };
 
 describe("orderSchema", () => {
@@ -10,7 +10,7 @@ describe("orderSchema", () => {
       deliveryDate: "2026-11-20",
       timeWindow: "7–11 a.m.",
       note: null,
-      lines: [{ clientId: 3, locationId: 7, reference: "Engorde 40", bags: 50 }],
+      lines: [{ clientId: 3, locationId: 7, referenceId: 12, bags: 50 }],
     });
   });
 
@@ -29,17 +29,17 @@ describe("orderSchema", () => {
     expect(!r.success && r.error.issues[0]?.message).toBe("Las líneas del pedido no son válidas.");
   });
 
-  it("requires a client, a reference and positive whole bags on every line", () => {
+  it("requires a client, a catalog product and positive whole bags on every line", () => {
     const bad = (over: object) => orderSchema.safeParse({ ...valid, lines: JSON.stringify([{ ...lines[0], ...over }]) });
     expect(bad({ clientId: null }).success).toBe(false);
-    expect(bad({ reference: "   " }).success).toBe(false);
+    for (const referenceId of [null, 0, -1, 1.5, "12", undefined]) expect(bad({ referenceId }).success).toBe(false);
     for (const bags of [0, -3, 1.5, null]) expect(bad({ bags }).success).toBe(false);
   });
 
   it("makes the finca optional", () => {
     const r = orderSchema.parse({ ...valid, lines: JSON.stringify([{ ...lines[0], locationId: null }]) });
     expect(r.lines[0]?.locationId).toBeNull();
-    const omitted = orderSchema.parse({ ...valid, lines: JSON.stringify([{ clientId: 3, reference: "X", bags: 1 }]) });
+    const omitted = orderSchema.parse({ ...valid, lines: JSON.stringify([{ clientId: 3, referenceId: 5, bags: 1 }]) });
     expect(omitted.lines[0]?.locationId).toBeNull();
   });
 

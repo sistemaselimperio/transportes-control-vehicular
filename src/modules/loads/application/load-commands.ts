@@ -1,6 +1,5 @@
-import { type EnsureReferences, resolveReferenceIds } from "@/modules/orders/application/reference-resolver";
+import { type FindCatalogProducts, productLabel } from "@/modules/orders/domain/catalog";
 import { unavailableOrderIds, type OrderStatus } from "@/modules/orders/domain/order-rules";
-import { searchKey } from "@/modules/shared/domain/search-key";
 import { firstDuplicate } from "../domain/load-lines";
 import type { LoadInput } from "./load-schemas";
 
@@ -19,8 +18,8 @@ export interface LoadPorts {
   findLoad(id: number): Promise<{ plate: string; vehicleId: number | null } | null>;
   /** The SIESA numbers among `numbers` already held by a line of another load (ignoring load `exceptId`). */
   findTakenSiesa(numbers: string[], exceptId?: number): Promise<string[]>;
-  /** The id of every product by `key` (see `searchKey`), creating the ones that do not exist yet. */
-  ensureReferences: EnsureReferences;
+  /** The catalog products among `ids`; legacy products (no code) and unknown ids are left out. */
+  findCatalogProducts: FindCatalogProducts;
   /** The orders among `ids` that exist, with their status and the load they belong to. */
   findOrdersByIds(ids: number[]): Promise<Array<{ id: number; status: OrderStatus; loadId: number | null }>>;
   /**
@@ -44,6 +43,8 @@ export const siesaTaken = (siesa: string) => `Ya existe un cargue con el número
 const NO_LINES = "Agrega al menos un producto al cargue.";
 const siesaRepeated = (siesa: string) => `El número SIESA ${siesa} está repetido en el cargue.`;
 const GONE = "El cargue ya no existe.";
+const PRODUCT_GONE = "Un producto del cargue ya no está en el catálogo.";
+const foreignProduct = (label: string, supplier: string) => `El producto ${label} no es del proveedor ${supplier}.`;
 const NOT_IN_FLEET = "Elige una placa de la flota.";
 export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya pertenece a otro cargue.";
 
@@ -58,12 +59,15 @@ export function createLoadCommands(ports: LoadPorts) {
     if (taken !== undefined) throw new LoadError(siesaTaken(taken));
   }
 
-  /** Swaps each product name for its catalog id, creating the unknown ones; run once every other check passed. */
+  /** Every line must carry a catalog product of the load's supplier; run once every other check passed. */
   async function prepare(input: LoadInput, owner: { plate: string; vehicleId: number | null }): Promise<LoadValues> {
-    const referenceIds = await resolveReferenceIds(
-      ports.ensureReferences,
-      input.lines.map((l) => l.reference),
-    );
+    const wanted = [...new Set(input.lines.map((l) => l.referenceId))];
+    const products = new Map((await ports.findCatalogProducts(wanted)).map((p) => [p.id, p]));
+    for (const id of wanted) {
+      const product = products.get(id);
+      if (!product) throw new LoadError(PRODUCT_GONE);
+      if (product.supplier !== input.supplier) throw new LoadError(foreignProduct(productLabel(product), input.supplier));
+    }
     return {
       date: input.date,
       supplier: input.supplier,
@@ -71,11 +75,13 @@ export function createLoadCommands(ports: LoadPorts) {
       vehicleId: owner.vehicleId,
       notes: input.notes,
       orderIds: input.orderIds,
-      lines: input.lines.map((l) => {
-        const referenceId = referenceIds.get(searchKey(l.reference));
-        if (referenceId === undefined) throw new LoadError("No se pudo registrar el producto.");
-        return { referenceId, tons: l.tons, cost: l.cost, siesaNumber: l.siesaNumber, orderNumber: l.orderNumber };
-      }),
+      lines: input.lines.map((l) => ({
+        referenceId: l.referenceId,
+        tons: l.tons,
+        cost: l.cost,
+        siesaNumber: l.siesaNumber,
+        orderNumber: l.orderNumber,
+      })),
     };
   }
 

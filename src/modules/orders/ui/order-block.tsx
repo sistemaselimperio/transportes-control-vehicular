@@ -4,6 +4,7 @@ import { Ban, CircleCheck, Clock, Container, Pencil } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { productLabel } from "../domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import {
@@ -139,7 +140,7 @@ export function OrderBlock({
                 <tr key={line.id}>
                   <td className="px-4 py-2.5 font-medium">{line.clientName}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{line.locationName ?? "—"}</td>
-                  <td className="px-4 py-2.5">{line.referenceName}</td>
+                  <td className="px-4 py-2.5">{productLabel({ code: line.referenceCode, name: line.referenceName })}</td>
                   <td className="num px-4 py-2.5 text-right">{formatDecimal(line.bags, 0)}</td>
                   <td className="num px-4 py-2.5 text-right">{formatDecimal(kg, 2)}</td>
                   <td className="num px-4 py-2.5 text-right">{formatDecimal(kgToTons(kg), 3)}</td>

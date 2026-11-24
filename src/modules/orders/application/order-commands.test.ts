@@ -6,7 +6,7 @@ const input = (over: Partial<OrderInput> = {}): OrderInput => ({
   deliveryDate: "2026-11-20",
   timeWindow: "7–11 a.m.",
   note: null,
-  lines: [{ clientId: 3, locationId: 7, reference: "Engorde 40", bags: 50 }],
+  lines: [{ clientId: 3, locationId: 7, referenceId: 10, bags: 50 }],
   ...over,
 });
 
@@ -14,9 +14,7 @@ function ports(over: Partial<OrderPorts> = {}): OrderPorts {
   return {
     findExistingClientIds: vi.fn(async (ids: number[]) => ids.filter((id) => id !== 99)),
     findLocationOwners: vi.fn(async (ids: number[]) => ids.map((id) => ({ id, clientId: id === 7 ? 3 : 4 }))),
-    ensureReferences: vi.fn(
-      async (refs: ReadonlyArray<{ name: string; key: string }>) => new Map(refs.map((r, i) => [r.key, 10 + i])),
-    ),
+    findCatalogProducts: vi.fn(async (ids: number[]) => ids.filter((id) => id !== 98).map((id) => ({ id, code: `C${id}`, name: `Producto ${id}`, supplier: "Finca" as const }))),
     findOrder: vi.fn(async () => ({ status: "pendiente" as const, loadId: null })),
     insertOrder: vi.fn(async () => 1),
     replaceOrder: vi.fn(async () => true),
@@ -27,20 +25,18 @@ function ports(over: Partial<OrderPorts> = {}): OrderPorts {
 }
 
 describe("create", () => {
-  it("resolves the references and stores the lines in order", async () => {
+  it("checks the catalog products once and stores the lines in order", async () => {
     const p = ports();
     await createOrderCommands(p).create(
       input({
         lines: [
-          { clientId: 3, locationId: 7, reference: "Engorde 40", bags: 50 },
-          { clientId: 3, locationId: null, reference: "Levante", bags: 10 },
+          { clientId: 3, locationId: 7, referenceId: 10, bags: 50 },
+          { clientId: 3, locationId: null, referenceId: 11, bags: 10 },
+          { clientId: 4, locationId: null, referenceId: 10, bags: 5 },
         ],
       }),
     );
-    expect(p.ensureReferences).toHaveBeenCalledWith([
-      { name: "Engorde 40", key: "engorde40" },
-      { name: "Levante", key: "levante" },
-    ]);
+    expect(p.findCatalogProducts).toHaveBeenCalledWith([10, 11]);
     expect(p.insertOrder).toHaveBeenCalledWith({
       deliveryDate: "2026-11-20",
       timeWindow: "7–11 a.m.",
@@ -48,29 +44,23 @@ describe("create", () => {
       lines: [
         { clientId: 3, locationId: 7, referenceId: 10, bags: 50 },
         { clientId: 3, locationId: null, referenceId: 11, bags: 10 },
+        { clientId: 4, locationId: null, referenceId: 10, bags: 5 },
       ],
     });
   });
 
-  it("dedupes a reference typed twice with different casing or accents", async () => {
+  it("refuses a product that is not in the catalog", async () => {
     const p = ports();
-    await createOrderCommands(p).create(
-      input({
-        lines: [
-          { clientId: 3, locationId: null, reference: "Engorde Último", bags: 5 },
-          { clientId: 4, locationId: null, reference: "engorde ultimo", bags: 5 },
-        ],
-      }),
-    );
-    expect(p.ensureReferences).toHaveBeenCalledWith([{ name: "Engorde Último", key: "engordeultimo" }]);
-    const stored = vi.mocked(p.insertOrder).mock.calls[0]?.[0];
-    expect(stored?.lines.map((l) => l.referenceId)).toEqual([10, 10]);
+    await expect(
+      createOrderCommands(p).create(input({ lines: [{ clientId: 3, locationId: null, referenceId: 98, bags: 1 }] })),
+    ).rejects.toThrow("Un producto del pedido ya no está en el catálogo.");
+    expect(p.insertOrder).not.toHaveBeenCalled();
   });
 
   it("refuses a client that no longer exists", async () => {
     const p = ports();
     await expect(
-      createOrderCommands(p).create(input({ lines: [{ clientId: 99, locationId: null, reference: "X", bags: 1 }] })),
+      createOrderCommands(p).create(input({ lines: [{ clientId: 99, locationId: null, referenceId: 10, bags: 1 }] })),
     ).rejects.toThrow("Un cliente del pedido ya no existe.");
     expect(p.insertOrder).not.toHaveBeenCalled();
   });
@@ -78,10 +68,10 @@ describe("create", () => {
   it("refuses a finca that belongs to another client", async () => {
     const p = ports();
     await expect(
-      createOrderCommands(p).create(input({ lines: [{ clientId: 3, locationId: 8, reference: "X", bags: 1 }] })),
+      createOrderCommands(p).create(input({ lines: [{ clientId: 3, locationId: 8, referenceId: 10, bags: 1 }] })),
     ).rejects.toThrow("La finca elegida no pertenece al cliente.");
     expect(p.insertOrder).not.toHaveBeenCalled();
-    expect(p.ensureReferences).not.toHaveBeenCalled();
+    expect(p.findCatalogProducts).not.toHaveBeenCalled();
   });
 
   it("refuses a finca that no longer exists", async () => {
@@ -91,6 +81,14 @@ describe("create", () => {
 });
 
 describe("update", () => {
+  it("refuses a product that left the catalog", async () => {
+    const p = ports();
+    await expect(
+      createOrderCommands(p).update(5, input({ lines: [{ clientId: 3, locationId: null, referenceId: 98, bags: 1 }] })),
+    ).rejects.toThrow("Un producto del pedido ya no está en el catálogo.");
+    expect(p.replaceOrder).not.toHaveBeenCalled();
+  });
+
   it("replaces a pending order", async () => {
     const p = ports();
     await createOrderCommands(p).update(5, input());
