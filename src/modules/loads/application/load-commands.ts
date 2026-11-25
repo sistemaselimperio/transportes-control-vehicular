@@ -1,9 +1,10 @@
 import { type FindCatalogProducts, productLabel } from "@/modules/orders/domain/catalog";
 import type { OrderStatus } from "@/modules/orders/domain/order-rules";
 import { allocationErrors, loadableSuppliers, unavailableOrderIds, type AllocationProduct } from "../domain/load-allocation";
+import { balanceBagsError, tripBagsError } from "../domain/load-balance";
 import { firstDuplicate, splitCost } from "../domain/load-lines";
 import type { LoadSupplier } from "../domain/load-rules";
-import type { CreateLoadsInput, LoadInput } from "./load-schemas";
+import type { BalanceTripInput, CreateLoadsInput, LoadInput } from "./load-schemas";
 
 /** A rule of the loads refused the operation; the message is for the user. */
 export class LoadError extends Error {}
@@ -16,6 +17,32 @@ export interface LoadValues extends Omit<LoadInput, "orders"> {
   vehicleId: number | null;
   orderIds: number[];
   lines: ReadonlyArray<{ orderId: number; referenceId: number; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
+  /** The bags a truck leaves behind, per order: transport only, with no SIESA, cost or tons. */
+  balances: ReadonlyArray<{ orderId: number; bags: number; date: string; plate: string | null; vehicleId: number | null }>;
+}
+
+/** The balance of an order of a load as stored. */
+export interface StoredBalance {
+  orderId: number;
+  bags: number;
+  plate: string | null;
+  vehicleId: number | null;
+}
+
+/** A trip of a balance. */
+export interface BalanceTripValues {
+  balanceId: number;
+  date: string;
+  plate: string;
+  vehicleId: number;
+  bags: number;
+}
+
+/** The new schedule of the bags a trip leaves behind. */
+export interface BalanceReschedule {
+  date: string;
+  plate: string | null;
+  vehicleId: number | null;
 }
 
 /** An order as the load needs it: its derived status, the loads that already took part of it and its product lines. */
@@ -52,6 +79,19 @@ export interface LoadPorts {
   updateLoad(id: number, values: LoadValues): Promise<"ok" | "gone" | "orders_unavailable">;
   /** Deletes the load with its lines (its orders go back to what the other loads leave them as). False when no load has that id. */
   deleteLoad(id: number): Promise<boolean>;
+  /** The balances the load left behind. */
+  findLoadBalances(loadId: number): Promise<StoredBalance[]>;
+  /** How many trips were registered against the balances of the load. */
+  countLoadTrips(loadId: number): Promise<number>;
+  /** A balance with the bags its trips already carried; null when gone. */
+  findBalance(id: number): Promise<{ id: number; bags: number; carried: number } | null>;
+  /**
+   * Stores a trip and, when it leaves bags behind, the new schedule of the rest, in one transaction that
+   * re-checks the remaining bags: "exceeds" (nothing stored) when the balance changed meanwhile.
+   */
+  insertBalanceTrip(trip: BalanceTripValues, reschedule: BalanceReschedule | null): Promise<"ok" | "gone" | "exceeds">;
+  /** Deletes a trip of a balance; false when no trip has that id. */
+  deleteBalanceTrip(id: number): Promise<boolean>;
 }
 
 /** Fallback for a race the command's own check did not catch. */
@@ -65,9 +105,22 @@ const foreignProduct = (label: string, supplier: string) => `El producto ${label
 const NOT_IN_FLEET = "Elige una placa de la flota.";
 export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya tiene cargue de este proveedor.";
 const NO_ORDERS = "Elige al menos un pedido.";
+export const BALANCE_TRIPS_REGISTERED = "Este cargue tiene viajes de saldo registrados; bórralos primero.";
+const BALANCE_GONE = "El saldo ya no existe.";
+const BALANCE_DONE = "Este saldo ya se llevó completo.";
+export const BALANCE_CHANGED = "El saldo cambió. Recarga la página e inténtalo de nuevo.";
+const NEXT_DATE_MISSING = "Elige la nueva fecha del saldo que queda.";
+const TRIP_GONE = "El viaje ya no existe.";
 const orderRepeated = (id: number) => `El pedido #${id} está repetido en el cargue.`;
 /** The loads must cover exactly what the order has pending right now: anything else means the screen is stale. */
 export const ORDERS_CHANGED = "El pedido cambió. Recarga la página e inténtalo de nuevo.";
+
+/** The balances an edit sends are the stored ones: the same orders with the same bags. */
+function sameBalances(orders: LoadInput["orders"], stored: readonly StoredBalance[]): boolean {
+  const sent = orders.flatMap((o) => (o.balance ? [`${o.orderId}:${o.balance.bags}`] : [])).sort();
+  const kept = stored.map((b) => `${b.orderId}:${b.bags}`).sort();
+  return sent.length === kept.length && sent.every((v, i) => v === kept[i]);
+}
 
 export function createLoadCommands(ports: LoadPorts) {
   /** The SIESA numbers must be distinct inside the submission and not held by another load (`exceptId` is the load being edited). */
@@ -93,6 +146,34 @@ export function createLoadCommands(ports: LoadPorts) {
     throw new LoadError(NOT_IN_FLEET);
   }
 
+  /** A plate picked for a balance or a trip: a fleet vehicle, or the plate its stored balance already had. */
+  async function fleetPlate(plate: string, stored?: { plate: string | null; vehicleId: number | null }) {
+    const vehicle = await ports.findVehicleByPlate(plate);
+    if (vehicle) return { plate: vehicle.plate, vehicleId: vehicle.id };
+    if (stored && stored.plate === plate) return { plate, vehicleId: stored.vehicleId };
+    throw new LoadError(NOT_IN_FLEET);
+  }
+
+  /** The balances of a load's orders: the bags left must be below the order's bags for the supplier. */
+  async function balancesOf(
+    orders: ReadonlyArray<Pick<LoadInput["orders"][number], "orderId" | "balance">>,
+    found: readonly OrderForLoad[],
+    supplier: LoadSupplier,
+    stored: readonly StoredBalance[] = [],
+  ): Promise<LoadValues["balances"]> {
+    const balances: Array<LoadValues["balances"][number]> = [];
+    for (const o of orders) {
+      if (!o.balance) continue;
+      const lines = found.find((f) => f.id === o.orderId)?.lines ?? [];
+      const orderBags = lines.filter((l) => l.supplier === supplier).reduce((sum, l) => sum + l.bags, 0);
+      const bagsError = balanceBagsError(o.balance.bags, orderBags);
+      if (bagsError) throw new LoadError(`Pedido #${o.orderId}: ${bagsError}`);
+      const owner = o.balance.plate === null ? null : await fleetPlate(o.balance.plate, stored.find((s) => s.orderId === o.orderId));
+      balances.push({ orderId: o.orderId, bags: o.balance.bags, date: o.balance.date, plate: owner?.plate ?? null, vehicleId: owner?.vehicleId ?? null });
+    }
+    return balances;
+  }
+
   /** Every product must be a catalog product of the load's supplier; run once every other check passed. */
   async function prepare(
     header: Pick<LoadValues, "date" | "supplier" | "notes">,
@@ -111,6 +192,7 @@ export function createLoadCommands(ports: LoadPorts) {
       plate: owner.plate,
       vehicleId: owner.vehicleId,
       orderIds: orders.map((o) => o.orderId),
+      balances: [],
       lines: orders.flatMap((o) => {
         const costs = splitCost(
           o.cost,
@@ -161,7 +243,12 @@ export function createLoadCommands(ports: LoadPorts) {
       const kgPerBag = await ports.getKgPerBag();
       const problems = values.flatMap((v) => allocationProblems(v, [order], kgPerBag));
       if (problems.length > 0) throw new LoadError(problems.join("; "));
-      if (!(await ports.insertLoads(values))) throw new LoadError(ORDERS_CHANGED);
+      const withBalances: LoadValues[] = [];
+      for (const [i, v] of values.entries()) {
+        const balance = input.blocks[i]?.balance;
+        withBalances.push({ ...v, balances: await balancesOf([{ orderId: input.orderId, balance }], [order], v.supplier) });
+      }
+      if (!(await ports.insertLoads(withBalances))) throw new LoadError(ORDERS_CHANGED);
     },
 
     async update(id: number, input: LoadInput) {
@@ -178,19 +265,54 @@ export function createLoadCommands(ports: LoadPorts) {
       );
       // An edit keeps the orders the load already took: it neither takes new ones nor lets go of any.
       ensureSameOrders(input, stored.orderIds);
+      // With trips registered the balances are frozen: the edit may only resend them as they are.
+      const storedBalances = await ports.findLoadBalances(id);
+      if ((await ports.countLoadTrips(id)) > 0 && !sameBalances(input.orders, storedBalances)) throw new LoadError(BALANCE_TRIPS_REGISTERED);
       const values = await prepare({ date: input.date, supplier: input.supplier, notes: input.notes }, input.orders, owner);
       // The orders must still be loadable by the supplier (`id` is the load being edited) and covered to the kilogram.
       const found = await ports.findOrdersForLoad([...values.orderIds]);
       if (unavailableOrderIds(found, values.orderIds, values.supplier, id).length > 0) throw new LoadError(ORDERS_UNAVAILABLE);
       const problems = allocationProblems(values, found, await ports.getKgPerBag());
       if (problems.length > 0) throw new LoadError(problems.join("; "));
-      const result = await ports.updateLoad(id, values);
+      const balances = await balancesOf(input.orders, found, values.supplier, storedBalances);
+      const result = await ports.updateLoad(id, { ...values, balances });
       if (result === "gone") throw new LoadError(GONE);
       if (result === "orders_unavailable") throw new LoadError(ORDERS_UNAVAILABLE);
     },
 
     async remove(id: number) {
+      if ((await ports.countLoadTrips(id)) > 0) throw new LoadError(BALANCE_TRIPS_REGISTERED);
       if (!(await ports.deleteLoad(id))) throw new LoadError(GONE);
+    },
+
+    /**
+     * A trip that carries part (or all) of a balance. When it leaves bags behind, the new date (and optional
+     * plate) of the rest is required.
+     */
+    async registerBalanceTrip(balanceId: number, input: BalanceTripInput) {
+      const balance = await ports.findBalance(balanceId);
+      if (!balance) throw new LoadError(BALANCE_GONE);
+      const remaining = balance.bags - balance.carried;
+      if (remaining <= 0) throw new LoadError(BALANCE_DONE);
+      const bagsError = tripBagsError(input.bags, remaining);
+      if (bagsError) throw new LoadError(bagsError);
+      const vehicle = await fleetPlate(input.plate);
+      let reschedule: BalanceReschedule | null = null;
+      if (input.bags < remaining) {
+        if (input.nextDate === null) throw new LoadError(NEXT_DATE_MISSING);
+        const next = input.nextPlate === null ? null : await fleetPlate(input.nextPlate);
+        reschedule = { date: input.nextDate, plate: next?.plate ?? null, vehicleId: next?.vehicleId ?? null };
+      }
+      const result = await ports.insertBalanceTrip(
+        { balanceId, date: input.date, plate: vehicle.plate, vehicleId: vehicle.vehicleId as number, bags: input.bags },
+        reschedule,
+      );
+      if (result === "gone") throw new LoadError(BALANCE_GONE);
+      if (result === "exceeds") throw new LoadError(BALANCE_CHANGED);
+    },
+
+    async removeBalanceTrip(id: number) {
+      if (!(await ports.deleteBalanceTrip(id))) throw new LoadError(TRIP_GONE);
     },
   };
 }

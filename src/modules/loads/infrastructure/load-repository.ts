@@ -4,6 +4,7 @@ import { LoadError, SIESA_TAKEN, type LoadPorts, type LoadValues } from "../appl
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { loadKgPerBag, loadOrderRows } from "@/modules/orders/infrastructure/order-repository";
 import { findCatalogProducts } from "@/modules/orders/infrastructure/reference-repository";
+import type { LoadBalanceRow } from "../domain/load-balance";
 import { loadTotals, type LoadLineRow } from "../domain/load-lines";
 import { groupLoadOrders, type LoadRow } from "../domain/load-rules";
 
@@ -51,6 +52,39 @@ export async function loadLoadRows(): Promise<LoadRow[]> {
   }));
 }
 
+/** Every balance with its trips (oldest first) and the day of the load that left it. */
+export async function loadBalanceRows(): Promise<LoadBalanceRow[]> {
+  const [balances, trips] = await Promise.all([
+    db
+      .select({
+        id: schema.loadBalances.id,
+        loadId: schema.loadBalances.loadId,
+        orderId: schema.loadBalances.orderId,
+        supplier: schema.loads.supplier,
+        loadDate: schema.loads.date,
+        bags: schema.loadBalances.bags,
+        scheduledDate: schema.loadBalances.scheduledDate,
+        plate: schema.loadBalances.plate,
+      })
+      .from(schema.loadBalances)
+      .innerJoin(schema.loads, eq(schema.loads.id, schema.loadBalances.loadId))
+      .orderBy(asc(schema.loadBalances.scheduledDate), asc(schema.loadBalances.id)),
+    db
+      .select({
+        id: schema.loadBalanceTrips.id,
+        balanceId: schema.loadBalanceTrips.balanceId,
+        date: schema.loadBalanceTrips.date,
+        plate: schema.loadBalanceTrips.plate,
+        bags: schema.loadBalanceTrips.bags,
+      })
+      .from(schema.loadBalanceTrips)
+      .orderBy(asc(schema.loadBalanceTrips.date), asc(schema.loadBalanceTrips.id)),
+  ]);
+  const byBalance = new Map<number, LoadBalanceRow["trips"][number][]>();
+  for (const { balanceId, ...trip } of trips) byBalance.set(balanceId, [...(byBalance.get(balanceId) ?? []), trip]);
+  return balances.map((b) => ({ ...b, trips: byBalance.get(b.id) ?? [] }));
+}
+
 const toColumns = (v: LoadValues) => ({
   date: v.date,
   supplier: v.supplier,
@@ -70,6 +104,9 @@ const toLineColumns = (loadId: number, lines: LoadValues["lines"]) =>
     orderNumber: l.orderNumber,
     position,
   }));
+
+const toBalanceColumns = (loadId: number, balances: LoadValues["balances"]) =>
+  balances.map((b) => ({ loadId, orderId: b.orderId, bags: b.bags, scheduledDate: b.date, plate: b.plate, vehicleId: b.vehicleId }));
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -173,6 +210,7 @@ export const loadRepository: LoadPorts = {
           if (!load) throw new Error("The load was not stored.");
           ids.push(load.id);
           await tx.insert(schema.loadLines).values(toLineColumns(load.id, v.lines));
+          if (v.balances.length > 0) await tx.insert(schema.loadBalances).values(toBalanceColumns(load.id, v.balances));
           await ensureNotLoadedElsewhere(tx, load.id, v.supplier, v.orderIds);
         }
         await ensureSiesaFree(tx, ids, values.flatMap((v) => v.lines.map((l) => l.siesaNumber)));
@@ -198,6 +236,17 @@ export const loadRepository: LoadPorts = {
         // The lines are rewritten whole.
         await tx.delete(schema.loadLines).where(eq(schema.loadLines.loadId, id));
         await tx.insert(schema.loadLines).values(toLineColumns(id, values.lines));
+        // With trips registered the balances stay as they are (the command already checked the edit resends them unchanged).
+        const [trip] = await tx
+          .select({ id: schema.loadBalanceTrips.id })
+          .from(schema.loadBalanceTrips)
+          .innerJoin(schema.loadBalances, eq(schema.loadBalances.id, schema.loadBalanceTrips.balanceId))
+          .where(eq(schema.loadBalances.loadId, id))
+          .limit(1);
+        if (!trip) {
+          await tx.delete(schema.loadBalances).where(eq(schema.loadBalances.loadId, id));
+          if (values.balances.length > 0) await tx.insert(schema.loadBalances).values(toBalanceColumns(id, values.balances));
+        }
         await ensureNotLoadedElsewhere(tx, id, values.supplier, values.orderIds);
         return "ok" as const;
       });
@@ -210,6 +259,78 @@ export const loadRepository: LoadPorts = {
   async deleteLoad(id) {
     // The lines go with the load (cascade); the status of its orders is derived, so they fall back by themselves.
     const rows = await db.delete(schema.loads).where(eq(schema.loads.id, id)).returning({ id: schema.loads.id });
+    return rows.length === 1;
+  },
+
+  async findLoadBalances(loadId) {
+    return db
+      .select({
+        orderId: schema.loadBalances.orderId,
+        bags: schema.loadBalances.bags,
+        plate: schema.loadBalances.plate,
+        vehicleId: schema.loadBalances.vehicleId,
+      })
+      .from(schema.loadBalances)
+      .where(eq(schema.loadBalances.loadId, loadId));
+  },
+
+  async countLoadTrips(loadId) {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.loadBalanceTrips)
+      .innerJoin(schema.loadBalances, eq(schema.loadBalances.id, schema.loadBalanceTrips.balanceId))
+      .where(eq(schema.loadBalances.loadId, loadId));
+    return row?.n ?? 0;
+  },
+
+  async findBalance(id) {
+    const [balance] = await db
+      .select({ id: schema.loadBalances.id, bags: schema.loadBalances.bags })
+      .from(schema.loadBalances)
+      .where(eq(schema.loadBalances.id, id))
+      .limit(1);
+    if (!balance) return null;
+    const [carried] = await db
+      .select({ n: sql<number>`coalesce(sum(${schema.loadBalanceTrips.bags}), 0)::int` })
+      .from(schema.loadBalanceTrips)
+      .where(eq(schema.loadBalanceTrips.balanceId, id));
+    return { ...balance, carried: carried?.n ?? 0 };
+  },
+
+  async insertBalanceTrip(trip, reschedule) {
+    return db.transaction(async (tx) => {
+      // The row lock serializes the trips of one balance, so the remaining bags are checked against a stable total.
+      const [balance] = await tx
+        .select({ bags: schema.loadBalances.bags })
+        .from(schema.loadBalances)
+        .where(eq(schema.loadBalances.id, trip.balanceId))
+        .for("update");
+      if (!balance) return "gone" as const;
+      const [carried] = await tx
+        .select({ n: sql<number>`coalesce(sum(${schema.loadBalanceTrips.bags}), 0)::int` })
+        .from(schema.loadBalanceTrips)
+        .where(eq(schema.loadBalanceTrips.balanceId, trip.balanceId));
+      const remaining = balance.bags - (carried?.n ?? 0);
+      if (trip.bags > remaining) return "exceeds" as const;
+      await tx.insert(schema.loadBalanceTrips).values({
+        balanceId: trip.balanceId,
+        date: trip.date,
+        plate: trip.plate,
+        vehicleId: trip.vehicleId,
+        bags: trip.bags,
+      });
+      if (reschedule && remaining - trip.bags > 0) {
+        await tx
+          .update(schema.loadBalances)
+          .set({ scheduledDate: reschedule.date, plate: reschedule.plate, vehicleId: reschedule.vehicleId, updatedAt: new Date() })
+          .where(eq(schema.loadBalances.id, trip.balanceId));
+      }
+      return "ok" as const;
+    });
+  },
+
+  async deleteBalanceTrip(id) {
+    const rows = await db.delete(schema.loadBalanceTrips).where(eq(schema.loadBalanceTrips.id, id)).returning({ id: schema.loadBalanceTrips.id });
     return rows.length === 1;
   },
 };

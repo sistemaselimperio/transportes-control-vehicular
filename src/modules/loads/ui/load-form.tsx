@@ -12,6 +12,7 @@ import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { createLoadsAction, updateLoadAction } from "../application/load-actions";
 import { NOTES_MAX, REFERENCE_MAX } from "../application/load-schemas";
 import { allocationErrors } from "../domain/load-allocation";
+import { balanceDraftError, buildBalanceDrafts, hasTrips, type BalanceDraft, type LoadBalanceRow } from "../domain/load-balance";
 import {
   allocationInputsOf,
   buildDrafts,
@@ -21,6 +22,7 @@ import {
   orderParts,
   pendingSuppliersOf,
   serializeBlocks,
+  supplierBags,
   type BlockDraft,
   type Drafts,
   type PendingSource,
@@ -41,6 +43,7 @@ export function LoadForm({
   plates,
   orders,
   kgPerBag,
+  balances = [],
   onDone,
   onCancel,
 }: {
@@ -52,6 +55,8 @@ export function LoadForm({
   /** Every order that is not annulled; the form takes the ones this load covers. */
   orders: readonly PendingSource[];
   kgPerBag: number;
+  /** The balances the load being edited left behind. */
+  balances?: readonly LoadBalanceRow[];
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
@@ -75,6 +80,12 @@ export function LoadForm({
     ),
   );
 
+  // The day of the load: the leftover of an order follows it until the loader picks another one.
+  const [date, setDate] = useState<string>(() => load?.date ?? today);
+  const [balanceDrafts, setBalanceDrafts] = useState<BalanceDraft[]>(() => buildBalanceDrafts(drafts.blocks, balances));
+  // Once a trip carried part of a balance, its checkbox and bags are frozen.
+  const lockedOrders = new Set(balances.filter(hasTrips).map((b) => b.orderId));
+
   const allocationInputs = allocationInputsOf(drafts.blocks, covered, drafts.products, kgPerBag);
   const totals = draftsTotals(drafts);
   const newOrder = load ? undefined : covered[0];
@@ -84,6 +95,9 @@ export function LoadForm({
       ...d,
       blocks: d.blocks.map((b) => (b.orderId === block.orderId && b.supplier === block.supplier ? { ...b, ...change } : b)),
     }));
+
+  const patchBalance = (block: BlockDraft, change: Partial<BalanceDraft>) =>
+    setBalanceDrafts((all) => all.map((b) => (b.orderId === block.orderId && b.supplier === block.supplier ? { ...b, ...change } : b)));
 
   return (
     <ActionForm
@@ -103,15 +117,20 @@ export function LoadForm({
         if (repeated !== null) {
           return Promise.resolve({ ok: false as const, error: `El número SIESA ${repeated} está repetido en el cargue.` });
         }
+        for (const draft of balanceDrafts) {
+          const source = covered.find((o) => o.id === draft.orderId);
+          const problem = balanceDraftError(draft, source ? supplierBags(source, draft.supplier) : 0, date);
+          if (problem) return Promise.resolve({ ok: false as const, error: problem });
+        }
         // The same rule the server enforces, so the loader sees what to fix before sending.
         const errors = allocationInputs.flatMap(allocationErrors);
         if (errors.length > 0) return Promise.resolve({ ok: false as const, error: errors.join("; ") });
         if (load) {
-          fd.set("orders", serializeBlocks(drafts));
+          fd.set("orders", serializeBlocks(drafts, balanceDrafts, date));
           return updateLoadAction(load.id, fd);
         }
         fd.set("orderId", String(orderId ?? ""));
-        fd.set("blocks", serializeBlocks(drafts));
+        fd.set("blocks", serializeBlocks(drafts, balanceDrafts, date));
         return createLoadsAction(fd);
       }}
       submitLabel={load ? "Guardar cambios" : drafts.blocks.length > 1 ? "Registrar cargues" : "Registrar cargue"}
@@ -120,7 +139,7 @@ export function LoadForm({
     >
       <div className="grid grid-cols-2 gap-3">
         <Field label="Fecha" htmlFor="load-date" required>
-          <Input id="load-date" name="date" type="date" className={FIELD} defaultValue={load?.date ?? today} required />
+          <Input id="load-date" name="date" type="date" className={FIELD} value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
         <Field label="Placa" htmlFor="load-plate" required>
           <NativeSelect id="load-plate" name="plate" defaultValue={load?.plate ?? ""} required>
@@ -153,7 +172,8 @@ export function LoadForm({
           <ul className="space-y-3">
             {drafts.blocks.map((block) => {
               const source = covered.find((o) => o.id === block.orderId);
-              if (!source) return null;
+              const balance = balanceDrafts.find((d) => d.orderId === block.orderId && d.supplier === block.supplier);
+              if (!source || !balance) return null;
               return (
                 <Block
                   key={`${block.orderId}-${block.supplier}`}
@@ -162,6 +182,12 @@ export function LoadForm({
                   editing={load !== undefined}
                   block={block}
                   onPatchBlock={(change) => patchBlock(block, change)}
+                  balance={balance}
+                  onPatchBalance={(change) => patchBalance(block, change)}
+                  orderBags={supplierBags(source, block.supplier)}
+                  loadDate={date}
+                  plates={plateOptions}
+                  locked={lockedOrders.has(block.orderId)}
                 />
               );
             })}
@@ -210,12 +236,27 @@ function Block({
   editing,
   block,
   onPatchBlock,
+  balance,
+  onPatchBalance,
+  orderBags,
+  loadDate,
+  plates,
+  locked,
 }: {
   order: PendingSource;
   kgPerBag: number;
   editing: boolean;
   block: BlockDraft;
   onPatchBlock: (change: Partial<BlockDraft>) => void;
+  /** The "Carga incompleta" draft of this block. */
+  balance: BalanceDraft;
+  onPatchBalance: (change: Partial<BalanceDraft>) => void;
+  /** Bags of the order that belong to the block's supplier. */
+  orderBags: number;
+  loadDate: string;
+  plates: readonly string[];
+  /** A trip of the balance was registered: the checkbox and the bags cannot change. */
+  locked: boolean;
 }) {
   const id = `${block.orderId}-${block.supplier}`;
   const part = orderParts(order, kgPerBag).find((p) => p.supplier === block.supplier);
@@ -278,6 +319,57 @@ function Block({
           </div>
         </div>
 
+        <div className="space-y-3 p-3">
+          <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className="size-5 shrink-0 accent-brand"
+              checked={balance.enabled}
+              disabled={locked}
+              onChange={(e) => onPatchBalance({ enabled: e.target.checked })}
+            />
+            Carga incompleta
+          </label>
+          {locked && (
+            <p className="text-xs text-muted-foreground">Este cargue tiene viajes de saldo registrados; bórralos primero para cambiar los bultos.</p>
+          )}
+          {balance.enabled && (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Bultos que se quedan" htmlFor={`load-balance-bags-${id}`} required hint={`De ${formatDecimal(orderBags, 0)} bultos del pedido`}>
+                <Input
+                  id={`load-balance-bags-${id}`}
+                  className={`${FIELD} num`}
+                  inputMode="numeric"
+                  value={balance.bags}
+                  disabled={locked}
+                  autoComplete="off"
+                  onChange={(e) => onPatchBalance({ bags: e.target.value })}
+                />
+              </Field>
+              <Field label="Fecha del saldo" htmlFor={`load-balance-date-${id}`} required>
+                <Input
+                  id={`load-balance-date-${id}`}
+                  type="date"
+                  className={FIELD}
+                  value={balance.date ?? loadDate}
+                  onChange={(e) => onPatchBalance({ date: e.target.value })}
+                />
+              </Field>
+              <div className="col-span-2">
+                <Field label="Placa del saldo" htmlFor={`load-balance-plate-${id}`} hint="Opcional">
+                  <NativeSelect id={`load-balance-plate-${id}`} value={balance.plate} onChange={(e) => onPatchBalance({ plate: e.target.value })}>
+                    <option value="">Sin placa</option>
+                    {(balance.plate !== "" && !plates.includes(balance.plate) ? [balance.plate, ...plates] : plates).map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </li>
   );

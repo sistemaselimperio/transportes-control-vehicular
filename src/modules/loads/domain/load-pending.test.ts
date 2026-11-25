@@ -9,6 +9,7 @@ import {
   orderParts,
   pendingSuppliersOf,
   serializeBlocks,
+  supplierBags,
   type PendingSource,
 } from "./load-pending";
 import type { LoadLineRow } from "./load-lines";
@@ -243,6 +244,40 @@ describe("draftsTotals and serializeBlocks", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("supplierBags", () => {
+  it("adds the bags of the order that belong to the supplier", () => {
+    const mixed = orders[0] as PendingSource;
+    expect(supplierBags(mixed, "Finca")).toBe(100);
+    expect(supplierBags(mixed, "Contegral")).toBe(50);
+    expect(supplierBags(mixed, "Italcol")).toBe(0);
+  });
+});
+
+describe("serializeBlocks with a balance", () => {
+  const drafts = {
+    blocks: [
+      { orderId: 1, supplier: "Contegral" as const, siesaNumber: "S-1", orderNumber: "P-1", cost: "100" },
+      { orderId: 2, supplier: "Finca" as const, siesaNumber: "S-2", orderNumber: "P-2", cost: "200" },
+    ],
+    products: [],
+  };
+  const balances = [
+    { orderId: 1, supplier: "Contegral" as const, enabled: true, bags: "5", date: null, plate: "ABC-123" },
+    { orderId: 2, supplier: "Finca" as const, enabled: false, bags: "9", date: "2026-11-30", plate: "" },
+  ];
+
+  it("sends the balance of a checked block, following the load date, and nothing for an unchecked one", () => {
+    const sent = JSON.parse(serializeBlocks(drafts, balances, "2026-11-20")) as Array<Record<string, unknown>>;
+    expect(sent[0]?.balance).toEqual({ bags: "5", date: "2026-11-20", plate: "ABC-123" });
+    expect(sent[1]).not.toHaveProperty("balance");
+  });
+
+  it("keeps the date chosen for the balance", () => {
+    const sent = JSON.parse(serializeBlocks(drafts, [{ ...balances[0]!, date: "2026-11-24" }], "2026-11-20")) as Array<Record<string, unknown>>;
+    expect(sent[0]?.balance).toEqual({ bags: "5", date: "2026-11-24", plate: "ABC-123" });
   });
 });
 

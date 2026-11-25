@@ -654,6 +654,53 @@ export const loadLines = comercial.table(
   ],
 );
 
+/**
+ * The bags of an order that a load left behind ("carga incompleta"): the load still records the whole
+ * purchase (tons, cost, SIESA), but the truck carried only part of the bags. Their carriage is transport
+ * only, so it holds no SIESA, cost or tons. One balance per (load, order); `scheduled_date` and `plate`
+ * say when and with which truck the rest is planned. `plate` is a fleet snapshot, like loads.
+ */
+export const loadBalances = comercial.table(
+  "load_balances",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    loadId: integer("load_id")
+      .notNull()
+      .references(() => loads.id, { onDelete: "cascade" }),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    bags: integer().notNull(),
+    scheduledDate: date("scheduled_date", { mode: "string" }).notNull(),
+    plate: text(),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("load_balances_load_order_uq").on(t.loadId, t.orderId),
+    index("load_balances_order_idx").on(t.orderId),
+    check("load_balances_bags_positive", sql`${t.bags} > 0`),
+  ],
+);
+
+/** A trip that carried part of a balance. What is left is the balance's bags minus the bags of its trips. */
+export const loadBalanceTrips = comercial.table(
+  "load_balance_trips",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    balanceId: integer("balance_id")
+      .notNull()
+      .references(() => loadBalances.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    plate: text().notNull(),
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    bags: integer().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("load_balance_trips_balance_idx").on(t.balanceId), check("load_balance_trips_bags_positive", sql`${t.bags} > 0`)],
+);
+
 /** Key/value settings of the commercial area (today only the kilograms per bag, `kg_per_bag`). */
 export const comercialSettings = comercial.table("settings", {
   key: text().primaryKey(),

@@ -12,7 +12,14 @@ import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dial
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { deleteLoadAction } from "../application/load-actions";
+import { deleteBalanceTripAction, deleteLoadAction } from "../application/load-actions";
+import {
+  buildPendingBalances,
+  pendingEntries,
+  type BalanceTripRow,
+  type LoadBalanceRow,
+  type PendingBalanceRow,
+} from "../domain/load-balance";
 import { buildPendingOrders } from "../domain/load-pending";
 import {
   filterLoads,
@@ -23,6 +30,7 @@ import {
   type LoadFilters,
   type LoadRow,
 } from "../domain/load-rules";
+import { BalanceTripForm } from "./balance-trip-form";
 import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
 import { PendingLoads } from "./pending-loads";
@@ -32,6 +40,7 @@ type LoadsTab = "pendientes" | "historial";
 /** Loads page: a tab with the orders still to load and one with the loads made (filters, totals, list), plus the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
   rows,
+  balances,
   plates,
   orders,
   kgPerBag,
@@ -40,6 +49,8 @@ export function LoadsView({
   today,
 }: {
   rows: readonly LoadRow[];
+  /** The bags the loads left behind, with their trips. */
+  balances: readonly LoadBalanceRow[];
   plates: readonly string[];
   /** Every order that is not annulled: the pending list and the form take the parts still to load. */
   orders: readonly OrderRow[];
@@ -56,12 +67,19 @@ export function LoadsView({
   const [creatingOrderId, setCreatingOrderId] = useState<number | null>(presetOrderId);
   const [editing, setEditing] = useState<LoadRow | undefined>();
   const [deleting, setDeleting] = useState<LoadRow | undefined>();
+  // The balance whose trip is being registered, and the trip being deleted.
+  const [tripFor, setTripFor] = useState<PendingBalanceRow | undefined>();
+  const [deletingTrip, setDeletingTrip] = useState<BalanceTripRow | undefined>();
   const [filters, setFilters] = useState<LoadFilters>({ supplier: null, from: null, to: null });
   const { message, flash } = useFlashMessage();
 
   const shown = useMemo(() => filterLoads(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOfLoads(shown), [shown]);
-  const pending = useMemo(() => buildPendingOrders(orders, kgPerBag), [orders, kgPerBag]);
+  const pendingBalances = useMemo(() => buildPendingBalances(balances, orders), [balances, orders]);
+  const pending = useMemo(
+    () => pendingEntries(buildPendingOrders(orders, kgPerBag), pendingBalances),
+    [orders, kgPerBag, pendingBalances],
+  );
 
   const editLoad = (load: LoadRow) => {
     setEditing(load);
@@ -97,7 +115,14 @@ export function LoadsView({
 
       <div id="loads-panel" role="tabpanel" aria-labelledby={`loads-tab-${tab}`} className="space-y-5">
         {tab === "pendientes" ? (
-          <PendingLoads orders={pending} today={today} canManage={canManage} onCreateLoad={createLoads} />
+          <PendingLoads
+            entries={pending}
+            today={today}
+            canManage={canManage}
+            onCreateLoad={createLoads}
+            onRegisterTrip={setTripFor}
+            onDeleteTrip={setDeletingTrip}
+          />
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
@@ -151,7 +176,14 @@ export function LoadsView({
               {totals.count} de {rows.length} cargues · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
             </p>
 
-            <LoadList rows={shown} canManage={canManage} onEdit={editLoad} onDelete={setDeleting} />
+            <LoadList
+              rows={shown}
+              balances={balances}
+              canManage={canManage}
+              onEdit={editLoad}
+              onDelete={setDeleting}
+              onDeleteTrip={setDeletingTrip}
+            />
           </>
         )}
       </div>
@@ -168,6 +200,40 @@ export function LoadsView({
         onDone={flash}
       />
 
+      <ConfirmDeleteDialog
+        open={deletingTrip !== undefined}
+        title="Eliminar viaje del saldo"
+        description={deletingTrip && `${formatDisplayDate(deletingTrip.date)} · ${deletingTrip.plate}`}
+        warning={
+          deletingTrip
+            ? `Se eliminará el viaje del ${formatDisplayDate(deletingTrip.date)} con ${deletingTrip.bags} ${deletingTrip.bags === 1 ? "bulto" : "bultos"}; esos bultos vuelven al saldo por llevar.`
+            : ""
+        }
+        action={() => (deletingTrip ? deleteBalanceTripAction(deletingTrip.id) : Promise.resolve({ ok: false as const, error: "Sin viaje." }))}
+        onClose={() => setDeletingTrip(undefined)}
+        onDone={flash}
+      />
+
+      <SlideOver
+        open={tripFor !== undefined}
+        onOpenChange={(next) => !next && setTripFor(undefined)}
+        title="Registrar faltante"
+        description={tripFor ? `Saldo del pedido #${tripFor.orderId} · ${tripFor.supplier}` : undefined}
+      >
+        {tripFor && (
+          <BalanceTripForm
+            key={tripFor.balanceId}
+            balance={tripFor}
+            plates={plates}
+            onCancel={() => setTripFor(undefined)}
+            onDone={(msg) => {
+              flash(msg);
+              setTripFor(undefined);
+            }}
+          />
+        )}
+      </SlideOver>
+
       <SlideOver
         open={open}
         onOpenChange={setOpen}
@@ -182,6 +248,7 @@ export function LoadsView({
           plates={plates}
           orders={orders}
           kgPerBag={kgPerBag}
+          balances={editing ? balances.filter((b) => b.loadId === editing.id) : undefined}
           onCancel={() => setOpen(false)}
           onDone={(msg) => {
             flash(msg);

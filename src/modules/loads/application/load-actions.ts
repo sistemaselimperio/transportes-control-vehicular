@@ -10,7 +10,7 @@ import { actionFailure } from "@/modules/shared/application/action-failure";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { loadRepository } from "../infrastructure/load-repository";
 import { createLoadCommands, LoadError } from "./load-commands";
-import { createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
+import { balanceTripSchema, createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
 
 const commands = createLoadCommands(loadRepository);
 
@@ -47,5 +47,22 @@ export async function deleteLoadAction(id: number): Promise<ActionResult> {
   return run(async () => {
     await commands.remove(loadIdSchema.parse(id));
     return "Cargue eliminado.";
+  });
+}
+
+/** A trip that carries part of the bags a load left behind; the form may also schedule the rest. */
+export async function registerBalanceTripAction(balanceId: number, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const id = loadIdSchema.parse(balanceId);
+    const input = balanceTripSchema.parse(Object.fromEntries(fd.entries()));
+    await commands.registerBalanceTrip(id, input);
+    return "Viaje registrado.";
+  });
+}
+
+export async function deleteBalanceTripAction(tripId: number): Promise<ActionResult> {
+  return run(async () => {
+    await commands.removeBalanceTrip(loadIdSchema.parse(tripId));
+    return "Viaje eliminado.";
   });
 }

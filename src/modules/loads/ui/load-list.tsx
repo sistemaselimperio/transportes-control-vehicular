@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { remainingBags, type BalanceTripRow, type LoadBalanceRow } from "../domain/load-balance";
 import { groupLinesByOrder } from "../domain/load-lines";
 import { formatCop, loadFooter, type LoadOrderBlock, type LoadRow } from "../domain/load-rules";
+import { BalanceTrips } from "./balance-trips";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
 function Plate({ row }: { row: LoadRow }) {
@@ -92,6 +94,30 @@ function LineDetails({ row }: { row: LoadRow }) {
   );
 }
 
+/** The bags this load left behind: what is still to carry (and when) and the trips that carried the rest. */
+function BalanceDetails({ balances, onDeleteTrip }: { balances: readonly LoadBalanceRow[]; onDeleteTrip?: (trip: BalanceTripRow) => void }) {
+  return (
+    <ul className="space-y-2 px-4 py-3 text-xs">
+      {balances.map((b) => {
+        const left = remainingBags(b);
+        return (
+          <li key={b.id} className="space-y-1.5 rounded-lg border bg-background p-2.5">
+            <p className="num text-sm font-medium">
+              Pedido #{b.orderId} · carga incompleta: {formatDecimal(b.bags, 0)} {b.bags === 1 ? "bulto" : "bultos"} por llevar aparte
+            </p>
+            <p className="num text-muted-foreground">
+              {left > 0
+                ? `Quedan ${formatDecimal(left, 0)} ${left === 1 ? "bulto" : "bultos"} · ${formatDisplayDate(b.scheduledDate)} · ${b.plate ?? "sin placa"}`
+                : "Saldo llevado completo."}
+            </p>
+            <BalanceTrips trips={b.trips} onDelete={onDeleteTrip} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function RowActions({
   row,
   onEdit,
@@ -134,20 +160,26 @@ function RowActions({
  */
 export function LoadList({
   rows,
+  balances = [],
   canManage,
   onEdit,
   onDelete,
+  onDeleteTrip,
 }: {
   rows: readonly LoadRow[];
+  /** The balances of every load: the ones of each row show under its orders. */
+  balances?: readonly LoadBalanceRow[];
   canManage: boolean;
   onEdit: (row: LoadRow) => void;
   onDelete: (row: LoadRow) => void;
+  onDeleteTrip?: (trip: BalanceTripRow) => void;
 }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No hay cargues para este filtro.</p>;
   return (
     <ul className="grid gap-3 lg:grid-cols-2">
       {rows.map((r) => {
         const footer = loadFooter(r.orders);
+        const left = balances.filter((b) => b.loadId === r.id);
         return (
           <li key={r.id} className="panel">
             <div className="flex items-start justify-between gap-2 border-b bg-muted/60 px-4 py-3">
@@ -176,6 +208,12 @@ export function LoadList({
                   <OrderBlock key={o.id} order={o} />
                 ))}
               </ul>
+            )}
+
+            {left.length > 0 && (
+              <div className="border-t">
+                <BalanceDetails balances={left} onDeleteTrip={canManage ? onDeleteTrip : undefined} />
+              </div>
             )}
 
             <div className="border-t">

@@ -1,6 +1,6 @@
 import { canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
-import { listLoadRows } from "@/modules/loads/application/load-queries";
+import { listLoadBalances, listLoadRows } from "@/modules/loads/application/load-queries";
 import { LoadsView } from "@/modules/loads/ui/loads-view";
 import { getKgPerBag, listOrderRows } from "@/modules/orders/application/order-queries";
 import { todayInBogota } from "@/modules/shared/domain/dates";
@@ -14,8 +14,9 @@ export default async function Page({
   const role = await requireSectionAccess("loads");
   const { nuevo, pedido } = await searchParams;
   // The plate list is a shared fleet read, not the fleet section: the commercial role needs no fleet access for it.
-  const [rows, plates, orders, kgPerBag] = await Promise.all([
+  const [rows, balances, plates, orders, kgPerBag] = await Promise.all([
     listLoadRows(),
+    listLoadBalances(),
     listDispatchPlates(),
     listOrderRows(),
     getKgPerBag(),
@@ -27,6 +28,7 @@ export default async function Page({
   return (
     <LoadsView
       rows={rows}
+      balances={balances}
       plates={plates}
       // Only what a load can still pick up, plus what loads already hold (to edit them).
       orders={orders.filter((o) => o.status !== "anulado")}

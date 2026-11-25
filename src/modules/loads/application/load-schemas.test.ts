@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
+import { balanceTripSchema, createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
 
 const product = { referenceId: 10, tons: "32,5" };
 const order = { orderId: 12, siesaNumber: " FV-100 ", orderNumber: " P-77 ", cost: "$ 1.500.000", lines: [product] };
@@ -138,5 +138,70 @@ describe("loadIdSchema", () => {
   it("accepts positive integers only", () => {
     expect(loadIdSchema.safeParse(2).success).toBe(true);
     expect(loadIdSchema.safeParse(0).success).toBe(false);
+  });
+});
+
+describe("the balance of an order", () => {
+  const withBalance = (balance: unknown) => withOrders([{ ...order, balance }]);
+
+  it("parses the leftover bags, the date and an optional plate", () => {
+    const parsed = loadSchema.parse(withBalance({ bags: " 5 ", date: "2026-11-25", plate: "abc 123" }));
+    expect(parsed.orders[0]?.balance).toEqual({ bags: 5, date: "2026-11-25", plate: "ABC-123" });
+  });
+
+  it("takes a blank plate as none", () => {
+    expect(loadSchema.parse(withBalance({ bags: "5", date: "2026-11-25", plate: "" })).orders[0]?.balance?.plate).toBeNull();
+    expect(loadSchema.parse(withBalance({ bags: "5", date: "2026-11-25" })).orders[0]?.balance?.plate).toBeNull();
+  });
+
+  it("is optional: absent or null means a complete load", () => {
+    expect(loadSchema.parse(valid).orders[0]?.balance).toBeUndefined();
+    expect(loadSchema.parse(withBalance(null)).orders[0]?.balance).toBeNull();
+  });
+
+  it.each(["", "0", "-1", "2,5", "abc"])("requires whole bags above zero (%j)", (bags) => {
+    expect(firstIssue(withBalance({ bags, date: "2026-11-25" }))).toBe("Los bultos que se quedan deben ser un número entero mayor que cero.");
+  });
+
+  it("requires a valid date", () => {
+    expect(firstIssue(withBalance({ bags: "5", date: "" }))).toBe("La fecha del saldo: ingresa una fecha válida.");
+    expect(firstIssue(withBalance({ bags: "5", date: "25/11/2026" }))).toBe("La fecha del saldo: ingresa una fecha válida.");
+  });
+
+  it("also travels on the blocks of a new load", () => {
+    const block = { supplier: "Finca", siesaNumber: "FV-1", orderNumber: "P-1", cost: "100", lines: [product], balance: { bags: "5", date: "2026-11-25" } };
+    const parsed = createLoadsSchema.parse({ date: "2026-11-18", orderId: "12", plate: "abc 123", notes: "", blocks: JSON.stringify([block]) });
+    expect(parsed.blocks[0]?.balance).toEqual({ bags: 5, date: "2026-11-25", plate: null });
+  });
+});
+
+describe("balanceTripSchema", () => {
+  const trip = { date: "2026-11-26", plate: "abc 123", bags: "3", nextDate: "", nextPlate: "" };
+
+  it("parses a trip that carries the whole rest", () => {
+    expect(balanceTripSchema.parse(trip)).toEqual({ date: "2026-11-26", plate: "ABC-123", bags: 3, nextDate: null, nextPlate: null });
+  });
+
+  it("parses the new schedule for the rest", () => {
+    expect(balanceTripSchema.parse({ ...trip, nextDate: "2026-11-30", nextPlate: "xyz 987" })).toMatchObject({
+      nextDate: "2026-11-30",
+      nextPlate: "XYZ-987",
+    });
+  });
+
+  it("requires the plate, the date and whole bags above zero", () => {
+    const issue = (input: unknown) => {
+      const r = balanceTripSchema.safeParse(input);
+      return r.success ? null : r.error.issues[0]?.message;
+    };
+    expect(issue({ ...trip, plate: "" })).toBe("Elige la placa del viaje.");
+    expect(issue({ ...trip, date: "" })).toBe("La fecha del viaje: ingresa una fecha válida.");
+    for (const bags of ["", "0", "1,5", "x"]) {
+      expect(issue({ ...trip, bags })).toBe("Los bultos del viaje deben ser un número entero mayor que cero.");
+    }
+  });
+
+  it("rejects a new date that is not a date", () => {
+    expect(balanceTripSchema.safeParse({ ...trip, nextDate: "mañana" }).success).toBe(false);
   });
 });

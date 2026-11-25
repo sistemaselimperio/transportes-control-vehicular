@@ -39,6 +39,33 @@ export const loadProductSchema = z.object({
     .transform((v) => v as number),
 });
 
+const BALANCE_BAGS_INVALID = "Los bultos que se quedan deben ser un número entero mayor que cero.";
+
+/** Whole bags typed as text: a count above zero. */
+const bagsField = (message: string) =>
+  z
+    .string(message)
+    .default("")
+    .transform((v) => v.trim())
+    .refine((v) => /^\d{1,6}$/.test(v) && Number(v) > 0, message)
+    .transform(Number);
+
+/** A plate that may be left blank: none then. */
+const optionalPlate = z
+  .string()
+  .default("")
+  .transform((v) => (v.trim() === "" ? null : normalizePlate(v)));
+
+/**
+ * The bags of an order that the truck does not carry ("Carga incompleta"): the load still records the whole
+ * purchase. The command checks the bags against the order and the plate against the fleet.
+ */
+export const loadBalanceSchema = z.object({
+  bags: bagsField(BALANCE_BAGS_INVALID),
+  date: dateField("La fecha del saldo"),
+  plate: optionalPlate,
+});
+
 /** One order of a load: one SIESA number, one supplier order number and one cost for all its products. */
 export const loadOrderSchema = z.object({
   orderId: z.number(ORDER_MISSING).int(ORDER_MISSING).positive(ORDER_MISSING),
@@ -55,6 +82,8 @@ export const loadOrderSchema = z.object({
     .array(loadProductSchema, ORDERS_INVALID)
     .min(1, "Cada pedido necesita al menos un producto.")
     .max(MAX_PRODUCTS_PER_ORDER, `Un pedido no puede tener más de ${MAX_PRODUCTS_PER_ORDER} productos.`),
+  /** The leftover bags to carry later; absent for a complete load. */
+  balance: loadBalanceSchema.nullish(),
 });
 
 /** The orders travel as one JSON field of the form; neither an order nor a SIESA number can repeat among them. */
@@ -147,3 +176,25 @@ export type LoadInput = z.infer<typeof loadSchema>;
 export type LoadOrderInput = LoadInput["orders"][number];
 
 export const loadIdSchema = z.number().int().positive();
+
+const isoDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+
+/** A trip of a balance; when it leaves bags behind, `nextDate` (and optionally `nextPlate`) schedules the rest. */
+export const balanceTripSchema = z.object({
+  date: dateField("La fecha del viaje"),
+  plate: z
+    .string()
+    .default("")
+    .transform((v) => (v.trim() === "" ? "" : normalizePlate(v)))
+    .refine((v) => v !== "", "Elige la placa del viaje."),
+  bags: bagsField("Los bultos del viaje deben ser un número entero mayor que cero."),
+  nextDate: z
+    .string()
+    .default("")
+    .transform((v) => v.trim())
+    .refine((v) => v === "" || isoDay(v), "La fecha del saldo: ingresa una fecha válida.")
+    .transform((v) => (v === "" ? null : v)),
+  nextPlate: optionalPlate,
+});
+
+export type BalanceTripInput = z.infer<typeof balanceTripSchema>;

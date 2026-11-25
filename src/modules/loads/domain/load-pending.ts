@@ -4,6 +4,7 @@ import { bagsToKg, kgToTons, productTotals, type OrderRow } from "@/modules/orde
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import { parseDecimal } from "@/modules/shared/domain/decimal";
 import type { AllocationInput } from "./load-allocation";
+import type { BalanceDraft } from "./load-balance";
 import { costOf, groupLinesByOrder, round3, suggestLines, type LoadLineRow } from "./load-lines";
 import { LOAD_SUPPLIERS, type LoadSupplier } from "./load-rules";
 
@@ -30,6 +31,9 @@ const supplierLines = <T extends Pick<OrderRow, "lines">>(order: T, supplier: Lo
 const tonsOfBags = (bags: number, kgPerBag: number): number => kgToTons(bagsToKg(bags, kgPerBag));
 
 const sumBags = (lines: ReadonlyArray<{ bags: number }>): number => lines.reduce((sum, l) => sum + l.bags, 0);
+
+/** All the bags of the order that belong to the supplier, loaded or not. */
+export const supplierBags = (order: Pick<OrderRow, "lines">, supplier: LoadSupplier): number => sumBags(supplierLines(order, supplier));
 
 export interface PendingProduct {
   referenceId: number;
@@ -194,19 +198,26 @@ export function draftsTotals(drafts: Drafts): { blocks: number; tons: number; co
   };
 }
 
-/** The JSON the server actions parse: each block with its order, supplier, numbers and products. */
-export function serializeBlocks(drafts: Drafts): string {
+/**
+ * The JSON the server actions parse: each block with its order, supplier, numbers and products, plus the
+ * balance of the blocks whose "Carga incompleta" is checked (its date follows the load's when not chosen).
+ */
+export function serializeBlocks(drafts: Drafts, balances: readonly BalanceDraft[] = [], loadDate = ""): string {
   return JSON.stringify(
-    drafts.blocks.map((b) => ({
-      orderId: b.orderId,
-      supplier: b.supplier,
-      siesaNumber: b.siesaNumber,
-      orderNumber: b.orderNumber,
-      cost: b.cost,
-      lines: drafts.products
-        .filter((p) => p.orderId === b.orderId && p.supplier === b.supplier)
-        .map((p) => ({ referenceId: p.referenceId, tons: p.tons })),
-    })),
+    drafts.blocks.map((b) => {
+      const balance = balances.find((d) => d.enabled && d.orderId === b.orderId && d.supplier === b.supplier);
+      return {
+        orderId: b.orderId,
+        supplier: b.supplier,
+        siesaNumber: b.siesaNumber,
+        orderNumber: b.orderNumber,
+        cost: b.cost,
+        lines: drafts.products
+          .filter((p) => p.orderId === b.orderId && p.supplier === b.supplier)
+          .map((p) => ({ referenceId: p.referenceId, tons: p.tons })),
+        balance: balance && { bags: balance.bags, date: balance.date ?? loadDate, plate: balance.plate },
+      };
+    }),
   );
 }
 

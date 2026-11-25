@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Truck } from "lucide-react";
 import { useState } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
 import { daysLate, pendingDay, type PendingDay } from "@/modules/orders/domain/order-days";
 import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { balanceLeftText, dayMonth, type BalanceTripRow, type PendingBalanceRow, type PendingEntry } from "../domain/load-balance";
 import type { PendingOrderRow } from "../domain/load-pending";
+import { BalanceTrips } from "./balance-trips";
 
 const tons = (value: number) => formatDecimal(value, 3);
 
@@ -36,20 +38,28 @@ function dayLabel(date: string, today: string): string {
 /**
  * What is still to load: one row per order with a part pending, oldest delivery first, naming its
  * pending suppliers. Clicking a row opens the whole order split by supplier; "Cargue" opens the load
- * form of that order, which covers all its pending suppliers. Without `canManage` the rows are read-only.
+ * form of that order, which covers all its pending suppliers. Among them, one row per balance (the bags a
+ * truck left behind) with bags still to carry, by its scheduled day: "Registrar faltante" records a trip.
+ * Without `canManage` the rows are read-only.
  */
 export function PendingLoads({
-  orders,
+  entries,
   today,
   canManage,
   onCreateLoad,
+  onRegisterTrip,
+  onDeleteTrip,
 }: {
-  orders: readonly PendingOrderRow[];
+  entries: readonly PendingEntry[];
   /** Colombia's current day. */
   today: string;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
+  onRegisterTrip: (balance: PendingBalanceRow) => void;
+  onDeleteTrip: (trip: BalanceTripRow) => void;
 }) {
+  const orders = entries.flatMap((e) => (e.kind === "order" ? [e.row] : []));
+  const balances = entries.flatMap((e) => (e.kind === "balance" ? [e.row] : []));
   const bags = orders.reduce((sum, o) => sum + o.bags, 0);
   const totalTons = orders.reduce((sum, o) => sum + o.tons, 0);
   return (
@@ -58,19 +68,39 @@ export function PendingLoads({
         <h2 id="pending-loads-title" className="sr-only">
           Por cargar
         </h2>
-        {orders.length > 0 && (
+        {entries.length > 0 && (
           <p className="num text-sm text-muted-foreground">
-            {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} · {formatDecimal(bags, 0)} bultos · {tons(totalTons)} t
+            {[
+              orders.length > 0 && `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"} · ${formatDecimal(bags, 0)} bultos · ${tons(totalTons)} t`,
+              balances.length > 0 &&
+                `${balances.length} ${balances.length === 1 ? "saldo" : "saldos"} · ${formatDecimal(
+                  balances.reduce((sum, b) => sum + b.remaining, 0),
+                  0,
+                )} bultos por llevar`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         )}
       </div>
-      {orders.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="panel px-4 py-6 text-center text-sm text-muted-foreground">No hay pedidos pendientes: todo lo pedido ya tiene cargue.</p>
       ) : (
         <ul className="panel divide-y text-sm">
-          {orders.map((o) => (
-            <OrderItem key={o.id} order={o} today={today} canManage={canManage} onCreateLoad={onCreateLoad} />
-          ))}
+          {entries.map((e) =>
+            e.kind === "order" ? (
+              <OrderItem key={`order-${e.row.id}`} order={e.row} today={today} canManage={canManage} onCreateLoad={onCreateLoad} />
+            ) : (
+              <BalanceItem
+                key={`balance-${e.row.balanceId}`}
+                balance={e.row}
+                today={today}
+                canManage={canManage}
+                onRegisterTrip={onRegisterTrip}
+                onDeleteTrip={onDeleteTrip}
+              />
+            ),
+          )}
         </ul>
       )}
     </section>
@@ -129,7 +159,7 @@ function OrderItem({
             onClick={() => onCreateLoad(o.id)}
             aria-label={`Crear cargue del pedido #${o.id} (${o.suppliers.join(" + ")})`}
           >
-            <Plus aria-hidden />
+            <Truck aria-hidden />
             Cargue
           </Button>
         </div>
@@ -160,6 +190,76 @@ function OrderItem({
               </ul>
             </section>
           ))}
+        </div>
+      </SlideOver>
+    </li>
+  );
+}
+
+/** One balance with bags still to carry: the row opens its trips, the button registers a new one. */
+function BalanceItem({
+  balance: b,
+  today,
+  canManage,
+  onRegisterTrip,
+  onDeleteTrip,
+}: {
+  balance: PendingBalanceRow;
+  today: string;
+  canManage: boolean;
+  onRegisterTrip: (balance: PendingBalanceRow) => void;
+  onDeleteTrip: (trip: BalanceTripRow) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="flex items-stretch">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
+      >
+        <span className="min-w-0 flex-1 space-y-0.5">
+          <span className="flex items-baseline gap-2">
+            <span className="num font-semibold">Pedido #{b.orderId}</span>
+            <span aria-hidden className="text-muted-foreground">·</span>
+            <span className={cn("num shrink-0", DAY_TEXT[pendingDay(b.scheduledDate, today)])}>{dayLabel(b.scheduledDate, today)}</span>
+            <span className="rounded-full border px-1.5 py-px text-[11px] font-medium">Saldo</span>
+          </span>
+          <span className="block truncate text-muted-foreground" title={b.clients.join(", ")}>
+            {b.clients.join(", ") || "Sin clientes"}
+          </span>
+          <span className="num block text-xs text-muted-foreground">
+            {balanceLeftText(b)}
+            {b.rescheduled ? ` · reprogramado desde ${dayMonth(b.originalDate)}` : ""}
+          </span>
+        </span>
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+      {canManage && (
+        <div className="flex shrink-0 items-center pr-3">
+          <Button
+            variant="outline"
+            className="h-11 px-3 md:h-8"
+            onClick={() => onRegisterTrip(b)}
+            aria-label={`Registrar faltante del pedido #${b.orderId} (${b.supplier})`}
+          >
+            <Truck aria-hidden />
+            Registrar faltante
+          </Button>
+        </div>
+      )}
+      <SlideOver open={open} onOpenChange={setOpen} title={`Saldo del pedido #${b.orderId}`} description={`${b.supplier} · ${balanceLeftText(b)}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{b.clients.join(", ") || "Sin clientes"}</p>
+          <section aria-label="Viajes del saldo" className="space-y-1.5">
+            <h3 className="border-b pb-1 text-sm font-semibold">Viajes registrados</h3>
+            {b.trips.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Todavía no hay viajes de este saldo.</p>
+            ) : (
+              <BalanceTrips trips={b.trips} onDelete={canManage ? onDeleteTrip : undefined} />
+            )}
+          </section>
         </div>
       </SlideOver>
     </li>
