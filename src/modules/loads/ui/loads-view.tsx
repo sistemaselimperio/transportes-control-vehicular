@@ -1,11 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -69,14 +67,6 @@ export function LoadsView({
       <PageHeader
         title="Cargues"
         description="Cargues recibidos de los proveedores, con los productos, el costo y el número SIESA de cada uno."
-        actions={
-          canManage && (
-            <Button className="h-11 px-4 md:h-10" onClick={() => openForm()}>
-              <Plus aria-hidden />
-              Nuevo cargue
-            </Button>
-          )
-        }
       />
 
       <PendingOrders orders={pending} today={today} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={createFromOrder} />

@@ -95,8 +95,11 @@ export function LoadForm({
   // The stored plate stays selectable when its vehicle left the fleet.
   const plateOptions = load && !plates.includes(load.plate) ? [load.plate, ...plates] : plates;
 
+  // A new load opened from an order's "Cargue" button is about that order only: no other order is offered.
+  const preset = load || presetOrderId === null ? undefined : orders.find((o) => o.id === presetOrderId);
   /** The orders a load of `s` can take; this load's own part counts as available when editing. */
-  const candidatesOf = (s: LoadSupplier | "") => ordersForSupplier(orders, s === "" ? null : s, load?.id);
+  const candidatesOf = (s: LoadSupplier | "") =>
+    ordersForSupplier(orders, s === "" ? null : s, load?.id).filter((o) => preset === undefined || o.id === preset.id);
   const suggestionsFor = (s: LoadSupplier | "", ids: ReadonlySet<number>) =>
     suggestLines(
       candidatesOf(s)
@@ -106,7 +109,6 @@ export function LoadForm({
     );
 
   // A preset order that only one supplier still has to load also chooses the supplier.
-  const preset = presetOrderId === null ? undefined : orders.find((o) => o.id === presetOrderId);
   const [supplier, setSupplier] = useState<LoadSupplier | "">(
     load?.supplier ?? (preset && preset.pendingSuppliers.length === 1 ? (preset.pendingSuppliers[0] ?? "") : ""),
   );
@@ -159,7 +161,7 @@ export function LoadForm({
   function changeSupplier(next: LoadSupplier | "") {
     setSupplier(next);
     // The checked orders and their lines belong to the previous supplier: start over, keeping the preset order.
-    const available = ordersForSupplier(orders, next === "" ? null : next, load?.id);
+    const available = candidatesOf(next);
     const first = preset && available.some((o) => o.id === preset.id) ? new Set([preset.id]) : new Set<number>();
     setChecked(first);
     const fresh = reconcileDrafts(
@@ -228,7 +230,7 @@ export function LoadForm({
             <option value="" disabled>
               Elige un proveedor
             </option>
-            {LOAD_SUPPLIERS.map((s) => (
+            {(preset ? LOAD_SUPPLIERS.filter((s) => preset.pendingSuppliers.includes(s)) : LOAD_SUPPLIERS).map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -250,7 +252,7 @@ export function LoadForm({
       </Field>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Pedidos</legend>
+        <legend className="text-sm font-medium">{preset ? "Pedido" : "Pedidos"}</legend>
         {supplier === "" ? (
           <p className="text-sm text-muted-foreground">Elige primero el proveedor.</p>
         ) : candidates.length === 0 ? (
@@ -268,6 +270,7 @@ export function LoadForm({
                   <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border bg-card p-2.5 text-sm has-checked:border-ring has-checked:bg-muted/50">
                     <input
                       type="checkbox"
+                      hidden={preset !== undefined}
                       name="orderIds"
                       value={o.id}
                       checked={isChecked}
