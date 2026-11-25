@@ -6,13 +6,24 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { VehicleGridRow } from "../domain/vehicle-row";
 
+/** Multi-select of the fleet list; absent for users who cannot edit vehicles. */
+export interface FleetSelection {
+  selected: ReadonlySet<string>;
+  /** Plates that can be selected at all (not sold) among the rows shown. */
+  selectable: readonly string[];
+  onToggle: (plate: string) => void;
+  onToggleAll: () => void;
+}
+
 /**
  * Desktop grid: group headers over the Excel headers, sticky class + plate,
  * sortable headers. Rows are keyboard-reachable through the plate link.
  */
-export function VehicleTable({ table }: { table: Table<VehicleGridRow> }) {
+export function VehicleTable({ table, selection }: { table: Table<VehicleGridRow>; selection?: FleetSelection }) {
   const router = useRouter();
   const [groupRow, leafRow] = table.getHeaderGroups();
+  const chosen = selection ? selection.selectable.filter((p) => selection.selected.has(p)).length : 0;
+  const allChosen = !!selection && selection.selectable.length > 0 && chosen === selection.selectable.length;
 
   return (
     <div
@@ -61,6 +72,19 @@ export function VehicleTable({ table }: { table: Table<VehicleGridRow> }) {
                     firstOfGroup && header.column.parent?.id !== groupRow.headers[0]?.id && "border-l",
                   )}
                 >
+                  {selection && header.column.id === "className" && (
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todos los vehículos de la lista"
+                      className="mr-2 size-4 cursor-pointer align-middle"
+                      checked={allChosen}
+                      ref={(el) => {
+                        if (el) el.indeterminate = chosen > 0 && !allChosen;
+                      }}
+                      disabled={selection.selectable.length === 0}
+                      onChange={selection.onToggleAll}
+                    />
+                  )}
                   {canSort ? (
                     <button
                       type="button"
@@ -112,7 +136,22 @@ export function VehicleTable({ table }: { table: Table<VehicleGridRow> }) {
                       meta?.className,
                     )}
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {selection && cell.column.id === "className" ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`Seleccionar ${row.original.plate}`}
+                          className="size-4 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                          checked={selection.selected.has(row.original.plate)}
+                          disabled={row.original.vehicleStatus === "SOLD"}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => selection.onToggle(row.original.plate)}
+                        />
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    ) : (
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    )}
                   </td>
                 );
               })}

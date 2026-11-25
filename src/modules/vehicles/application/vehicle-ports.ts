@@ -163,6 +163,8 @@ export interface VehicleCommandRepository {
     odometer: { odometerWorking: boolean; reading: { km: number; at: IsoDate } | null },
   ): Promise<void>;
   setStatus(vehicleId: number, status: VehicleStatus): Promise<void>;
+  /** Sets the same status on several vehicles in a single update. */
+  setStatusMany(vehicleIds: number[], status: VehicleStatus): Promise<void>;
   /** Closes the current assignment and opens the new one. */
   assignDriver(input: {
     vehicleId: number;

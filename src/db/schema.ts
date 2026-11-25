@@ -760,6 +760,8 @@ export const user = transportes.table("user", {
   hasPettyCash: boolean("has_petty_cash").notNull().default(false),
   /** Only users with this flag see and use the cotero payments (see `src/modules/cotero-payments`). */
   hasCoteroPayments: boolean("has_cotero_payments").notNull().default(false),
+  /** Only users with this flag are warned on "Hoy" (and in the nav badge) about a trip programmed on a parked vehicle. */
+  receivesParkedTripAlerts: boolean("receives_parked_trip_alerts").notNull().default(false),
 });
 
 export const session = transportes.table("session", {

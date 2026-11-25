@@ -112,6 +112,19 @@ export const statusSchema = z.object({
   status: z.enum(["ACTIVE", "IDLE", "IN_WORKSHOP"], "Elige el estado."),
 });
 
+/** Most vehicles a bulk status change accepts in one call. */
+export const MAX_BULK_VEHICLES = 500;
+
+/** Bulk status change from the fleet list: plain data (not a form), repeated plates collapse into one. */
+export const bulkStatusSchema = z.object({
+  plates: z
+    .array(z.string().min(1).max(20), "Elige al menos un vehículo.")
+    .min(1, "Elige al menos un vehículo.")
+    .max(MAX_BULK_VEHICLES, "Elegiste demasiados vehículos a la vez.")
+    .transform((plates) => [...new Set(plates)]),
+  status: z.enum(["ACTIVE", "IDLE", "IN_WORKSHOP"], "Elige el estado."),
+});
+
 export const assignDriverSchema = z
   .object({
     /** `none` removes the current driver and leaves the vehicle without one. */

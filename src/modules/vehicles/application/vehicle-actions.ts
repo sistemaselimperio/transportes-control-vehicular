@@ -16,6 +16,7 @@ import { vehicleCommandRepository } from "../infrastructure/vehicle-command-repo
 import { getVehicleActionContext, type VehicleActionContext } from "./vehicle-queries";
 import {
   assignDriverSchema,
+  bulkStatusSchema,
   capacitySchema,
   oilChangeSchema,
   oilChangeIdSchema,
@@ -166,6 +167,14 @@ export async function changeStatusAction(plate: string, fd: FormData): Promise<A
   return run(async () => {
     const v = parse(statusSchema, formValues(fd));
     return commands.changeStatus(parse(plateSchema, plate), v.status);
+  });
+}
+
+/** The fleet list's multi-select: one status (never SOLD) for several vehicles. Same guard as the single change. */
+export async function changeStatusBulkAction(input: { plates: string[]; status: string }): Promise<ActionResult> {
+  return run(async () => {
+    const v = parse(bulkStatusSchema, input);
+    return commands.changeStatusBulk(v.plates, v.status);
   });
 }
 

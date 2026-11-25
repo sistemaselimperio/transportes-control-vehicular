@@ -2,7 +2,7 @@
  * Pure aggregation for the dashboard. Works on a minimal projection of the
  * vehicle grid row, so it needs no database and is trivially testable.
  */
-import type { AlertStatus, VehicleStatus } from "@/modules/alerts/domain/alert-status";
+import { alertsSilenced, type AlertStatus, type VehicleStatus } from "@/modules/alerts/domain/alert-status";
 import { daysBetween, formatDisplayDate, type IsoDate } from "@/modules/shared/domain/dates";
 
 export type OwnerGroup = "IMPERIO" | "PAEZ" | "THIRD_PARTY";
@@ -43,9 +43,6 @@ export function filterByGroup<T extends Pick<DashboardRow, "ownerGroup">>(
   return group ? rows.filter((r) => r.ownerGroup === group) : [...rows];
 }
 
-const notSold = <T extends Pick<DashboardRow, "vehicleStatus">>(rows: readonly T[]) =>
-  rows.filter((r) => r.vehicleStatus !== "SOLD");
-
 /* ------------------------------ Attention items ------------------------------ */
 
 export type ItemKind = "SOAT" | "TECNO" | "POLICY" | "TAX" | "OIL";
@@ -63,7 +60,8 @@ const isAlert = (s: AlertStatus): s is "expired" | "warning" =>
   s === "expired" || s === "warning";
 
 function itemsOf(row: DashboardRow, today: IsoDate): AttentionItem[] {
-  if (row.vehicleStatus === "SOLD") return [];
+  // Sold, idle and in-workshop vehicles raise nothing: nobody is warned about a stopped vehicle.
+  if (alertsSilenced(row.vehicleStatus)) return [];
   const out: AttentionItem[] = [];
 
   const docs: Array<[ItemKind, DashboardRow["soat"]]> = [
@@ -112,7 +110,7 @@ export const byUrgency = (a: AttentionItem, b: AttentionItem) => {
   return a.plate.localeCompare(b.plate);
 };
 
-/** Expired and expiring-soon items of non-sold vehicles, most urgent first. */
+/** Expired and expiring-soon items of vehicles whose alerts are not silenced, most urgent first. */
 export function buildAttentionItems(
   rows: readonly DashboardRow[],
   today: IsoDate,
@@ -130,8 +128,7 @@ export interface Kpis {
 }
 
 export function computeKpis(rows: readonly DashboardRow[], today: IsoDate): Kpis {
-  const live = notSold(rows);
-  const items = live.flatMap((r) => itemsOf(r, today));
+  const items = rows.flatMap((r) => itemsOf(r, today));
   const vehiclesWith = (status: "expired" | "warning") =>
     new Set(items.filter((i) => i.status === status).map((i) => i.plate)).size;
 

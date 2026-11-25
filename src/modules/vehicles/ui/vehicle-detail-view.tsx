@@ -102,22 +102,29 @@ function ExpirationStrip({ r }: { r: VehicleGridRow }) {
     { label: "Aceite", cell: r.nextChange },
   ];
   return (
-    <ul
-      aria-label="Vencimientos"
-      className="mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-5"
-    >
-      {cells.map(({ label, cell }, i) => (
-        <li
-          key={label}
-          className={`min-w-0 bg-card px-3 py-2 ${i === cells.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
-        >
-          <span className="micro-label block">{label}</span>
-          <StatusPill status={cell.status} className="mt-1.5">
-            {cell.text || "—"}
-          </StatusPill>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul
+        aria-label="Vencimientos"
+        className="mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-5"
+      >
+        {cells.map(({ label, cell }, i) => (
+          <li
+            key={label}
+            className={`min-w-0 bg-card px-3 py-2 ${i === cells.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
+          >
+            <span className="micro-label block">{label}</span>
+            <StatusPill status={cell.status} muted={r.silenced} className="mt-1.5">
+              {cell.text || "—"}
+            </StatusPill>
+          </li>
+        ))}
+      </ul>
+      {r.silenced && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Alertas silenciadas (estado: {r.statusLabel}). Los vencimientos se muestran en gris y no generan avisos en Hoy.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -368,7 +375,7 @@ export function VehicleDetailView({
                   <span className="num">{r.lastOilDate ? formatDisplayDate(r.lastOilDate) : "—"}</span>
                 </Figure>
                 <Figure label="Próximo cambio de aceite">
-                  <StatusMark status={r.nextChange.status} className="whitespace-normal">
+                  <StatusMark status={r.nextChange.status} muted={r.silenced} className="whitespace-normal">
                     {r.nextChange.text || "—"}
                   </StatusMark>
                 </Figure>

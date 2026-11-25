@@ -145,13 +145,26 @@ describe("buildVehicleRow", () => {
     expect(row.nextChange).toMatchObject({ text: "Sin registro", status: "warning" });
   });
 
-  it("shows idle and workshop vehicles as inactive with a label", () => {
-    const idle = buildVehicleRow(input({ vehicle: { ...input().vehicle, status: "IDLE" } }));
-    expect(idle.nextChange).toMatchObject({ text: "Quieta", status: "inactive" });
-    const shop = buildVehicleRow(
-      input({ vehicle: { ...input().vehicle, status: "IN_WORKSHOP" } }),
-    );
-    expect(shop.nextChange).toMatchObject({ text: "En taller", status: "inactive" });
+  it("keeps the real statuses of idle and workshop vehicles but marks them silenced", () => {
+    for (const status of ["IDLE", "IN_WORKSHOP"] as const) {
+      const row = buildVehicleRow(
+        input({
+          vehicle: { ...input().vehicle, status },
+          soat: { kind: null, expiresOn: "2026-10-01", notApplicable: false },
+          lastOil: null,
+        }),
+      );
+      expect(row.silenced).toBe(true);
+      expect(row.soat).toMatchObject({ text: "01/10/2026", status: "expired" });
+      expect(row.nextChange).toMatchObject({ text: "Sin registro", status: "warning" });
+      expect(row.overall).toBe("inactive");
+      expect(row.statusLabel).toBe(status === "IDLE" ? "Quieta" : "En taller");
+    }
+  });
+
+  it("does not silence active vehicles", () => {
+    const row = buildVehicleRow(input());
+    expect(row.silenced).toBe(false);
   });
 
   it("greys out everything for sold vehicles", () => {
@@ -163,6 +176,7 @@ describe("buildVehicleRow", () => {
     );
     expect(row.soat.status).toBe("inactive");
     expect(row.overall).toBe("inactive");
+    expect(row.silenced).toBe(false);
     expect(row.statusLabel).toBe("Vendido");
   });
 

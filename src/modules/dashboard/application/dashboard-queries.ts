@@ -3,6 +3,7 @@ import { cache } from "react";
 import { currentDay } from "@/lib/current-day";
 import { readTags } from "@/lib/cache-tags";
 import type { IsoDate } from "@/modules/shared/domain/dates";
+import { listTripRows } from "@/modules/trips/application/trip-queries";
 import { listVehicleRows } from "@/modules/vehicles/application/vehicle-queries";
 import {
   buildAttentionItems,
@@ -11,6 +12,7 @@ import {
   type DashboardRow,
   type OwnerGroup,
 } from "../domain/dashboard-metrics";
+import { parkedTripWarnings, type ParkedTripWarning } from "../domain/parked-trips";
 
 /** One read per request, shared by the page and the layout (sidebar count). */
 const loadRows = cache(async (today: IsoDate): Promise<DashboardRow[]> => {
@@ -71,4 +73,18 @@ async function loadExpiredVehicleCounts(today: IsoDate): Promise<ExpiredVehicleC
     PAEZ: count("PAEZ"),
     THIRD_PARTY: count("THIRD_PARTY"),
   };
+}
+
+/**
+ * Programmed trips of vehicles that are idle or in the workshop, soonest first. Derived from the
+ * cached trips and fleet reads on every request (`now` decides which trips already count as
+ * delivered), so it disappears as soon as the vehicle is active again; nothing is stored.
+ */
+export async function getParkedTripWarnings(): Promise<ParkedTripWarning[]> {
+  const [trips, vehicles] = await Promise.all([listTripRows(), listVehicleRows(await currentDay())]);
+  return parkedTripWarnings(
+    trips,
+    vehicles.map((v) => ({ id: v.id, plate: v.plate, status: v.vehicleStatus, ownerGroup: v.ownerGroup })),
+    new Date(),
+  );
 }

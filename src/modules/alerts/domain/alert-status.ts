@@ -11,6 +11,20 @@ export type VehicleStatus = "ACTIVE" | "IDLE" | "IN_WORKSHOP" | "SOLD";
 
 export const WARNING_DAYS = 30;
 
+/** A vehicle that is stopped on purpose: idle ("Quieta") or in the workshop. */
+export function isParked(status: VehicleStatus): boolean {
+  return status === "IDLE" || status === "IN_WORKSHOP";
+}
+
+/**
+ * Whether the vehicle's alerts (SOAT, tecno, policy, tax, oil) are silenced: they raise no attention
+ * item and no badge. Sold vehicles are out of the fleet; parked ones keep their real statuses
+ * (so the file can show what is missing) but nobody is warned about them.
+ */
+export function alertsSilenced(status: VehicleStatus): boolean {
+  return status === "SOLD" || isParked(status);
+}
+
 const SEVERITY: Record<AlertStatus, number> = {
   expired: 4,
   warning: 3,
@@ -48,6 +62,6 @@ export function vehicleOverallStatus(input: {
   vehicleStatus: VehicleStatus;
   alerts: readonly AlertStatus[];
 }): AlertStatus {
-  if (input.vehicleStatus === "SOLD") return "inactive";
+  if (alertsSilenced(input.vehicleStatus)) return "inactive";
   return worstStatus(input.alerts);
 }

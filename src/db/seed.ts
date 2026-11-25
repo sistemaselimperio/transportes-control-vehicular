@@ -69,6 +69,8 @@ async function seedUser(user: {
   hasPettyCash?: boolean;
   /** Sees the cotero payments (pagos a coteros). */
   hasCoteroPayments?: boolean;
+  /** Is warned about trips programmed on a parked vehicle. */
+  receivesParkedTripAlerts?: boolean;
   passwordVar: string;
 }) {
   const password = process.env[user.passwordVar];
@@ -88,6 +90,9 @@ async function seedUser(user: {
     if (user.hasCoteroPayments) {
       await db.update(schema.user).set({ hasCoteroPayments: true }).where(eq(schema.user.id, existing.id));
     }
+    if (user.receivesParkedTripAlerts) {
+      await db.update(schema.user).set({ receivesParkedTripAlerts: true }).where(eq(schema.user.id, existing.id));
+    }
     return;
   }
   const id = crypto.randomUUID();
@@ -102,6 +107,7 @@ async function seedUser(user: {
     theme: user.theme,
     hasPettyCash: user.hasPettyCash ?? false,
     hasCoteroPayments: user.hasCoteroPayments ?? false,
+    receivesParkedTripAlerts: user.receivesParkedTripAlerts ?? false,
   });
   await db.insert(schema.account).values({
     id: crypto.randomUUID(),
@@ -114,7 +120,7 @@ async function seedUser(user: {
 }
 
 const seedAdmin = () =>
-  seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, passwordVar: "SEED_ADMIN_PASSWORD" });
+  seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, receivesParkedTripAlerts: true, passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
   seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", hasCoteroPayments: true, passwordVar: "SEED_LEIDY_PASSWORD" });
 const seedGabriella = () =>

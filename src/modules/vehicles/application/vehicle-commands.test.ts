@@ -48,6 +48,7 @@ function fakeRepo(vehicles: VehicleSnapshot[], imperioId: number | null = 99, oi
     deleteOilChange: async (id) => void calls.push({ op: "deleteOilChange", args: { id } }),
     updateOdometer: async (id, o) => void calls.push({ op: "updateOdometer", args: { id, o } }),
     setStatus: async (id, s) => void calls.push({ op: "setStatus", args: { id, s } }),
+    setStatusMany: async (ids, s) => void calls.push({ op: "setStatusMany", args: { ids, s } }),
     assignDriver: record("assignDriver"),
     endDriverAssignment: record("endDriverAssignment"),
     transferOwnership: record("transferOwnership"),
@@ -330,6 +331,51 @@ describe("changeStatus", () => {
   it("rejects the same status", async () => {
     const c = commands([snapshot()]);
     await expect(c.changeStatus("AAA-111", "ACTIVE")).rejects.toThrow(RuleError);
+  });
+});
+
+describe("changeStatusBulk", () => {
+  const fleet = () => [
+    snapshot({ id: 1, plate: "AAA-111" }),
+    snapshot({ id: 2, plate: "BBB-222", status: "IDLE" }),
+    snapshot({ id: 3, plate: "CCC-333", status: "IN_WORKSHOP" }),
+    snapshot({ id: 4, plate: "DDD-444", status: "SOLD" }),
+  ];
+
+  it("updates every vehicle that needs it in one repository call", async () => {
+    const c = commands(fleet());
+    const result = await c.changeStatusBulk(["AAA-111", "BBB-222", "CCC-333"], "IDLE");
+    expect(c.calls).toEqual([{ op: "setStatusMany", args: { ids: [1, 3], s: "IDLE" } }]);
+    expect(result.message).toBe("Estado actualizado en 2 vehículos.");
+  });
+
+  it("says 'vehículo' for a single one", async () => {
+    const c = commands(fleet());
+    expect((await c.changeStatusBulk(["AAA-111"], "IN_WORKSHOP")).message).toBe("Estado actualizado en 1 vehículo.");
+  });
+
+  it("skips sold and unchanged vehicles", async () => {
+    const c = commands(fleet());
+    await c.changeStatusBulk(["AAA-111", "BBB-222", "DDD-444"], "IDLE");
+    expect(c.calls).toEqual([{ op: "setStatusMany", args: { ids: [1], s: "IDLE" } }]);
+  });
+
+  it("normalizes the plates it receives", async () => {
+    const c = commands(fleet());
+    await c.changeStatusBulk(["aaa 111"], "IDLE");
+    expect(c.calls).toEqual([{ op: "setStatusMany", args: { ids: [1], s: "IDLE" } }]);
+  });
+
+  it("rejects the whole batch when a plate does not exist", async () => {
+    const c = commands(fleet());
+    await expect(c.changeStatusBulk(["AAA-111", "ZZZ-999"], "IDLE")).rejects.toThrow(RuleError);
+    expect(c.calls).toEqual([]);
+  });
+
+  it("rejects a batch that would change nothing", async () => {
+    const c = commands(fleet());
+    await expect(c.changeStatusBulk(["BBB-222"], "IDLE")).rejects.toThrow(RuleError);
+    expect(c.calls).toEqual([]);
   });
 });
 

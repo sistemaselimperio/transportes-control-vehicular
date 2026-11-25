@@ -206,6 +206,15 @@ export function canUseCoteroPayments(flag: unknown): boolean {
   return flag === true;
 }
 
+/**
+ * The parked-vehicle trip warning ("Vehículo quieto con viaje programado") is outside the role
+ * matrix too: only users flagged with `receivesParkedTripAlerts` see it on "Hoy" and in the nav
+ * badge. Closed for anything but `true`.
+ */
+export function receivesParkedTripAlerts(flag: unknown): boolean {
+  return flag === true;
+}
+
 /** The first section the role can see: where a redirect from a forbidden page lands. */
 export function homePath(role: Role): string {
   if (canViewSection(role, "today")) return "/";

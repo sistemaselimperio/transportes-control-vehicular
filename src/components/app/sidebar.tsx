@@ -210,7 +210,7 @@ function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, grupo, c
                       )}
                     >
                       {expiredVehicles}
-                      <span className="sr-only"> {expiredVehicles === 1 ? "vehículo vencido" : "vehículos vencidos"}</span>
+                      <span className="sr-only"> {expiredVehicles === 1 ? "vehículo con alerta" : "vehículos con alertas"}</span>
                     </span>
                   )}
                 </Link>

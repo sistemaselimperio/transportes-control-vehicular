@@ -26,11 +26,12 @@ import {
 import { filterVehicleRows, ownerOptions, type GroupFilter, type VehicleFilters } from "../domain/vehicle-filters";
 import type { VehicleGridRow } from "../domain/vehicle-row";
 import { ColumnGroupToggles } from "./column-group-toggles";
+import { FleetBulkBar } from "./fleet-bulk-bar";
 import { FleetViewTabs } from "./fleet-view-tabs";
 import { VehicleCards } from "./vehicle-cards";
 import { vehicleColumns } from "./vehicle-columns";
 import { VehicleFiltersBar } from "./vehicle-filters-bar";
-import { VehicleTable } from "./vehicle-table";
+import { VehicleTable, type FleetSelection } from "./vehicle-table";
 
 const STORAGE_KEY = "fleet.hiddenColumnGroups";
 
@@ -44,8 +45,11 @@ const sortToValue = (s: SortingState) =>
 export function VehicleGrid({
   rows,
   group,
+  canEdit = false,
 }: {
   rows: VehicleGridRow[];
+  /** Whether the user may change statuses: turns on the multi-select. */
+  canEdit?: boolean;
   /** Owner group from the sidebar (`?grupo=`). */
   group: GroupFilter;
 }) {
@@ -74,6 +78,33 @@ export function VehicleGrid({
     getSortedRowModel: getSortedRowModel(),
   });
   const visible = table.getRowModel().rows.map((r) => r.original);
+
+  // Only what is on screen counts: a plate hidden by a filter or a tab is not changed behind the user's back.
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const selectable = visible.filter((r) => r.vehicleStatus !== "SOLD").map((r) => r.plate);
+  const selectedPlates = selectable.filter((p) => picked.has(p));
+  const selection: FleetSelection | undefined = canEdit
+    ? {
+        selected: picked,
+        selectable,
+        onToggle: (plate) =>
+          setPicked((prev) => {
+            const next = new Set(prev);
+            if (!next.delete(plate)) next.add(plate);
+            return next;
+          }),
+        onToggleAll: () =>
+          setPicked((prev) => {
+            const next = new Set(prev);
+            const all = selectable.length > 0 && selectable.every((p) => next.has(p));
+            for (const p of selectable) {
+              if (all) next.delete(p);
+              else next.add(p);
+            }
+            return next;
+          }),
+      }
+    : undefined;
 
   function selectView(next: FleetView) {
     // history.replaceState feeds useSearchParams without re-running the server page.
@@ -124,6 +155,8 @@ export function VehicleGrid({
           </div>
         </div>
 
+        {canEdit && <FleetBulkBar plates={selectedPlates} onClear={() => setPicked(new Set())} />}
+
         {visible.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-card/60 px-6 py-12 text-center">
             <p className="text-sm text-muted-foreground">No hay vehículos en esta vista con estos filtros.</p>
@@ -137,10 +170,10 @@ export function VehicleGrid({
           <>
             {/* Fills the remaining viewport so both scrollbars stay on screen. */}
             <div className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
-              <VehicleTable table={table} />
+              <VehicleTable table={table} selection={selection} />
             </div>
             <div className="md:hidden">
-              <VehicleCards rows={visible} />
+              <VehicleCards rows={visible} selection={selection} />
             </div>
           </>
         )}

@@ -7,6 +7,7 @@ import {
   assertEditable,
   assertKmNotDecreasing,
   closePeriod,
+  planBulkStatusChange,
   RuleError,
 } from "./vehicle-rules";
 
@@ -47,6 +48,32 @@ describe("assertCanChangeStatus", () => {
   });
   it("allows a different non-sold status", () => {
     expect(() => assertCanChangeStatus("ACTIVE", "IN_WORKSHOP")).not.toThrow();
+  });
+});
+
+describe("planBulkStatusChange", () => {
+  const v = (id: number, status: "ACTIVE" | "IDLE" | "IN_WORKSHOP" | "SOLD") => ({ id, plate: `P${id}`, status });
+
+  it("changes every vehicle that has another status", () => {
+    expect(planBulkStatusChange([v(1, "ACTIVE"), v(2, "IN_WORKSHOP")], "IDLE")).toEqual({
+      ids: [1, 2],
+      unchanged: 0,
+      sold: 0,
+    });
+  });
+  it("skips vehicles that already have the status and sold ones, and counts them", () => {
+    expect(planBulkStatusChange([v(1, "IDLE"), v(2, "ACTIVE"), v(3, "SOLD")], "IDLE")).toEqual({
+      ids: [2],
+      unchanged: 1,
+      sold: 1,
+    });
+  });
+  it("rejects SOLD as a target", () => {
+    expect(() => planBulkStatusChange([v(1, "ACTIVE")], "SOLD")).toThrow(RuleError);
+  });
+  it("rejects a change that would touch nothing", () => {
+    expect(() => planBulkStatusChange([v(1, "IDLE"), v(2, "SOLD")], "IDLE")).toThrow(RuleError);
+    expect(() => planBulkStatusChange([], "IDLE")).toThrow(RuleError);
   });
 });
 

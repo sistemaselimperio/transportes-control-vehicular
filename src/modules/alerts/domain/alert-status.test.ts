@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  alertsSilenced,
   documentStatus,
+  isParked,
   vehicleOverallStatus,
   worstStatus,
 } from "./alert-status";
@@ -56,12 +58,32 @@ describe("vehicleOverallStatus", () => {
       vehicleOverallStatus({ vehicleStatus: "SOLD", alerts: ["expired"] }),
     ).toBe("inactive");
   });
-  it("keeps document alerts for idle vehicles", () => {
+  it("is inactive for idle vehicles too: their alerts are silenced", () => {
     expect(
       vehicleOverallStatus({
         vehicleStatus: "IDLE",
         alerts: ["inactive", "expired"],
       }),
-    ).toBe("expired");
+    ).toBe("inactive");
+  });
+});
+
+describe("isParked / alertsSilenced", () => {
+  it("parks only idle and in-workshop vehicles", () => {
+    expect(isParked("IDLE")).toBe(true);
+    expect(isParked("IN_WORKSHOP")).toBe(true);
+    expect(isParked("ACTIVE")).toBe(false);
+    expect(isParked("SOLD")).toBe(false);
+  });
+  it("silences the alerts of every vehicle that is not active", () => {
+    expect(alertsSilenced("ACTIVE")).toBe(false);
+    expect(alertsSilenced("IDLE")).toBe(true);
+    expect(alertsSilenced("IN_WORKSHOP")).toBe(true);
+    expect(alertsSilenced("SOLD")).toBe(true);
+  });
+  it("makes the overall status inactive for a parked vehicle whatever its alerts", () => {
+    expect(vehicleOverallStatus({ vehicleStatus: "IDLE", alerts: ["expired"] })).toBe("inactive");
+    expect(vehicleOverallStatus({ vehicleStatus: "IN_WORKSHOP", alerts: ["warning"] })).toBe("inactive");
+    expect(vehicleOverallStatus({ vehicleStatus: "ACTIVE", alerts: ["expired"] })).toBe("expired");
   });
 });

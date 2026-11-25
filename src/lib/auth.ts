@@ -35,6 +35,8 @@ export const auth = betterAuth({
       hasPettyCash: { type: "boolean", required: true, defaultValue: false, input: false },
       // Same for the cotero-payments access flag.
       hasCoteroPayments: { type: "boolean", required: true, defaultValue: false, input: false },
+      // Same for the parked-vehicle trip warning flag.
+      receivesParkedTripAlerts: { type: "boolean", required: true, defaultValue: false, input: false },
     },
   },
   plugins: [

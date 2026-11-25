@@ -45,7 +45,7 @@ export default async function Page({
           )
         }
       />
-      <VehicleGrid rows={rows} group={group} />
+      <VehicleGrid rows={rows} group={group} canEdit={editable} />
     </section>
   );
 }

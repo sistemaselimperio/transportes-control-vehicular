@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assignDriverSchema,
+  bulkStatusSchema,
   capacitySchema,
   oilChangeSchema,
   renewDocumentSchema,
@@ -142,5 +143,30 @@ describe("capacity in tons", () => {
       expect(() => capacitySchema.parse({ capacity: bad })).toThrow(/toneladas/);
       expect(() => technicalDataSchema.parse({ capacity: bad })).toThrow(/toneladas/);
     }
+  });
+});
+
+describe("bulkStatusSchema", () => {
+  it("accepts several plates and a non-sold status", () => {
+    expect(bulkStatusSchema.parse({ plates: ["AAA-111", "BBB-222"], status: "IDLE" })).toEqual({
+      plates: ["AAA-111", "BBB-222"],
+      status: "IDLE",
+    });
+  });
+  it("drops repeated plates", () => {
+    expect(bulkStatusSchema.parse({ plates: ["AAA-111", "AAA-111"], status: "ACTIVE" }).plates).toEqual(["AAA-111"]);
+  });
+  it("rejects SOLD and unknown statuses", () => {
+    expect(() => bulkStatusSchema.parse({ plates: ["AAA-111"], status: "SOLD" })).toThrow(/estado/);
+    expect(() => bulkStatusSchema.parse({ plates: ["AAA-111"], status: "x" })).toThrow(/estado/);
+  });
+  it("needs at least one plate and caps the batch", () => {
+    expect(() => bulkStatusSchema.parse({ plates: [], status: "IDLE" })).toThrow(/vehículo/);
+    const many = Array.from({ length: 501 }, (_, i) => `P${i}`);
+    expect(() => bulkStatusSchema.parse({ plates: many, status: "IDLE" })).toThrow(/demasiados/);
+  });
+  it("rejects blank plates and non-array input", () => {
+    expect(() => bulkStatusSchema.parse({ plates: [""], status: "IDLE" })).toThrow();
+    expect(() => bulkStatusSchema.parse({ plates: "AAA-111", status: "IDLE" })).toThrow();
   });
 });

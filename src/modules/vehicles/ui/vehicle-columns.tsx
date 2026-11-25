@@ -21,8 +21,9 @@ declare module "@tanstack/react-table" {
 
 const SEVERITY = { expired: 4, warning: 3, ok: 2, not_applicable: 1, inactive: 0 } as const;
 
-const pill = (cell: { text: string; status: DocCell["status"] }) => (
-  <StatusPill status={cell.status}>{cell.text || "—"}</StatusPill>
+/** `silenced`: the vehicle is idle or in the workshop, so its real status shows greyed out. */
+const pill = (cell: { text: string; status: DocCell["status"] }, silenced: boolean) => (
+  <StatusPill status={cell.status} muted={silenced}>{cell.text || "—"}</StatusPill>
 );
 
 const dateOrUndefined = (cell: DocCell) => cell.date ?? undefined;
@@ -117,27 +118,27 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
     header: "Póliza",
     accessorFn: (r) => dateOrUndefined(r.policy),
     sortUndefined: "last",
-    cell: ({ row }) => pill(row.original.policy),
+    cell: ({ row }) => pill(row.original.policy, row.original.silenced),
   },
   soat: {
     id: "soat",
     header: "SOAT",
     accessorFn: (r) => dateOrUndefined(r.soat),
     sortUndefined: "last",
-    cell: ({ row }) => pill(row.original.soat),
+    cell: ({ row }) => pill(row.original.soat, row.original.silenced),
   },
   tecno: {
     id: "tecno",
     header: "Tecno",
     accessorFn: (r) => dateOrUndefined(r.tecno),
     sortUndefined: "last",
-    cell: ({ row }) => pill(row.original.tecno),
+    cell: ({ row }) => pill(row.original.tecno, row.original.silenced),
   },
   tax: {
     id: "tax",
     header: "Impuesto",
     accessorFn: (r) => r.tax.text,
-    cell: ({ row }) => pill(row.original.tax),
+    cell: ({ row }) => pill(row.original.tax, row.original.silenced),
   },
   lastOil: {
     id: "lastOil",
@@ -171,7 +172,7 @@ const leaves: Record<string, ColumnDef<VehicleGridRow>> = {
     header: "Próx. cambio",
     accessorFn: (r) => SEVERITY[r.nextChange.status],
     sortDescFirst: true,
-    cell: ({ row }) => pill(row.original.nextChange),
+    cell: ({ row }) => pill(row.original.nextChange, row.original.silenced),
   },
 };
 

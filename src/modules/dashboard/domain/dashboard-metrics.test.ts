@@ -129,3 +129,26 @@ describe("buildAttentionItems", () => {
     expect(item.detail).toBe("20/06/2026");
   });
 });
+
+describe("silenced vehicles", () => {
+  const expired = { status: "expired" as const, date: "2020-01-01" };
+  const parked = (vehicleStatus: "IDLE" | "IN_WORKSHOP") =>
+    r({
+      plate: vehicleStatus,
+      vehicleStatus,
+      soat: expired,
+      tecno: expired,
+      policy: expired,
+      tax: { status: "expired", text: "2020" },
+      nextChange: { status: "expired", text: "x" },
+    });
+
+  it("raises no attention item for an idle or in-workshop vehicle", () => {
+    expect(buildAttentionItems([parked("IDLE"), parked("IN_WORKSHOP")], TODAY)).toEqual([]);
+  });
+
+  it("does not count them in the KPIs (nor the sidebar badge, which reads expiredVehicles)", () => {
+    const k = computeKpis([parked("IDLE"), parked("IN_WORKSHOP"), r({ plate: "A" })], TODAY);
+    expect(k).toEqual({ expiredItems: 0, expiredVehicles: 0, warningItems: 0, warningVehicles: 0 });
+  });
+});

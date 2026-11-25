@@ -46,6 +46,32 @@ export function assertCanChangeStatus(current: VehicleStatus, target: VehicleSta
   }
 }
 
+/**
+ * Which vehicles of a bulk status change really change: the ones with another status. Sold vehicles
+ * and the ones already in the target status are skipped (and counted); a change that would touch
+ * nothing is rejected.
+ */
+export function planBulkStatusChange(
+  vehicles: ReadonlyArray<{ id: number; status: VehicleStatus }>,
+  target: VehicleStatus,
+): { ids: number[]; unchanged: number; sold: number } {
+  if (target === "SOLD") {
+    throw new RuleError("Para marcar un vehículo como vendido usa la opción Vender.");
+  }
+  const ids: number[] = [];
+  let unchanged = 0;
+  let sold = 0;
+  for (const v of vehicles) {
+    if (v.status === "SOLD") sold += 1;
+    else if (v.status === target) unchanged += 1;
+    else ids.push(v.id);
+  }
+  if (ids.length === 0) {
+    throw new RuleError("Ningún vehículo cambia de estado: ya lo tienen o están vendidos.");
+  }
+  return { ids, unchanged, sold };
+}
+
 export function assertCanTransfer(input: {
   status: VehicleStatus;
   currentOwnerId: number | null;

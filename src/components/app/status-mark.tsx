@@ -34,15 +34,18 @@ export function StatusMark({
   status,
   children,
   className,
+  muted = false,
 }: {
   status: AlertStatus;
   children?: ReactNode;
   className?: string;
+  /** Greys the dot and the word out but keeps the real status word (a silenced alert). */
+  muted?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-sm whitespace-nowrap", className)}>
-      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
-      <span className={TONE[status]}>{children ?? WORDS[status]}</span>
+      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[muted ? "inactive" : status])} />
+      <span className={TONE[muted ? "inactive" : status]}>{children ?? WORDS[status]}</span>
     </span>
   );
 }

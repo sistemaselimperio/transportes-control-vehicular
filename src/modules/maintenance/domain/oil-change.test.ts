@@ -58,9 +58,13 @@ describe("oilChangeStatus", () => {
     today,
   };
 
-  it("is inactive for IDLE, IN_WORKSHOP and SOLD vehicles", () => {
-    for (const vehicleStatus of ["IDLE", "IN_WORKSHOP", "SOLD"] as const) {
-      expect(oilChangeStatus({ ...base, vehicleStatus })).toBe("inactive");
+  it("is inactive for SOLD vehicles", () => {
+    expect(oilChangeStatus({ ...base, vehicleStatus: "SOLD" })).toBe("inactive");
+  });
+  it("keeps the real status for IDLE and IN_WORKSHOP vehicles (their alerts are silenced elsewhere)", () => {
+    for (const vehicleStatus of ["IDLE", "IN_WORKSHOP"] as const) {
+      expect(oilChangeStatus({ ...base, vehicleStatus })).toBe("ok");
+      expect(oilChangeStatus({ ...base, vehicleStatus, last: null })).toBe("warning");
     }
   });
   it("is not_applicable when the class has no oil interval", () => {

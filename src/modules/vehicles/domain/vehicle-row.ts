@@ -4,6 +4,7 @@
  */
 import {
   documentStatus,
+  isParked,
   vehicleOverallStatus,
   type AlertStatus,
   type VehicleStatus,
@@ -96,6 +97,11 @@ export interface VehicleGridRow {
   tecno: DocCell;
   vehicleStatus: VehicleStatus;
   statusLabel: string;
+  /**
+   * Idle or in the workshop: its alerts are silenced. The cells keep their real status (so the file
+   * can show what is missing, greyed out) and `overall` is inactive, so nothing is flagged.
+   */
+  silenced: boolean;
   overall: AlertStatus;
   notes: string | null;
   technical: VehicleTechnicalData;
@@ -189,8 +195,6 @@ function oilCell(input: VehicleRowInput): Cell {
   });
 
   if (vehicle.status === "SOLD") return { text: "", status };
-  if (vehicle.status === "IDLE") return { text: "Quieta", status };
-  if (vehicle.status === "IN_WORKSHOP") return { text: "En taller", status };
   if (status === "not_applicable") return { text: "No aplica", status };
   if (!lastOil) return { text: "Sin registro", status };
 
@@ -255,6 +259,7 @@ export function buildVehicleRow(input: VehicleRowInput): VehicleGridRow {
     tecno,
     vehicleStatus: vehicle.status,
     statusLabel: STATUS_LABELS[vehicle.status],
+    silenced: isParked(vehicle.status),
     overall: vehicleOverallStatus({
       vehicleStatus: vehicle.status,
       alerts: [policy.status, soat.status, tecno.status, tax.status, nextChange.status],

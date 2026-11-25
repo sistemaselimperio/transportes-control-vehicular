@@ -305,6 +305,11 @@ export const vehicleCommandRepository: VehicleCommandRepository = {
     await db.update(schema.vehicles).set({ status }).where(eq(schema.vehicles.id, vehicleId));
   },
 
+  async setStatusMany(vehicleIds, status) {
+    if (vehicleIds.length === 0) return;
+    await db.update(schema.vehicles).set({ status }).where(inArray(schema.vehicles.id, vehicleIds));
+  },
+
   async assignDriver({ vehicleId, driver, date, close }) {
     await db.transaction(async (tx) => {
       const driverId = (await resolveDriverId(tx, driver, true))!;

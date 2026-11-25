@@ -22,6 +22,7 @@ import {
   assertKmNotDecreasing,
   assertNotFuture,
   closePeriod,
+  planBulkStatusChange,
   RuleError,
 } from "../domain/vehicle-rules";
 import type {
@@ -399,6 +400,18 @@ export function createVehicleCommands(
       assertCanChangeStatus(vehicle.status, target);
       await repo.setStatus(vehicle.id, target);
       return { message: "Estado actualizado." };
+    },
+
+    /** The fleet list's multi-select: the same non-sold status for several vehicles, in one update. */
+    async changeStatusBulk(plates: string[], target: VehicleStatus): Promise<CommandResult> {
+      const normalized = [...new Set(plates.map(parsePlate))];
+      const vehicles = await repo.findByPlates(normalized);
+      const missing = normalized.filter((p) => !vehicles.some((v) => v.plate === p));
+      if (missing.length > 0) throw new RuleError(`El vehículo ${missing[0]} no existe.`);
+      const plan = planBulkStatusChange(vehicles, target);
+      await repo.setStatusMany(plan.ids, target);
+      const n = plan.ids.length;
+      return { message: `Estado actualizado en ${n} ${n === 1 ? "vehículo" : "vehículos"}.` };
     },
 
     async assignDriver(

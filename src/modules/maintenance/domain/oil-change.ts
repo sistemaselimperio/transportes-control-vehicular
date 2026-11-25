@@ -43,7 +43,8 @@ export function oilChangeStatus(input: {
   mode: OilMode;
   today: IsoDate;
 }): AlertStatus {
-  if (input.vehicleStatus !== "ACTIVE") return "inactive";
+  // Idle and workshop vehicles keep their real status; their alerts are silenced where they are raised.
+  if (input.vehicleStatus === "SOLD") return "inactive";
   if (input.interval.months == null && input.interval.km == null) {
     return "not_applicable";
   }
