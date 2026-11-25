@@ -225,6 +225,13 @@
       "when": 1795804800000,
       "tag": "0031_load_lines_order",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795891200000,
+      "tag": "0032_terneras_nodriza_names",
+      "breakpoints": true
     }
   ]
 }

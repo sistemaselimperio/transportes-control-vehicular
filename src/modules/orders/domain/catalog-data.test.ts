@@ -27,9 +27,12 @@ describe("CATALOG_SEED", () => {
     expect(CATALOG_SEED.every((p) => /^\d{6}[A-Z]?$/.test(p.code))).toBe(true);
   });
 
-  it("allows one name under two codes, and one code under two suppliers", () => {
-    const nodriza = bySupplier("Finca").filter((p) => p.name === "Terneras Nodriza");
-    expect(nodriza.map((p) => p.code)).toEqual(["302040", "302540"]);
+  it("tells the pellet and extruded presentations apart, and allows one code under two suppliers", () => {
+    const nodriza = bySupplier("Finca").filter((p) => p.name.startsWith("Terneras Nodriza"));
+    expect(nodriza.map((p) => [p.code, p.name])).toEqual([
+      ["302040", "Terneras Nodriza P"],
+      ["302540", "Terneras Nodriza E"],
+    ]);
     const finca = bySupplier("Finca").find((p) => p.code === "132240");
     const contegral = bySupplier("Contegral").find((p) => p.code === "132240");
     expect(finca?.name).not.toBe(contegral?.name);
@@ -49,8 +52,18 @@ describe("CATALOG_SEED", () => {
     expect(file).toBeDefined();
     const sql = readFileSync(join(dir, file as string), "utf8");
     expect(sql).toContain('ON CONFLICT ("supplier","code") DO NOTHING');
+    // A later migration may rename a product: the seed holds the name it ends with.
+    const renames = new Map<string, string>();
+    for (const later of readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f) && f > (file as string)).sort()) {
+      const text = readFileSync(join(dir, later), "utf8");
+      for (const m of text.matchAll(/SET "name" = '([^']+)' WHERE "supplier" = '([^']+)' AND "code" = '([^']+)'/g)) {
+        renames.set(`${m[2]}|${m[3]}`, m[1] as string);
+      }
+    }
     for (const p of CATALOG_SEED) {
-      expect(sql).toContain(`('${p.supplier}', '${p.code}', '${p.name.replace(/'/g, "''")}')`);
+      const renamed = renames.get(`${p.supplier}|${p.code}`);
+      if (renamed !== undefined) expect(renamed).toBe(p.name);
+      else expect(sql).toContain(`('${p.supplier}', '${p.code}', '${p.name.replace(/'/g, "''")}')`);
     }
   });
 });
