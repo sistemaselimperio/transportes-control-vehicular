@@ -3,7 +3,7 @@ import type { LoadSupplier } from "./load-rules";
 import {
   allocationInputsOf,
   buildDrafts,
-  buildPendingSections,
+  buildPendingOrders,
   draftsTotals,
   isBlockDraftComplete,
   orderParts,
@@ -80,49 +80,43 @@ describe("orderParts", () => {
   });
 });
 
-describe("buildPendingSections", () => {
-  const sections = buildPendingSections(orders, 40);
+describe("buildPendingOrders", () => {
+  const rows = buildPendingOrders(orders, 40);
 
-  it("makes one section per supplier with pending work, in the fixed supplier order", () => {
-    expect(sections.map((s) => s.supplier)).toEqual(["Finca", "Contegral"]);
-    expect(buildPendingSections([], 40)).toEqual([]);
+  it("lists each order with pending work once, oldest delivery first", () => {
+    expect(rows.map((o) => o.id)).toEqual([1, 2, 3]);
+    expect(buildPendingOrders([], 40)).toEqual([]);
   });
 
-  it("totals the orders, bags and tons of the supplier's part", () => {
-    expect(sections[0]).toMatchObject({ supplier: "Finca", bags: 200, tons: 8 });
-    expect(sections[1]).toMatchObject({ supplier: "Contegral", bags: 75, tons: 3 });
+  it("names the pending suppliers in the fixed supplier order", () => {
+    expect(rows.map((o) => [o.id, o.suppliers])).toEqual([
+      [1, ["Finca"]],
+      [2, ["Contegral"]],
+      [3, ["Finca", "Contegral"]],
+    ]);
   });
 
-  it("lists the orders oldest delivery first with the bags, tons and clients of that supplier", () => {
-    expect(sections[0]?.orders.map((o) => [o.id, o.bags, o.tons, o.clients])).toEqual([
+  it("totals the bags, tons and clients of the pending parts", () => {
+    expect(rows.map((o) => [o.id, o.bags, o.tons, o.clients])).toEqual([
       [1, 100, 4, ["Cliente 1", "Cliente 3"]],
-      [3, 100, 4, ["Cliente 1"]],
-    ]);
-    expect(sections[1]?.orders.map((o) => [o.id, o.bags])).toEqual([
-      [2, 25],
-      [3, 50],
+      [2, 25, 1, ["Cliente 2"]],
+      [3, 150, 6, ["Cliente 1", "Cliente 2"]],
     ]);
   });
 
-  it("shows a mixed order in both sections, each naming the other pending supplier", () => {
-    expect(sections[0]?.orders.find((o) => o.id === 3)?.otherSuppliers).toEqual(["Contegral"]);
-    expect(sections[1]?.orders.find((o) => o.id === 3)?.otherSuppliers).toEqual(["Finca"]);
-    expect(sections[0]?.orders.find((o) => o.id === 1)?.otherSuppliers).toEqual([]);
-  });
-
-  it("does not name a supplier that is already loaded as another pending one", () => {
-    const partial = [order(7, "2026-11-18", [orderLine(1, 1, "Finca", 10), orderLine(1, 5, "Contegral", 10)], { pendingSuppliers: ["Contegral"] })];
-    const [only] = buildPendingSections(partial, 40);
-    expect(only?.supplier).toBe("Contegral");
-    expect(only?.orders[0]?.otherSuppliers).toEqual([]);
-    expect(only?.orders[0]?.parts.map((p) => [p.supplier, p.pending])).toEqual([
+  it("leaves out the part already loaded but keeps it in the detail", () => {
+    const partial = [order(7, "2026-11-18", [orderLine(1, 1, "Finca", 10), orderLine(2, 5, "Contegral", 10)], { pendingSuppliers: ["Contegral"] })];
+    const [only] = buildPendingOrders(partial, 40);
+    expect(only).toMatchObject({ suppliers: ["Contegral"], bags: 10, clients: ["Cliente 2"] });
+    expect(only?.parts.map((p) => [p.supplier, p.pending])).toEqual([
       ["Finca", false],
       ["Contegral", true],
     ]);
   });
 
-  it("keeps the oldest delivery day of the section", () => {
-    expect(sections.map((s) => s.oldestDate)).toEqual(["2026-11-18", "2026-11-18"]);
+  it("skips orders that are annulled or fully loaded", () => {
+    const done = order(9, "2026-11-18", [orderLine(1, 1, "Finca", 10)], { status: "cargado", pendingSuppliers: [] });
+    expect(buildPendingOrders([done], 40)).toEqual([]);
   });
 });
 
@@ -162,28 +156,28 @@ describe("buildDrafts", () => {
     ...over,
   });
 
-  it("fills an edit with the stored tons, SIESA, supplier order and the cost summed over the order's lines", () => {
+  it("fills an edit with the SIESA, supplier order and the cost summed over the order's lines, and the ordered tons", () => {
     const drafts = buildDrafts([{ order: single, supplier: "Finca" }], 40, [
       stored({ id: 1, referenceId: 1, tons: 3.5, cost: 600 }),
       stored({ id: 2, referenceId: 2, tons: 1, cost: 400 }),
     ]);
     expect(drafts.blocks[0]).toEqual({ orderId: 1, supplier: "Finca", siesaNumber: "S-1", orderNumber: "P-1", cost: "1000" });
-    expect(drafts.products.map((p) => p.tons)).toEqual(["3.5", "1"]);
+    expect(drafts.products.map((p) => p.tons)).toEqual(["3", "1"]);
   });
 
-  it("takes the first SIESA when the old lines of an order differ, and sums split lines of a product", () => {
+  it("takes the first SIESA when the old lines of an order differ", () => {
     const drafts = buildDrafts([{ order: single, supplier: "Finca" }], 40, [
       stored({ id: 1, referenceId: 1, tons: 1, siesaNumber: "S-1" }),
       stored({ id: 2, referenceId: 1, tons: 2, siesaNumber: "S-2" }),
       stored({ id: 3, referenceId: 2, tons: 1, siesaNumber: "S-3" }),
     ]);
     expect(drafts.blocks[0]?.siesaNumber).toBe("S-1");
-    expect(drafts.products.map((p) => p.tons)).toEqual(["3", "1"]);
   });
 
-  it("drops a stored line without product and suggests the order's products instead", () => {
+  it("always takes the ordered tons, whatever the stored lines carried", () => {
     const drafts = buildDrafts([{ order: single, supplier: "Finca" }], 40, [
-      stored({ referenceId: null, referenceName: null, referenceCode: null, tons: 9 }),
+      stored({ id: 1, referenceId: 1, tons: 3.5 }),
+      stored({ id: 2, referenceId: null, referenceName: null, referenceCode: null, tons: 9 }),
     ]);
     expect(drafts.products.map((p) => p.tons)).toEqual(["3", "1"]);
   });

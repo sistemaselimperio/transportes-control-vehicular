@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { daysLate, pendingDay, type PendingDay } from "@/modules/orders/domain/order-days";
 import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import type { PendingOrderRow, PendingSection } from "../domain/load-pending";
+import type { PendingOrderRow } from "../domain/load-pending";
 
 const tons = (value: number) => formatDecimal(value, 3);
 
@@ -34,34 +34,42 @@ function dayLabel(date: string, today: string): string {
 }
 
 /**
- * What is still to load, one section per supplier with its totals and one row per order that has a part
- * of it pending (a mixed order shows in each of its suppliers). Clicking a row opens the whole order;
- * "Cargue" opens the load form of that order, which covers all its pending suppliers. Without
- * `canManage` the rows are read-only.
+ * What is still to load: one row per order with a part pending, oldest delivery first, naming its
+ * pending suppliers. Clicking a row opens the whole order split by supplier; "Cargue" opens the load
+ * form of that order, which covers all its pending suppliers. Without `canManage` the rows are read-only.
  */
 export function PendingLoads({
-  sections,
+  orders,
   today,
   canManage,
   onCreateLoad,
 }: {
-  sections: readonly PendingSection[];
+  orders: readonly PendingOrderRow[];
   /** Colombia's current day. */
   today: string;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
 }) {
+  const bags = orders.reduce((sum, o) => sum + o.bags, 0);
+  const totalTons = orders.reduce((sum, o) => sum + o.tons, 0);
   return (
     <section aria-labelledby="pending-loads-title" className="space-y-3">
-      <h2 id="pending-loads-title" className="text-base font-semibold">
-        Por cargar
-      </h2>
-      {sections.length === 0 ? (
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 id="pending-loads-title" className="sr-only">
+          Por cargar
+        </h2>
+        {orders.length > 0 && (
+          <p className="num text-sm text-muted-foreground">
+            {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} · {formatDecimal(bags, 0)} bultos · {tons(totalTons)} t
+          </p>
+        )}
+      </div>
+      {orders.length === 0 ? (
         <p className="panel px-4 py-6 text-center text-sm text-muted-foreground">No hay pedidos pendientes: todo lo pedido ya tiene cargue.</p>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {sections.map((s) => (
-            <SupplierSection key={s.supplier} section={s} today={today} canManage={canManage} onCreateLoad={onCreateLoad} />
+        <ul className="panel divide-y text-sm">
+          {orders.map((o) => (
+            <OrderItem key={o.id} order={o} today={today} canManage={canManage} onCreateLoad={onCreateLoad} />
           ))}
         </ul>
       )}
@@ -69,44 +77,14 @@ export function PendingLoads({
   );
 }
 
-function SupplierSection({
-  section: s,
-  today,
-  canManage,
-  onCreateLoad,
-}: {
-  section: PendingSection;
-  today: string;
-  canManage: boolean;
-  onCreateLoad: (orderId: number) => void;
-}) {
-  return (
-    <li className="panel flex flex-col">
-      <div className="space-y-0.5 border-b px-4 py-3">
-        <h3 className="text-base font-semibold">{s.supplier}</h3>
-        <p className="num text-sm text-muted-foreground">
-          {s.orders.length} {s.orders.length === 1 ? "pedido" : "pedidos"} · {formatDecimal(s.bags, 0)} bultos · {tons(s.tons)} t
-        </p>
-      </div>
-      <ul className="divide-y text-sm">
-        {s.orders.map((o) => (
-          <OrderItem key={o.id} order={o} supplier={s.supplier} today={today} canManage={canManage} onCreateLoad={onCreateLoad} />
-        ))}
-      </ul>
-    </li>
-  );
-}
-
-/** One order of a section: the row opens its detail, the button opens its load form. */
+/** One pending order: the row opens its detail, the button opens its load form. */
 function OrderItem({
   order: o,
-  supplier,
   today,
   canManage,
   onCreateLoad,
 }: {
   order: PendingOrderRow;
-  supplier: string;
   today: string;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
@@ -119,11 +97,12 @@ function OrderItem({
         type="button"
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-start gap-2 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
+        className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
       >
         <span className="min-w-0 flex-1 space-y-0.5">
-          <span className="flex items-baseline justify-between gap-3">
+          <span className="flex items-baseline gap-2">
             <span className="num font-semibold">Pedido #{o.id}</span>
+            <span aria-hidden className="text-muted-foreground">·</span>
             <span className={cn("num shrink-0", DAY_TEXT[pendingDay(o.deliveryDate, today)])}>{dayLabel(o.deliveryDate, today)}</span>
           </span>
           <span className="block truncate text-muted-foreground" title={o.clients.join(", ")}>
@@ -133,14 +112,14 @@ function OrderItem({
             <span>
               {formatDecimal(o.bags, 0)} bultos · {tons(o.tons)} t{o.timeWindow ? ` · ${o.timeWindow}` : ""}
             </span>
-            {o.otherSuppliers.map((other) => (
-              <span key={other} className="rounded-full border px-1.5 py-px text-[11px] font-medium text-foreground">
-                + {other}
+            {o.suppliers.map((supplier) => (
+              <span key={supplier} className="rounded-full border px-1.5 py-px text-[11px] font-medium text-foreground">
+                {supplier}
               </span>
             ))}
           </span>
         </span>
-        <ChevronRight aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       </button>
       {canManage && (
         <div className="flex shrink-0 items-center pr-3">
@@ -148,7 +127,7 @@ function OrderItem({
             variant="outline"
             className="h-11 px-3 md:h-8"
             onClick={() => onCreateLoad(o.id)}
-            aria-label={`Crear cargue del pedido #${o.id} (${supplier})`}
+            aria-label={`Crear cargue del pedido #${o.id} (${o.suppliers.join(" + ")})`}
           >
             <Plus aria-hidden />
             Cargue

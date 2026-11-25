@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
 import { SlideOver } from "@/components/app/slide-over";
+import { TabBar } from "@/components/app/tab-bar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -12,7 +13,7 @@ import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { deleteLoadAction } from "../application/load-actions";
-import { buildPendingSections } from "../domain/load-pending";
+import { buildPendingOrders } from "../domain/load-pending";
 import {
   filterLoads,
   formatCop,
@@ -26,7 +27,9 @@ import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
 import { PendingLoads } from "./pending-loads";
 
-/** Loads page: filters, totals, the list, the create / edit side sheet and the delete confirmation. */
+type LoadsTab = "pendientes" | "historial";
+
+/** Loads page: a tab with the orders still to load and one with the loads made (filters, totals, list), plus the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
   rows,
   plates,
@@ -47,6 +50,7 @@ export function LoadsView({
   /** Colombia's current day, read on the server. */
   today: string;
 }) {
+  const [tab, setTab] = useState<LoadsTab>("pendientes");
   const [open, setOpen] = useState(presetOrderId !== null);
   // The order whose loads are being created; an edit takes the orders of its load.
   const [creatingOrderId, setCreatingOrderId] = useState<number | null>(presetOrderId);
@@ -57,7 +61,7 @@ export function LoadsView({
 
   const shown = useMemo(() => filterLoads(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOfLoads(shown), [shown]);
-  const sections = useMemo(() => buildPendingSections(orders, kgPerBag), [orders, kgPerBag]);
+  const pending = useMemo(() => buildPendingOrders(orders, kgPerBag), [orders, kgPerBag]);
 
   const editLoad = (load: LoadRow) => {
     setEditing(load);
@@ -79,60 +83,78 @@ export function LoadsView({
         description="Cargues recibidos de los proveedores, con los productos, el costo y el número SIESA de cada uno."
       />
 
-      <PendingLoads sections={sections} today={today} canManage={canManage} onCreateLoad={createLoads} />
+      <TabBar
+        label="Vista de cargues"
+        items={[
+          { key: "pendientes", label: "Pendientes", count: pending.length },
+          { key: "historial", label: "Historial" },
+        ]}
+        active={tab}
+        onSelect={setTab}
+        idPrefix="loads-tab"
+        panelId="loads-panel"
+      />
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
-        <div>
-          <Label htmlFor="load-supplier-filter" className="mb-1 block text-xs text-muted-foreground">
-            Proveedor
-          </Label>
-          <NativeSelect
-            id="load-supplier-filter"
-            className="h-11 md:h-9"
-            value={filters.supplier ?? ""}
-            onChange={(e) => setFilters((f) => ({ ...f, supplier: isLoadSupplier(e.target.value) ? e.target.value : null }))}
-          >
-            <option value="">Todos</option>
-            {LOAD_SUPPLIERS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-        <div>
-          <Label htmlFor="load-from-filter" className="mb-1 block text-xs text-muted-foreground">
-            Desde
-          </Label>
-          <Input
-            id="load-from-filter"
-            type="date"
-            className="h-11 md:h-9"
-            value={filters.from ?? ""}
-            max={filters.to ?? undefined}
-            onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || null }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="load-to-filter" className="mb-1 block text-xs text-muted-foreground">
-            Hasta
-          </Label>
-          <Input
-            id="load-to-filter"
-            type="date"
-            className="h-11 md:h-9"
-            value={filters.to ?? ""}
-            min={filters.from ?? undefined}
-            onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || null }))}
-          />
-        </div>
+      <div id="loads-panel" role="tabpanel" aria-labelledby={`loads-tab-${tab}`} className="space-y-5">
+        {tab === "pendientes" ? (
+          <PendingLoads orders={pending} today={today} canManage={canManage} onCreateLoad={createLoads} />
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
+              <div>
+                <Label htmlFor="load-supplier-filter" className="mb-1 block text-xs text-muted-foreground">
+                  Proveedor
+                </Label>
+                <NativeSelect
+                  id="load-supplier-filter"
+                  className="h-11 md:h-9"
+                  value={filters.supplier ?? ""}
+                  onChange={(e) => setFilters((f) => ({ ...f, supplier: isLoadSupplier(e.target.value) ? e.target.value : null }))}
+                >
+                  <option value="">Todos</option>
+                  {LOAD_SUPPLIERS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <Label htmlFor="load-from-filter" className="mb-1 block text-xs text-muted-foreground">
+                  Desde
+                </Label>
+                <Input
+                  id="load-from-filter"
+                  type="date"
+                  className="h-11 md:h-9"
+                  value={filters.from ?? ""}
+                  max={filters.to ?? undefined}
+                  onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || null }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="load-to-filter" className="mb-1 block text-xs text-muted-foreground">
+                  Hasta
+                </Label>
+                <Input
+                  id="load-to-filter"
+                  type="date"
+                  className="h-11 md:h-9"
+                  value={filters.to ?? ""}
+                  min={filters.from ?? undefined}
+                  onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || null }))}
+                />
+              </div>
+            </div>
+
+            <p className="num text-sm text-muted-foreground" aria-live="polite">
+              {totals.count} de {rows.length} cargues · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
+            </p>
+
+            <LoadList rows={shown} canManage={canManage} onEdit={editLoad} onDelete={setDeleting} />
+          </>
+        )}
       </div>
-
-      <p className="num text-sm text-muted-foreground" aria-live="polite">
-        {totals.count} de {rows.length} cargues · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
-      </p>
-
-      <LoadList rows={shown} canManage={canManage} onEdit={editLoad} onDelete={setDeleting} />
 
       <FlashMessage message={message} />
 

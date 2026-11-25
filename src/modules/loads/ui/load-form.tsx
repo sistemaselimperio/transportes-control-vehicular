@@ -6,13 +6,12 @@ import { PesosInput } from "@/components/app/pesos-input";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { clientNames } from "@/modules/orders/domain/order-days";
 import { formatDisplayDate, todayInBogota } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { createLoadsAction, updateLoadAction } from "../application/load-actions";
 import { NOTES_MAX, REFERENCE_MAX } from "../application/load-schemas";
-import { allocationErrors, compareAllocation, differenceText, type ProductAllocation } from "../domain/load-allocation";
+import { allocationErrors } from "../domain/load-allocation";
 import {
   allocationInputsOf,
   buildDrafts,
@@ -25,7 +24,6 @@ import {
   type BlockDraft,
   type Drafts,
   type PendingSource,
-  type ProductDraft,
 } from "../domain/load-pending";
 import { costOf, firstDuplicate } from "../domain/load-lines";
 import { formatCop, type LoadRow } from "../domain/load-rules";
@@ -34,7 +32,7 @@ const FIELD = "h-10 md:h-9";
 
 /**
  * Creates the loads of an order, one block per supplier still pending in it (each with its own SIESA,
- * supplier order, cost and products; they are saved together), or edits one load (`load`), which keeps
+ * supplier order and cost, its products at the ordered tons; they are saved together), or edits one load (`load`), which keeps
  * the orders it already took.
  */
 export function LoadForm({
@@ -78,7 +76,6 @@ export function LoadForm({
   );
 
   const allocationInputs = allocationInputsOf(drafts.blocks, covered, drafts.products, kgPerBag);
-  const allocations = allocationInputs.flatMap((input) => compareAllocation(input).map((a) => ({ supplier: input.supplier, ...a })));
   const totals = draftsTotals(drafts);
   const newOrder = load ? undefined : covered[0];
 
@@ -87,8 +84,6 @@ export function LoadForm({
       ...d,
       blocks: d.blocks.map((b) => (b.orderId === block.orderId && b.supplier === block.supplier ? { ...b, ...change } : b)),
     }));
-  const patchProduct = (key: number, tons: string) =>
-    setDrafts((d) => ({ ...d, products: d.products.map((p) => (p.key === key ? { ...p, tons } : p)) }));
 
   return (
     <ActionForm
@@ -101,7 +96,7 @@ export function LoadForm({
         if (incomplete) {
           return Promise.resolve({
             ok: false as const,
-            error: `Completa el SIESA, el pedido proveedor, el costo y las toneladas de ${load ? `el pedido #${incomplete.orderId}` : incomplete.supplier}.`,
+            error: `Completa el SIESA, el pedido proveedor y el costo de ${load ? `el pedido #${incomplete.orderId}` : incomplete.supplier}.`,
           });
         }
         const repeated = firstDuplicate(drafts.blocks.map((b) => b.siesaNumber.trim()));
@@ -166,10 +161,7 @@ export function LoadForm({
                   kgPerBag={kgPerBag}
                   editing={load !== undefined}
                   block={block}
-                  products={drafts.products.filter((p) => p.orderId === block.orderId && p.supplier === block.supplier)}
-                  allocations={allocations.find((a) => a.orderId === block.orderId && a.supplier === block.supplier)?.products ?? []}
                   onPatchBlock={(change) => patchBlock(block, change)}
-                  onPatchProduct={patchProduct}
                 />
               );
             })}
@@ -208,45 +200,22 @@ function OrderSummary({ order, kgPerBag }: { order: PendingSource; kgPerBag: num
   );
 }
 
-/** Expected against entered kilos of a product: a green "Completo" when it matches to the kilo, the difference otherwise. */
-function ProductBalance({ product }: { product: ProductAllocation }) {
-  const ok = product.differenceKg === 0;
-  return (
-    <span
-      aria-live="polite"
-      className={cn(
-        "num shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
-        ok ? "bg-ok text-ok-foreground" : "bg-destructive-soft text-danger-foreground",
-      )}
-    >
-      {ok ? "Completo" : differenceText(product.differenceKg)}
-    </span>
-  );
-}
-
 /**
- * One block of the form: its SIESA number, supplier order number and total cost, and each of its
- * products with the kilos ordered, whether the entered tons match, and the tons. A new load shows the
- * supplier as the heading; an edit shows the order (an old load can carry several).
+ * One block of the form: its SIESA number, supplier order number and total cost; its products carry the
+ * ordered tons, so they are not shown. A new load shows the supplier as the heading; an edit shows the order (an old load can carry several).
  */
 function Block({
   order,
   kgPerBag,
   editing,
   block,
-  products,
-  allocations,
   onPatchBlock,
-  onPatchProduct,
 }: {
   order: PendingSource;
   kgPerBag: number;
   editing: boolean;
   block: BlockDraft;
-  products: readonly ProductDraft[];
-  allocations: readonly ProductAllocation[];
   onPatchBlock: (change: Partial<BlockDraft>) => void;
-  onPatchProduct: (key: number, tons: string) => void;
 }) {
   const id = `${block.orderId}-${block.supplier}`;
   const part = orderParts(order, kgPerBag).find((p) => p.supplier === block.supplier);
@@ -277,7 +246,7 @@ function Block({
         <div className="space-y-0.5 bg-muted/40 p-3 text-sm">{heading}</div>
 
         <div className="grid grid-cols-2 gap-3 p-3">
-          <Field label="Número SIESA" htmlFor={`load-siesa-${id}`} required hint="No se puede repetir.">
+          <Field label="Número SIESA" htmlFor={`load-siesa-${id}`} required>
             <Input
               id={`load-siesa-${id}`}
               className={`${FIELD} num`}
@@ -309,34 +278,6 @@ function Block({
           </div>
         </div>
 
-        {allocations.map((product) => {
-          const line = products.find((p) => p.referenceId === product.referenceId);
-          return (
-            <div key={product.referenceId} className="space-y-3 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{product.label}</p>
-                  <p className="num text-xs text-muted-foreground">
-                    {formatDecimal(product.bags, 0)} bultos · {formatDecimal(product.expectedKg / 1000, 3)} t pedidas
-                  </p>
-                </div>
-                <ProductBalance product={product} />
-              </div>
-              {line && (
-                <Field label="Toneladas" htmlFor={`load-tons-${line.key}`} required>
-                  <Input
-                    id={`load-tons-${line.key}`}
-                    inputMode="decimal"
-                    className={`${FIELD} num`}
-                    value={line.tons}
-                    autoComplete="off"
-                    onChange={(e) => onPatchProduct(line.key, e.target.value)}
-                  />
-                </Field>
-              )}
-            </div>
-          );
-        })}
       </section>
     </li>
   );

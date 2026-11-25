@@ -8,8 +8,7 @@ import { costOf, groupLinesByOrder, round3, suggestLines, type LoadLineRow } fro
 import { LOAD_SUPPLIERS, type LoadSupplier } from "./load-rules";
 
 /*
- * What the loader sees: the pending list (one section per supplier, one row per order that still has a
- * part of it to load) and the drafts of the load form (one block per supplier part of an order).
+ * What the loader sees: the pending list (one row per order that still has a part of it to load) and the drafts of the load form (one block per supplier part of an order).
  */
 
 /** What the pending list and the form need of an order. */
@@ -73,56 +72,41 @@ export function orderParts(order: PendingSource, kgPerBag: number): PendingOrder
   });
 }
 
-/** One pending order inside the section of a supplier. */
+/** One order that still has a part to load. */
 export interface PendingOrderRow {
   id: number;
   deliveryDate: IsoDate;
   timeWindow: string | null;
-  /** Clients of the supplier's part. */
+  /** The suppliers still to load, in the fixed order. */
+  suppliers: LoadSupplier[];
+  /** Clients of the pending parts. */
   clients: string[];
-  /** Bags and tons of this supplier's part. */
+  /** Bags and tons of the pending parts. */
   bags: number;
   tons: number;
-  /** The other suppliers of the order that are still pending, in the fixed order. */
-  otherSuppliers: LoadSupplier[];
   /** The whole order split by supplier, for the detail. */
   parts: PendingOrderPart[];
 }
 
-/** Everything still to load of one supplier. */
-export interface PendingSection {
-  supplier: LoadSupplier;
-  /** Delivery day of the oldest pending order. */
-  oldestDate: IsoDate;
-  /** Oldest delivery first. */
-  orders: PendingOrderRow[];
-  bags: number;
-  tons: number;
-}
-
-/** One section per supplier with pending work, in the fixed supplier order; a mixed order shows in each of its pending suppliers. */
-export function buildPendingSections(orders: readonly PendingSource[], kgPerBag: number): PendingSection[] {
-  const sorted = [...orders].sort(compareByDelivery);
-  return LOAD_SUPPLIERS.flatMap((supplier) => {
-    const pending = sorted.filter((o) => pendingSuppliersOf(o).includes(supplier));
-    const first = pending[0];
-    if (!first) return [];
-    const rows = pending.map((o): PendingOrderRow => {
-      const mine = supplierLines(o, supplier);
-      const bags = sumBags(mine);
-      return {
+/** One row per order with pending work, oldest delivery first; a mixed order shows once. */
+export function buildPendingOrders(orders: readonly PendingSource[], kgPerBag: number): PendingOrderRow[] {
+  return [...orders].sort(compareByDelivery).flatMap((o) => {
+    const suppliers = pendingSuppliersOf(o);
+    if (suppliers.length === 0) return [];
+    const lines = o.lines.filter((l) => suppliers.includes(l.supplier as LoadSupplier));
+    const bags = sumBags(lines);
+    return [
+      {
         id: o.id,
         deliveryDate: o.deliveryDate,
         timeWindow: o.timeWindow,
-        clients: clientNames({ lines: mine }),
+        suppliers,
+        clients: clientNames({ lines }),
         bags,
         tons: tonsOfBags(bags, kgPerBag),
-        otherSuppliers: pendingSuppliersOf(o).filter((s) => s !== supplier),
         parts: orderParts(o, kgPerBag),
-      };
-    });
-    const bags = rows.reduce((sum, r) => sum + r.bags, 0);
-    return [{ supplier, oldestDate: first.deliveryDate, orders: rows, bags, tons: tonsOfBags(bags, kgPerBag) }];
+      },
+    ];
   });
 }
 
@@ -154,9 +138,8 @@ export interface Drafts {
 
 /**
  * The form: one block per target (an order and one of its suppliers) with one product line per product
- * the order asks of that supplier, tons suggested from bags x kg per bag. When editing, `stored` fills in
- * what the load already had: tons per product, and the SIESA, supplier order number and cost of each
- * order (the first SIESA / order number when old lines of one order differ; the cost is the sum of its lines).
+ * the order asks of that supplier, its tons always bags x kg per bag (the loader does not type them). When
+ * editing, `stored` fills in the SIESA, supplier order number and cost of each order (the first SIESA / order number when old lines of one order differ; the cost is the sum of its lines).
  */
 export function buildDrafts(
   targets: ReadonlyArray<{ order: PendingSource; supplier: LoadSupplier }>,
@@ -176,10 +159,6 @@ export function buildDrafts(
       orderNumber: before?.orderNumbers[0] ?? "",
       cost: before ? String(before.cost) : "",
     });
-    const storedTons = new Map<number, number>();
-    for (const l of before?.lines ?? []) {
-      if (l.referenceId !== null) storedTons.set(l.referenceId, (storedTons.get(l.referenceId) ?? 0) + l.tons);
-    }
     for (const s of suggestLines([{ id: order.id, lines: supplierLines(order, supplier) }], kgPerBag)) {
       products.push({
         key: key++,
@@ -187,7 +166,7 @@ export function buildDrafts(
         supplier,
         referenceId: s.referenceId,
         reference: productLabel({ code: s.referenceCode, name: s.referenceName }),
-        tons: String(round3(storedTons.get(s.referenceId) ?? s.tons)),
+        tons: String(round3(s.tons)),
       });
     }
   }
