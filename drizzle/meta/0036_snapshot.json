@@ -1,6 +1,6 @@
 {
   "id": "c8ade8ee-2d46-4a2e-b61a-07c5b7678371",
-  "prevId": "733f8ae1-74f0-438a-943b-1b883f993876",
+  "prevId": "f990f045-6c28-4034-aa9e-22065bdf3ccd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1623,6 +1623,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "load_lines_siesa_idx": {
+          "name": "load_lines_siesa_idx",
+          "columns": [
+            {
+              "expression": "siesa_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1670,15 +1685,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "load_lines_siesa_number_unique": {
-          "name": "load_lines_siesa_number_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "siesa_number"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "load_lines_tons_positive": {
