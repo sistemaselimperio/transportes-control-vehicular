@@ -256,20 +256,21 @@ export function LoadForm({
         ) : candidates.length === 0 ? (
           <p className="text-sm text-muted-foreground">No hay pedidos con productos de {supplier} por cargar.</p>
         ) : (
-          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+          <ul className="space-y-1.5">
             {candidates.map((o) => {
               // Only what this supplier loads of the order: its products, bags and weight.
               const mine = supplierLinesOf(o, supplier);
               const totalsOfSupplier = orderTotals(mine, kgPerBag);
               const names = clientNames(o).join(", ");
+              const isChecked = checked.has(o.id);
               return (
-                <li key={o.id}>
+                <li key={o.id} className="space-y-2">
                   <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border bg-card p-2.5 text-sm has-checked:border-ring has-checked:bg-muted/50">
                     <input
                       type="checkbox"
                       name="orderIds"
                       value={o.id}
-                      checked={checked.has(o.id)}
+                      checked={isChecked}
                       onChange={(e) => toggle(o.id, e.target.checked)}
                       className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
                     />
@@ -283,6 +284,20 @@ export function LoadForm({
                       </span>
                     </span>
                   </label>
+                  {/* A checked order opens its products right under it, so it is never listed twice. */}
+                  {isChecked && (
+                    <OrderSection
+                      order={o}
+                      allocation={allocations.find((a) => a.orderId === o.id)}
+                      lines={lines.filter((l) => l.orderId === o.id)}
+                      openKey={openKey}
+                      canAddLines={lines.length < MAX_LINES}
+                      onToggleLine={(key) => setOpenKey((open) => (open === key ? null : key))}
+                      onRemoveLine={(key) => setLines((all) => all.filter((l) => l.key !== key))}
+                      onAddLine={(referenceId, reference) => addLine(o.id, referenceId, reference)}
+                      onPatch={patch}
+                    />
+                  )}
                 </li>
               );
             })}
@@ -295,24 +310,6 @@ export function LoadForm({
           {totals.count} {totals.count === 1 ? "línea" : "líneas"} · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
         </p>
       )}
-
-      {checkedOrders.map((order) => {
-        const allocation = allocations.find((a) => a.orderId === order.id);
-        return (
-          <OrderSection
-            key={order.id}
-            order={order}
-            allocation={allocation}
-            lines={lines.filter((l) => l.orderId === order.id)}
-            openKey={openKey}
-            canAddLines={lines.length < MAX_LINES}
-            onToggleLine={(key) => setOpenKey((open) => (open === key ? null : key))}
-            onRemoveLine={(key) => setLines((all) => all.filter((l) => l.key !== key))}
-            onAddLine={(referenceId, reference) => addLine(order.id, referenceId, reference)}
-            onPatch={patch}
-          />
-        );
-      })}
 
       <Field label="Observación" htmlFor="load-notes" hint="Opcional">
         <Textarea id="load-notes" name="notes" rows={3} maxLength={NOTES_MAX} defaultValue={load?.notes ?? ""} />
@@ -359,23 +356,10 @@ function OrderSection({
   onAddLine: (referenceId: number, reference: string) => void;
   onPatch: (key: number, change: Partial<LineDraft>) => void;
 }) {
-  const names = clientNames(order).join(", ");
   const expectedIds = new Set(allocation?.products.map((p) => p.referenceId));
   const stray = lines.filter((l) => l.referenceId === null || !expectedIds.has(l.referenceId));
   return (
-    <section aria-label={`Pedido ${order.id}`} className="space-y-3 rounded-2xl border bg-muted/30 p-3">
-      <header className="space-y-0.5">
-        <h3 className="text-sm font-semibold">
-          <span className="num">Pedido #{order.id}</span>
-          {order.partial && <span className="font-normal text-warn-foreground"> · Cargado parcial</span>}
-        </h3>
-        <p className="truncate text-xs text-muted-foreground">{names}</p>
-        <p className="num text-xs text-muted-foreground">
-          Entrega {formatDisplayDate(order.deliveryDate)}
-          {order.timeWindow ? ` · ${order.timeWindow}` : ""}
-        </p>
-      </header>
-
+    <section aria-label={`Productos del pedido ${order.id}`} className="ml-7 space-y-3 rounded-2xl border bg-muted/30 p-3">
       {(allocation?.products ?? []).map((product) => {
         const productLines = lines.filter((l) => l.referenceId === product.referenceId);
         return (
