@@ -12,10 +12,19 @@ import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { deleteLoadAction } from "../application/load-actions";
-import { filterLoads, formatCop, isLoadSupplier, LOAD_SUPPLIERS, totalsOfLoads, type LoadFilters, type LoadRow } from "../domain/load-rules";
+import { buildPendingSections } from "../domain/load-pending";
+import {
+  filterLoads,
+  formatCop,
+  isLoadSupplier,
+  LOAD_SUPPLIERS,
+  totalsOfLoads,
+  type LoadFilters,
+  type LoadRow,
+} from "../domain/load-rules";
 import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
-import { PendingOrders } from "./pending-orders";
+import { PendingLoads } from "./pending-loads";
 
 /** Loads page: filters, totals, the list, the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
@@ -29,17 +38,18 @@ export function LoadsView({
 }: {
   rows: readonly LoadRow[];
   plates: readonly string[];
-  /** Every order that is not annulled: the form keeps, for its supplier, the ones with products still to load. */
+  /** Every order that is not annulled: the pending list and the form take the parts still to load. */
   orders: readonly OrderRow[];
   kgPerBag: number;
-  /** An order to start the new load with, from the "Crear cargue" button of the orders page. */
+  /** The order whose load form opens at once, from the "Crear cargue" button of the orders page. */
   presetOrderId: number | null;
   canManage: boolean;
   /** Colombia's current day, read on the server. */
   today: string;
 }) {
   const [open, setOpen] = useState(presetOrderId !== null);
-  const [preset, setPreset] = useState<number | null>(presetOrderId);
+  // The order whose loads are being created; an edit takes the orders of its load.
+  const [creatingOrderId, setCreatingOrderId] = useState<number | null>(presetOrderId);
   const [editing, setEditing] = useState<LoadRow | undefined>();
   const [deleting, setDeleting] = useState<LoadRow | undefined>();
   const [filters, setFilters] = useState<LoadFilters>({ supplier: null, from: null, to: null });
@@ -47,18 +57,18 @@ export function LoadsView({
 
   const shown = useMemo(() => filterLoads(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOfLoads(shown), [shown]);
-  const pending = useMemo(() => orders.filter((o) => o.status === "pendiente"), [orders]);
+  const sections = useMemo(() => buildPendingSections(orders, kgPerBag), [orders, kgPerBag]);
 
-  const openForm = (load?: LoadRow) => {
+  const editLoad = (load: LoadRow) => {
     setEditing(load);
-    setPreset(null);
+    setCreatingOrderId(null);
     setOpen(true);
   };
 
-  /** "Crear cargue" on a pending order: a new load with that order already checked. */
-  const createFromOrder = (orderId: number) => {
+  /** "Cargue" on an order: the loads of all its pending suppliers. */
+  const createLoads = (orderId: number) => {
     setEditing(undefined);
-    setPreset(orderId);
+    setCreatingOrderId(orderId);
     setOpen(true);
   };
 
@@ -69,7 +79,7 @@ export function LoadsView({
         description="Cargues recibidos de los proveedores, con los productos, el costo y el número SIESA de cada uno."
       />
 
-      <PendingOrders orders={pending} today={today} kgPerBag={kgPerBag} canManage={canManage} onCreateLoad={createFromOrder} />
+      <PendingLoads sections={sections} today={today} canManage={canManage} onCreateLoad={createLoads} />
 
       <div className="grid gap-3 sm:grid-cols-3 lg:max-w-2xl">
         <div>
@@ -122,7 +132,7 @@ export function LoadsView({
         {totals.count} de {rows.length} cargues · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
       </p>
 
-      <LoadList rows={shown} canManage={canManage} onEdit={openForm} onDelete={setDeleting} />
+      <LoadList rows={shown} canManage={canManage} onEdit={editLoad} onDelete={setDeleting} />
 
       <FlashMessage message={message} />
 
@@ -140,14 +150,16 @@ export function LoadsView({
         open={open}
         onOpenChange={setOpen}
         title={editing ? "Editar cargue" : "Nuevo cargue"}
-        description={editing && `${editing.supplier} · ${formatDisplayDate(editing.date)}`}
+        description={editing ? `${editing.supplier} · ${formatDisplayDate(editing.date)}` : creatingOrderId === null ? undefined : `Pedido #${creatingOrderId}`}
       >
+        {/* Keyed so a different load or order starts from fresh drafts. */}
         <LoadForm
+          key={editing ? `edit-${editing.id}` : `new-${creatingOrderId}`}
           load={editing}
+          orderId={creatingOrderId ?? undefined}
           plates={plates}
           orders={orders}
           kgPerBag={kgPerBag}
-          presetOrderId={editing ? null : preset}
           onCancel={() => setOpen(false)}
           onDone={(msg) => {
             flash(msg);

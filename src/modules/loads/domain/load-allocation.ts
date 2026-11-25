@@ -1,6 +1,6 @@
 import type { OrderStatus } from "@/modules/orders/domain/order-rules";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import type { LoadSupplier } from "./load-rules";
+import { LOAD_SUPPLIERS, type LoadSupplier } from "./load-rules";
 
 /*
  * An order is loaded in parts, one load per supplier. In a load, for each checked order, the lines of
@@ -159,7 +159,7 @@ export function unavailableOrderIds(
   });
 }
 
-/** The orders a load of `supplier` can take (the form offers these). */
-export function ordersForSupplier<T extends LoadableOrder>(orders: readonly T[], supplier: LoadSupplier | null, ownLoadId?: number): T[] {
-  return supplier === null ? [] : orders.filter((o) => isOrderLoadable(o, supplier, ownLoadId));
+/** The suppliers a new load can take of the order, in the fixed supplier order. */
+export function loadableSuppliers(order: LoadableOrder): LoadSupplier[] {
+  return LOAD_SUPPLIERS.filter((s) => isOrderLoadable(order, s));
 }

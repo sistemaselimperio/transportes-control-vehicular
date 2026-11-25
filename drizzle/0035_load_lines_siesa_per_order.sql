@@ -1,0 +1,2 @@
+ALTER TABLE "comercial"."load_lines" DROP CONSTRAINT "load_lines_siesa_number_unique";--> statement-breakpoint
+CREATE INDEX "load_lines_siesa_idx" ON "comercial"."load_lines" USING btree ("siesa_number");

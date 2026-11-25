@@ -616,10 +616,12 @@ export const loads = comercial.table(
 );
 
 /**
- * A product of a load, with its own tons, cost, SIESA number (unique across every line) and the
- * supplier's order number. Every line takes its product from exactly one order (`order_id`): an order is
- * loaded in parts, one load per supplier, and a product may be split across several lines. The tons of
- * the lines of an (order, product) must add up to bags x kg per bag; the application enforces it.
+ * A product of a load, with its tons and its share of the cost. Every line takes its product from exactly
+ * one order (`order_id`): an order is loaded in parts, one load per supplier. The SIESA number and the
+ * supplier's order number belong to the order inside the load, so they repeat on every line of it (the
+ * order's cost is split across them); a SIESA number belongs to exactly one (load, order), which the
+ * application enforces because no unique index can express it. The tons of the lines of an
+ * (order, product) must add up to bags x kg per bag; the application enforces it as well.
  * `reference_id` is null only for lines migrated from the single-product loads.
  */
 export const loadLines = comercial.table(
@@ -637,7 +639,7 @@ export const loadLines = comercial.table(
     tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
     /** Whole pesos (COP). */
     cost: numeric({ precision: 14, scale: 2, mode: "number" }).notNull(),
-    siesaNumber: text("siesa_number").notNull().unique(),
+    siesaNumber: text("siesa_number").notNull(),
     /** The supplier's order number. */
     orderNumber: text("order_number").notNull(),
     /** Order of the line inside its load. */
@@ -646,6 +648,7 @@ export const loadLines = comercial.table(
   (t) => [
     index("load_lines_load_idx").on(t.loadId),
     index("load_lines_order_idx").on(t.orderId),
+    index("load_lines_siesa_idx").on(t.siesaNumber),
     check("load_lines_tons_positive", sql`${t.tons} > 0`),
     check("load_lines_cost_non_negative", sql`${t.cost} >= 0`),
   ],

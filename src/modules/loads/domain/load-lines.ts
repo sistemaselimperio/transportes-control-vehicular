@@ -1,27 +1,28 @@
-import { productLabel } from "@/modules/orders/domain/catalog";
 import { bagsToKg, kgToTons } from "@/modules/orders/domain/order-rules";
-import { parseDecimal } from "@/modules/shared/domain/decimal";
 
-/** One product of a load, with its own cost, SIESA number and supplier order number. */
+/**
+ * One product of a load. The SIESA number and the supplier order number belong to the order inside the
+ * load, so they repeat on every line of the same order; the cost of the order is split across its lines.
+ */
 export interface LoadLineRow {
   id: number;
   /** The order this line takes its product from. */
   orderId: number;
-  /** Null only for lines migrated from the single-product loads: they must get a product when edited. */
+  /** Null only for lines migrated from the single-product loads: they are replaced by the order's products when edited. */
   referenceId: number | null;
   referenceName: string | null;
   /** Null for lines without a product and for products typed inline before the catalog existed. */
   referenceCode: string | null;
   tons: number;
-  /** Whole pesos (COP). */
+  /** Whole pesos (COP): this line's share of the order's cost. */
   cost: number;
-  /** Unique across the lines of every load. */
+  /** One per (load, order); loads made order by order may carry a different one on each line. */
   siesaNumber: string;
   /** The supplier's order number. */
   orderNumber: string;
 }
 
-const round3 = (value: number): number => Math.round(value * 1000) / 1000 + 0;
+export const round3 = (value: number): number => Math.round(value * 1000) / 1000 + 0;
 
 /** Tons and cost of a load: the sum of its lines. */
 export function loadTotals(lines: ReadonlyArray<{ tons: number; cost: number }>): { tons: number; cost: number } {
@@ -40,6 +41,48 @@ export function firstDuplicate(values: readonly string[]): string | null {
     seen.add(v);
   }
   return null;
+}
+
+/** The lines of one order inside a load, with what the order carries as a whole. */
+export interface LoadOrderLines<T extends LoadLineRow = LoadLineRow> {
+  orderId: number;
+  /** Distinct SIESA numbers of the lines, in order of appearance: exactly one for a load made as a general. */
+  siesaNumbers: string[];
+  orderNumbers: string[];
+  /** Sum of the cost of the lines. */
+  cost: number;
+  tons: number;
+  lines: T[];
+}
+
+/** The lines of a load grouped by order, in order of first appearance. */
+export function groupLinesByOrder<T extends LoadLineRow>(lines: readonly T[]): LoadOrderLines<T>[] {
+  const groups = new Map<number, LoadOrderLines<T>>();
+  for (const l of lines) {
+    const group = groups.get(l.orderId) ?? { orderId: l.orderId, siesaNumbers: [], orderNumbers: [], cost: 0, tons: 0, lines: [] };
+    if (!group.siesaNumbers.includes(l.siesaNumber)) group.siesaNumbers.push(l.siesaNumber);
+    if (!group.orderNumbers.includes(l.orderNumber)) group.orderNumbers.push(l.orderNumber);
+    group.cost += l.cost;
+    group.tons = round3(group.tons + l.tons);
+    group.lines.push(l);
+    groups.set(l.orderId, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Splits the total cost of an order (whole pesos) across its lines in proportion to their tons. Every
+ * share is a whole number and the last line takes the remainder, so the shares add up to `total` exactly.
+ */
+export function splitCost(total: number, tons: readonly number[]): number[] {
+  const weight = tons.reduce((sum, t) => sum + t, 0);
+  let left = total;
+  return tons.map((t, i) => {
+    if (i === tons.length - 1) return left;
+    const share = weight > 0 ? Math.min(left, Math.floor((total * t) / weight)) : 0;
+    left -= share;
+    return share;
+  });
 }
 
 /** What an order asks for of one product. */
@@ -75,85 +118,5 @@ export function suggestLines(orders: ReadonlyArray<{ id: number; lines: readonly
   });
 }
 
-/** A product line while the form is being filled: everything is text until it is sent. */
-export interface LineDraft {
-  key: number;
-  /** The order this line takes its product from. */
-  orderId: number;
-  /** The catalog product, or null while none is chosen. */
-  referenceId: number | null;
-  /** The product as last known ("code · name"); what a stored product outside the catalog shows. */
-  reference: string;
-  tons: string;
-  cost: string;
-  siesaNumber: string;
-  orderNumber: string;
-  /** Suggested from its order and not touched since: it follows the order. */
-  auto: boolean;
-}
-
-const tonsText = (tons: number): string => String(round3(tons));
-
-/**
- * The drafts after the checked orders changed. The lines of an order that is no longer checked go away;
- * a product that stays keeps what the user entered (an untouched suggestion only follows the new tons);
- * a product with no line gets a suggested one; a suggested line the user never touched disappears with
- * its product. Extra lines of a split product always stay.
- */
-export function reconcileDrafts(
-  drafts: readonly LineDraft[],
-  suggestions: readonly SuggestedLine[],
-  checkedOrderIds: ReadonlySet<number>,
-  nextKey: number,
-): LineDraft[] {
-  const pair = (orderId: number, referenceId: number): string => `${orderId}:${referenceId}`;
-  const byPair = new Map(suggestions.map((s) => [pair(s.orderId, s.referenceId), s]));
-  const present = new Set<string>();
-  const kept: LineDraft[] = [];
-  for (const d of drafts) {
-    if (!checkedOrderIds.has(d.orderId)) continue;
-    const suggestion = d.referenceId === null ? undefined : byPair.get(pair(d.orderId, d.referenceId));
-    if (d.auto && !suggestion) continue;
-    if (suggestion) present.add(pair(suggestion.orderId, suggestion.referenceId));
-    kept.push(d.auto && suggestion ? { ...d, tons: tonsText(suggestion.tons) } : d);
-  }
-  let key = nextKey;
-  for (const s of suggestions) {
-    if (present.has(pair(s.orderId, s.referenceId))) continue;
-    kept.push({
-      key: key++,
-      orderId: s.orderId,
-      referenceId: s.referenceId,
-      reference: productLabel({ code: s.referenceCode, name: s.referenceName }),
-      tons: tonsText(s.tons),
-      cost: "",
-      siesaNumber: "",
-      orderNumber: "",
-      auto: true,
-    });
-  }
-  return kept;
-}
-
 /** The whole pesos typed in a cost field ("1.500.000" -> 1500000); 0 when there are no digits. */
 export const costOf = (text: string): number => Number(text.replace(/\D/g, "")) || 0;
-
-/** A line the server would accept: product, tons > 0, cost > 0, SIESA and supplier order filled. */
-export function isDraftComplete(d: Pick<LineDraft, "referenceId" | "tons" | "cost" | "siesaNumber" | "orderNumber">): boolean {
-  return (
-    d.referenceId !== null &&
-    (parseDecimal(d.tons) ?? 0) > 0 &&
-    costOf(d.cost) > 0 &&
-    d.siesaNumber.trim() !== "" &&
-    d.orderNumber.trim() !== ""
-  );
-}
-
-/** What the form shows above the lines: how many, and the tons and pesos typed so far. */
-export function draftsTotals(drafts: ReadonlyArray<Pick<LineDraft, "tons" | "cost">>): { count: number; tons: number; cost: number } {
-  return {
-    count: drafts.length,
-    tons: round3(drafts.reduce((sum, d) => sum + (parseDecimal(d.tons) ?? 0), 0)),
-    cost: drafts.reduce((sum, d) => sum + costOf(d.cost), 0),
-  };
-}

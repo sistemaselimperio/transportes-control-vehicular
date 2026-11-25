@@ -9,13 +9,10 @@ import { requireSectionManager } from "@/lib/session";
 import { actionFailure } from "@/modules/shared/application/action-failure";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { loadRepository } from "../infrastructure/load-repository";
-import { createLoadCommands, LoadError, SIESA_TAKEN } from "./load-commands";
-import { loadIdSchema, loadSchema } from "./load-schemas";
+import { createLoadCommands, LoadError } from "./load-commands";
+import { createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
 
 const commands = createLoadCommands(loadRepository);
-
-/** The checked orders repeat the `orderIds` field, which `Object.fromEntries` would collapse into one; the lines travel as one JSON field. */
-const formValues = (fd: FormData) => ({ ...Object.fromEntries(fd.entries()), orderIds: fd.getAll("orderIds") });
 
 async function run(fn: () => Promise<string>): Promise<ActionResult> {
   try {
@@ -24,22 +21,23 @@ async function run(fn: () => Promise<string>): Promise<ActionResult> {
     expireAfterAction({ kind: "load" });
     return { ok: true, message };
   } catch (e) {
-    return actionFailure(e, { label: "load", expected: [LoadError], unique: { load_lines_siesa_number_unique: SIESA_TAKEN } });
+    return actionFailure(e, { label: "load", expected: [LoadError] });
   }
 }
 
-export async function createLoadAction(fd: FormData): Promise<ActionResult> {
+/** The loads of one order, one per pending supplier, saved together. */
+export async function createLoadsAction(fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const input = loadSchema.parse(formValues(fd));
-    await commands.create(input);
-    return "Cargue registrado.";
+    const input = createLoadsSchema.parse(Object.fromEntries(fd.entries()));
+    await commands.createForOrder(input);
+    return input.blocks.length === 1 ? "Cargue registrado." : `${input.blocks.length} cargues registrados.`;
   });
 }
 
 export async function updateLoadAction(id: number, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const loadId = loadIdSchema.parse(id);
-    const input = loadSchema.parse(formValues(fd));
+    const input = loadSchema.parse(Object.fromEntries(fd.entries()));
     await commands.update(loadId, input);
     return "Cargue actualizado.";
   });

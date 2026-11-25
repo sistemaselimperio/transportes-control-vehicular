@@ -3,7 +3,7 @@ import {
   allocationErrors,
   compareAllocation,
   isOrderLoadable,
-  ordersForSupplier,
+  loadableSuppliers,
   unavailableOrderIds,
   type AllocationInput,
   type LoadableOrder,
@@ -175,8 +175,10 @@ describe("order availability", () => {
     expect(unavailableOrderIds(found, [3], "Finca", 8)).toEqual([]);
   });
 
-  it("keeps the orders a supplier can load", () => {
-    const rows = [order({ id: 1 }), order({ id: 2, lines: [{ supplier: "Italcol" }] }), order({ id: 3, status: "anulado" })];
-    expect(ordersForSupplier(rows, "Finca").map((o) => o.id)).toEqual([1]);
+  it("lists the suppliers a new load can still take of an order, in the fixed order", () => {
+    const rows = order({ lines: [{ supplier: "Italcol" }, { supplier: "Finca" }] });
+    expect(loadableSuppliers(rows)).toEqual(["Finca", "Italcol"]);
+    expect(loadableSuppliers({ ...rows, loads: [{ loadId: 8, supplier: "Finca" }] })).toEqual(["Italcol"]);
+    expect(loadableSuppliers({ ...rows, status: "anulado" })).toEqual([]);
   });
 });

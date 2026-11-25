@@ -21,10 +21,9 @@ export default async function Page({
     getKgPerBag(),
   ]);
   const canManage = canManageSection(role, "loads");
-  // "Crear cargue" on an order lands here: open the form with that order checked, if it is still pending.
+  // "Crear cargue" on an order lands here: open the load form of that order, which covers all its pending suppliers.
   const presetId = Number(typeof pedido === "string" ? pedido : "");
-  const presetOrderId =
-    canManage && nuevo === "1" && orders.some((o) => o.id === presetId && o.status === "pendiente") ? presetId : null;
+  const presetOrder = canManage && nuevo === "1" ? orders.find((o) => o.id === presetId && o.status === "pendiente") : undefined;
   return (
     <LoadsView
       rows={rows}
@@ -32,7 +31,7 @@ export default async function Page({
       // Only what a load can still pick up, plus what loads already hold (to edit them).
       orders={orders.filter((o) => o.status !== "anulado")}
       kgPerBag={kgPerBag}
-      presetOrderId={presetOrderId}
+      presetOrderId={presetOrder?.id ?? null}
       canManage={canManage}
       today={todayInBogota()}
     />

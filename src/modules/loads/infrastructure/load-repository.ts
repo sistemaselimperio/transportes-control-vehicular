@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import type { LoadPorts, LoadValues } from "../application/load-commands";
+import { LoadError, SIESA_TAKEN, type LoadPorts, type LoadValues } from "../application/load-commands";
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { loadKgPerBag, loadOrderRows } from "@/modules/orders/infrastructure/order-repository";
 import { findCatalogProducts } from "@/modules/orders/infrastructure/reference-repository";
@@ -88,6 +88,27 @@ async function ensureNotLoadedElsewhere(tx: Tx, loadId: number, supplier: LoadVa
   if (taken.length > 0) throw new OrdersUnavailable();
 }
 
+/**
+ * A SIESA number belongs to exactly one (load, order), so it can repeat across the lines of one order but
+ * not across loads, which no unique index can express. Writers of the same number queue on an advisory
+ * lock held until the transaction ends (taken in sorted order, so two writers never wait on each other).
+ */
+async function lockSiesa(tx: Tx, numbers: readonly string[]) {
+  for (const n of [...new Set(numbers)].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"load_siesa:" + n}))`);
+}
+
+/** With the lock held, no load outside `ownLoadIds` may hold any of the numbers. */
+async function ensureSiesaFree(tx: Tx, ownLoadIds: readonly number[], numbers: readonly string[]) {
+  const unique = [...new Set(numbers)];
+  if (unique.length === 0) return;
+  const taken = await tx
+    .select({ id: schema.loadLines.id })
+    .from(schema.loadLines)
+    .where(and(inArray(schema.loadLines.siesaNumber, unique), notInArray(schema.loadLines.loadId, [...ownLoadIds])))
+    .limit(1);
+  if (taken.length > 0) throw new LoadError(SIESA_TAKEN);
+}
+
 export const loadRepository: LoadPorts = {
   async findVehicleByPlate(plate) {
     // A sold vehicle left the fleet: it cannot be picked. No fleet permission is involved: this is
@@ -106,7 +127,12 @@ export const loadRepository: LoadPorts = {
       .from(schema.loads)
       .where(eq(schema.loads.id, id))
       .limit(1);
-    return row ?? null;
+    if (!row) return null;
+    const orders = await db
+      .selectDistinct({ orderId: schema.loadLines.orderId })
+      .from(schema.loadLines)
+      .where(eq(schema.loadLines.loadId, id));
+    return { ...row, orderIds: orders.map((o) => o.orderId) };
   },
 
   async findTakenSiesa(numbers, exceptId) {
@@ -137,13 +163,19 @@ export const loadRepository: LoadPorts = {
 
   getKgPerBag: loadKgPerBag,
 
-  async insertLoad(values) {
+  async insertLoads(values) {
     try {
       await db.transaction(async (tx) => {
-        const [load] = await tx.insert(schema.loads).values(toColumns(values)).returning({ id: schema.loads.id });
-        if (!load) throw new Error("The load was not stored.");
-        await tx.insert(schema.loadLines).values(toLineColumns(load.id, values.lines));
-        await ensureNotLoadedElsewhere(tx, load.id, values.supplier, values.orderIds);
+        await lockSiesa(tx, values.flatMap((v) => v.lines.map((l) => l.siesaNumber)));
+        const ids: number[] = [];
+        for (const v of values) {
+          const [load] = await tx.insert(schema.loads).values(toColumns(v)).returning({ id: schema.loads.id });
+          if (!load) throw new Error("The load was not stored.");
+          ids.push(load.id);
+          await tx.insert(schema.loadLines).values(toLineColumns(load.id, v.lines));
+          await ensureNotLoadedElsewhere(tx, load.id, v.supplier, v.orderIds);
+        }
+        await ensureSiesaFree(tx, ids, values.flatMap((v) => v.lines.map((l) => l.siesaNumber)));
       });
       return true;
     } catch (e) {
@@ -161,7 +193,9 @@ export const loadRepository: LoadPorts = {
           .where(eq(schema.loads.id, id))
           .returning({ id: schema.loads.id });
         if (rows.length !== 1) return "gone" as const;
-        // The lines are rewritten whole: the old ones go first so a kept SIESA number never collides with itself.
+        await lockSiesa(tx, values.lines.map((l) => l.siesaNumber));
+        await ensureSiesaFree(tx, [id], values.lines.map((l) => l.siesaNumber));
+        // The lines are rewritten whole.
         await tx.delete(schema.loadLines).where(eq(schema.loadLines.loadId, id));
         await tx.insert(schema.loadLines).values(toLineColumns(id, values.lines));
         await ensureNotLoadedElsewhere(tx, id, values.supplier, values.orderIds);

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { groupLinesByOrder } from "../domain/load-lines";
 import { formatCop, loadFooter, type LoadOrderBlock, type LoadRow } from "../domain/load-rules";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
@@ -52,27 +53,38 @@ function OrderBlock({ order }: { order: LoadOrderBlock }) {
   );
 }
 
-/** The lines of a load as they were typed: product, order, tons, cost and numbers. */
+/** What each order of the load carries: its SIESA and supplier order numbers, its cost and the tons of each product. */
 function LineDetails({ row }: { row: LoadRow }) {
-  const count = row.lines.length;
+  const groups = groupLinesByOrder(row.lines);
   return (
     <details className="group px-4 py-2.5">
       <summary className="num cursor-pointer rounded-sm text-xs text-muted-foreground outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
-        {count} {count === 1 ? "línea" : "líneas"} · costo y números
+        {groups.length} {groups.length === 1 ? "pedido" : "pedidos"} · costo y números
       </summary>
       <ul className="mt-2 space-y-2">
-        {row.lines.map((l) => (
-          <li key={l.id} className="rounded-lg border bg-background p-2.5 text-xs">
-            <p className="text-sm font-medium">
-              {l.referenceName !== null ? productLabel({ code: l.referenceCode, name: l.referenceName }) : <span className="font-normal text-muted-foreground">Sin producto</span>}
-              <span className="num font-normal text-muted-foreground"> · Pedido #{l.orderId}</span>
+        {groups.map((g) => (
+          <li key={g.orderId} className="rounded-lg border bg-background p-2.5 text-xs">
+            <p className="text-sm font-medium">Pedido #{g.orderId}</p>
+            <p className="num text-muted-foreground">
+              SIESA {g.siesaNumbers.join(", ")} · Pedido proveedor {g.orderNumbers.join(", ")}
             </p>
             <p className="num text-muted-foreground">
-              {formatDecimal(l.tons, 3)} t · {formatCop(l.cost)}
+              {formatDecimal(g.tons, 3)} t · {formatCop(g.cost)}
             </p>
-            <p className="num text-muted-foreground">
-              SIESA {l.siesaNumber} · Pedido proveedor {l.orderNumber}
-            </p>
+            <ul className="mt-1.5 divide-y rounded-md border">
+              {g.lines.map((l) => (
+                <li key={l.id} className="flex items-baseline justify-between gap-3 px-2 py-1">
+                  <span className="min-w-0">
+                    {l.referenceName !== null ? (
+                      productLabel({ code: l.referenceCode, name: l.referenceName })
+                    ) : (
+                      <span className="text-muted-foreground">Sin producto</span>
+                    )}
+                  </span>
+                  <span className="num shrink-0 text-muted-foreground">{formatDecimal(l.tons, 3)} t</span>
+                </li>
+              ))}
+            </ul>
           </li>
         ))}
       </ul>
