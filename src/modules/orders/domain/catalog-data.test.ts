@@ -28,10 +28,10 @@ describe("CATALOG_SEED", () => {
   });
 
   it("tells the pellet and extruded presentations apart, and allows one code under two suppliers", () => {
-    const nodriza = bySupplier("Finca").filter((p) => p.name.startsWith("Terneras Nodriza"));
+    const nodriza = bySupplier("Finca").filter((p) => p.name.startsWith("Ternera Nodriza"));
     expect(nodriza.map((p) => [p.code, p.name])).toEqual([
-      ["302040", "Terneras Nodriza P"],
-      ["302540", "Terneras Nodriza E"],
+      ["302040", "Ternera Nodriza P"],
+      ["302540", "Ternera Nodriza ESP"],
     ]);
     const finca = bySupplier("Finca").find((p) => p.code === "132240");
     const contegral = bySupplier("Contegral").find((p) => p.code === "132240");

@@ -260,6 +260,13 @@
       "when": 1796236800000,
       "tag": "0036_parked_trip_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1796323200000,
+      "tag": "0037_ternera_nodriza_names",
+      "breakpoints": true
     }
   ]
 }
