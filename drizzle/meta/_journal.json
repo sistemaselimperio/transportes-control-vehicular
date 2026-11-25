@@ -232,6 +232,20 @@
       "when": 1795891200000,
       "tag": "0032_terneras_nodriza_names",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795977600000,
+      "tag": "0033_cotero_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1796064000000,
+      "tag": "0034_cotero_fleet_refs",
+      "breakpoints": true
     }
   ]
 }

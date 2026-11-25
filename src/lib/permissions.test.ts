@@ -10,6 +10,7 @@ import {
   canManageSection,
   canManageTrips,
   canSetKgPerBag,
+  canUseCoteroPayments,
   canUsePettyCash,
   canViewSection,
   ForbiddenError,
@@ -323,6 +324,20 @@ describe("canUsePettyCash", () => {
     expect(canUsePettyCash(null)).toBe(false);
     expect(canUsePettyCash("true")).toBe(false);
     expect(canUsePettyCash(1)).toBe(false);
+  });
+});
+
+describe("canUseCoteroPayments", () => {
+  it("is only for users flagged for it", () => {
+    expect(canUseCoteroPayments(true)).toBe(true);
+    expect(canUseCoteroPayments(false)).toBe(false);
+  });
+
+  it("is closed for anything that is not exactly true", () => {
+    expect(canUseCoteroPayments(undefined)).toBe(false);
+    expect(canUseCoteroPayments(null)).toBe(false);
+    expect(canUseCoteroPayments("true")).toBe(false);
+    expect(canUseCoteroPayments(1)).toBe(false);
   });
 });
 

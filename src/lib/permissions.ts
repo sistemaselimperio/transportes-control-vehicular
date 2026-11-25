@@ -197,6 +197,15 @@ export function canUsePettyCash(flag: unknown): boolean {
   return flag === true;
 }
 
+/**
+ * Cotero payments (pagos a coteros) are outside the role matrix too: only users flagged with
+ * `hasCoteroPayments` see or use them, whatever their role (an admin does not get it implicitly).
+ * Closed for anything but `true`.
+ */
+export function canUseCoteroPayments(flag: unknown): boolean {
+  return flag === true;
+}
+
 /** The first section the role can see: where a redirect from a forbidden page lands. */
 export function homePath(role: Role): string {
   if (canViewSection(role, "today")) return "/";

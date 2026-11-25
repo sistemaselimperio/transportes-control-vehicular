@@ -758,6 +758,8 @@ export const user = transportes.table("user", {
   theme: text().notNull().default("yellow"),
   /** Only users with this flag see and use the petty-cash ledgers (see `src/modules/petty-cash`). */
   hasPettyCash: boolean("has_petty_cash").notNull().default(false),
+  /** Only users with this flag see and use the cotero payments (see `src/modules/cotero-payments`). */
+  hasCoteroPayments: boolean("has_cotero_payments").notNull().default(false),
 });
 
 export const session = transportes.table("session", {
@@ -902,3 +904,118 @@ export const pettyCashSuppliers = transportes.table("petty_cash_suppliers", {
   responsibilityType: pettyCashResponsibilityEnum("responsibility_type"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ---------------- Cotero payments (pagos a coteros) ---------------- */
+
+export const coteroReceiptStatusEnum = transportes.enum("cotero_receipt_status", ["pending", "settled", "paid"]);
+export const coteroSettlementStatusEnum = transportes.enum("cotero_settlement_status", ["open", "paid", "annulled"]);
+
+/** Price per ton paid to coteros, with history: the tariff of a receipt is the latest `validFrom` on or before its date. */
+export const coteroTariffs = transportes.table(
+  "cotero_tariffs",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    /** Whole pesos per ton. */
+    pricePerTon: integer("price_per_ton").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("cotero_tariffs_valid_from_uq").on(t.validFrom), check("cotero_tariffs_price_positive", sql`${t.pricePerTon} > 0`)],
+);
+
+/**
+ * What is remembered about a cotero, keyed by the grouping key (`doc:<cédula>` or `name:<search key>`):
+ * the cédula / NIT and how they are paid, written once and offered again on the next settlement.
+ */
+export const coteroProfiles = transportes.table("cotero_profiles", {
+  key: text().primaryKey(),
+  name: text().notNull(),
+  document: text(),
+  /** One of efectivo, transferencia, nequi, daviplata, otro. */
+  paymentMethod: text("payment_method"),
+  /** Account or phone number the payment goes to. */
+  paymentAccount: text("payment_account"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A settlement (liquidación) of the pending receipts of one cotero. Name, cédula and payment method are
+ * snapshots. `number` is permanent and sequential: an annulled settlement keeps its row and its number.
+ * `paymentMethod` starts as the planned one and becomes the real one when the settlement is paid.
+ */
+export const coteroSettlements = transportes.table(
+  "cotero_settlements",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    number: integer().notNull(),
+    date: date({ mode: "string" }).notNull(),
+    coteroKey: text("cotero_key").notNull(),
+    coteroName: text("cotero_name").notNull(),
+    coteroDocument: text("cotero_document"),
+    paymentMethod: text("payment_method"),
+    paymentAccount: text("payment_account"),
+    /** Sum of the written amounts of its receipts, in whole pesos. */
+    total: integer().notNull(),
+    status: coteroSettlementStatusEnum().notNull().default("open"),
+    paidAt: date("paid_at", { mode: "string" }),
+    /** Storage path of the proof of payment (comprobante), when one was uploaded. */
+    proofPath: text("proof_path"),
+    annulledAt: timestamp("annulled_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("cotero_settlements_number_uq").on(t.number), index("cotero_settlements_cotero_idx").on(t.coteroKey)],
+);
+
+/**
+ * One row per paper receipt ("recibo de caja menor"). `amount` is the value written on the receipt and
+ * is what gets paid; `tariffPerTon` and `expectedAmount` are a snapshot of the tariff in force on the
+ * receipt's date (never recalculated when tariffs change). The original file lives in Supabase Storage
+ * at `filePath`, `pageNumber` being its page in a multi-page file. Standalone: no link to loads or orders.
+ */
+export const coteroReceipts = transportes.table(
+  "cotero_receipts",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** Normalized ("T-0248"); unique. */
+    receiptNumber: text("receipt_number").notNull(),
+    date: date({ mode: "string" }).notNull(),
+    destination: text().notNull().default(""),
+    /** Informational remission numbers as written. */
+    remissions: text().array().notNull().default(sql`'{}'::text[]`),
+    tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
+    /** Normalized: uppercase, no hyphen ("ABC123"). */
+    vehiclePlate: text("vehicle_plate").notNull(),
+    trailerPlate: text("trailer_plate"),
+    crew: text(),
+    /** Grouping key of the cotero (see `cotero-identity`). */
+    coteroKey: text("cotero_key").notNull(),
+    coteroName: text("cotero_name").notNull(),
+    coteroDocument: text("cotero_document"),
+    driverName: text("driver_name").notNull().default(""),
+    /** The fleet entries the receipt names; the plate and driver text above are their snapshot. */
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+    trailerId: integer("trailer_id").references(() => vehicles.id, { onDelete: "set null" }),
+    driverId: integer("driver_id").references(() => drivers.id, { onDelete: "set null" }),
+    amount: integer().notNull(),
+    tariffPerTon: integer("tariff_per_ton"),
+    expectedAmount: integer("expected_amount"),
+    amountMismatch: boolean("amount_mismatch").notNull().default(false),
+    filePath: text("file_path"),
+    pageNumber: integer("page_number"),
+    status: coteroReceiptStatusEnum().notNull().default("pending"),
+    settlementId: integer("settlement_id").references(() => coteroSettlements.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("cotero_receipts_number_uq").on(t.receiptNumber),
+    index("cotero_receipts_cotero_status_idx").on(t.coteroKey, t.status),
+    index("cotero_receipts_date_idx").on(t.date),
+    index("cotero_receipts_settlement_idx").on(t.settlementId),
+    check("cotero_receipts_amount_positive", sql`${t.amount} > 0`),
+    check("cotero_receipts_tons_positive", sql`${t.tons} > 0`),
+  ],
+);

@@ -22,6 +22,7 @@ const CHANGES: Change[] = [
   { kind: "delivery" },
   { kind: "load" },
   { kind: "order" },
+  { kind: "cotero-payments" },
   { kind: "vehicle-file", plate: "ABC-123" },
 ];
 
@@ -121,6 +122,19 @@ describe("changeTags", () => {
     expect(readTags("clientRows")).toEqual(expect.arrayContaining([CACHE_TAGS.clients, CACHE_TAGS.deliveries]));
   });
 
+  it("a cotero-payments write expires every cotero read and nothing else", () => {
+    expect(changeTags({ kind: "cotero-payments" })).toEqual([CACHE_TAGS.coteroPayments]);
+    for (const read of ["coteroReceipts", "coteroSettlements", "coteroTariffs", "coteroProfiles"] as const) {
+      expect(readTags(read)).toContain(CACHE_TAGS.coteroPayments);
+    }
+  });
+
+  it("the fleet a receipt may name is expired by vehicle and driver writes, not by cotero writes", () => {
+    expect(changeTags({ kind: "driver" })).toContain(CACHE_TAGS.drivers);
+    expect(readTags("coteroFleet")).toEqual(expect.arrayContaining([CACHE_TAGS.fleet, CACHE_TAGS.drivers]));
+    expect(readTags("coteroFleet")).not.toContain(CACHE_TAGS.coteroPayments);
+  });
+
   it("a plain logbook write leaves the fleet alone", () => {
     expect(changeTags({ kind: "logbook" })).toEqual([CACHE_TAGS.logbook]);
   });
@@ -160,6 +174,7 @@ describe("read / change consistency", () => {
     delivery: [CACHE_TAGS.deliveries],
     load: [CACHE_TAGS.loads, CACHE_TAGS.orders],
     order: [CACHE_TAGS.orders],
+    "cotero-payments": [CACHE_TAGS.coteroPayments],
     "vehicle-file": [CACHE_TAGS.files],
   };
 

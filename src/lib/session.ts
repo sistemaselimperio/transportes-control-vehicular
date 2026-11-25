@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canDeleteVehicles, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -102,5 +102,24 @@ export async function requirePettyCashAccess() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
   if (!canUsePettyCash(session.user.hasPettyCash)) redirect(homePath(parseRole(session.user.role)));
+  return session;
+}
+
+/**
+ * Cotero-payment reads and writes: only users flagged with `hasCoteroPayments` (not a role, and not
+ * implied by admin). The flag is read from the stored session user on every call, so it cannot be
+ * skipped by calling an action directly. Throws `ForbiddenError` otherwise.
+ */
+export async function requireCoteroPayments() {
+  const session = await requireSession();
+  if (!canUseCoteroPayments(session.user.hasCoteroPayments)) throw new ForbiddenError();
+  return session;
+}
+
+/** For cotero-payment pages: sends a signed-out user to the login and anyone without the flag to its home. */
+export async function requireCoteroPaymentsAccess() {
+  const session = await getRequestSession();
+  if (!session) redirect("/login");
+  if (!canUseCoteroPayments(session.user.hasCoteroPayments)) redirect(homePath(parseRole(session.user.role)));
   return session;
 }

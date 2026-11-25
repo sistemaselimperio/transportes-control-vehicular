@@ -29,6 +29,8 @@ export const CACHE_TAGS = {
   loads: "loads",
   /** Concentrate orders, their lines, the reference catalog and the kg-per-bag setting. */
   orders: "orders",
+  /** Cotero payments: receipts, settlements, tariffs and cotero profiles (flag-gated, company-wide). */
+  coteroPayments: "cotero-payments",
 } as const;
 
 type EntityTag =
@@ -42,7 +44,8 @@ type EntityTag =
   | typeof CACHE_TAGS.clients
   | typeof CACHE_TAGS.deliveries
   | typeof CACHE_TAGS.loads
-  | typeof CACHE_TAGS.orders;
+  | typeof CACHE_TAGS.orders
+  | typeof CACHE_TAGS.coteroPayments;
 
 /** Files attached to one vehicle (listed on its detail page; the bytes are served by a route). */
 export const vehicleFilesTag = (plate: string) => `vehicle-files:${plate}`;
@@ -62,6 +65,7 @@ const {
   deliveries,
   loads,
   orders,
+  coteroPayments,
 } = CACHE_TAGS;
 
 export type ReadName =
@@ -83,7 +87,12 @@ export type ReadName =
   | "loadRows"
   | "orderRows"
   | "orderReferences"
-  | "kgPerBag";
+  | "kgPerBag"
+  | "coteroReceipts"
+  | "coteroSettlements"
+  | "coteroTariffs"
+  | "coteroProfiles"
+  | "coteroFleet";
 
 /** Tags each cached read is stored under; a write that changes any of them expires the read. */
 export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
@@ -113,6 +122,13 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   orderRows: [orders, clients],
   orderReferences: [orders],
   kgPerBag: [orders],
+  /** Receipts, settlements, tariffs and profiles all change together with any cotero-payment write. */
+  coteroReceipts: [coteroPayments],
+  coteroSettlements: [coteroPayments],
+  coteroTariffs: [coteroPayments],
+  coteroProfiles: [coteroPayments],
+  /** The active vehicles and drivers a receipt may name; the drivers section writes them. */
+  coteroFleet: [fleet, drivers],
 };
 
 /** The tags to hand to `cacheTag` for a read. The vehicle detail also needs its plate. */
@@ -139,6 +155,7 @@ export type Change =
   | { kind: "delivery" }
   | { kind: "load" }
   | { kind: "order" }
+  | { kind: "cotero-payments" }
   | { kind: "vehicle-file"; plate: string };
 
 const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTag[]> = {
@@ -155,6 +172,7 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   /** A load links and unlinks orders, so it also changes their status. */
   load: [loads, orders],
   order: [orders],
+  "cotero-payments": [coteroPayments],
 };
 
 /** The tags a write must expire so every read that shows what it changed is recomputed. */

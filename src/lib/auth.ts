@@ -33,6 +33,8 @@ export const auth = betterAuth({
       theme: { type: "string", required: true, defaultValue: "yellow", input: false },
       // Same for the petty-cash access flag.
       hasPettyCash: { type: "boolean", required: true, defaultValue: false, input: false },
+      // Same for the cotero-payments access flag.
+      hasCoteroPayments: { type: "boolean", required: true, defaultValue: false, input: false },
     },
   },
   plugins: [

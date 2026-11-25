@@ -67,6 +67,8 @@ async function seedUser(user: {
   theme: Theme;
   /** Sees the petty-cash ledgers (caja menor). */
   hasPettyCash?: boolean;
+  /** Sees the cotero payments (pagos a coteros). */
+  hasCoteroPayments?: boolean;
   passwordVar: string;
 }) {
   const password = process.env[user.passwordVar];
@@ -83,6 +85,9 @@ async function seedUser(user: {
     if (user.hasPettyCash) {
       await db.update(schema.user).set({ hasPettyCash: true }).where(eq(schema.user.id, existing.id));
     }
+    if (user.hasCoteroPayments) {
+      await db.update(schema.user).set({ hasCoteroPayments: true }).where(eq(schema.user.id, existing.id));
+    }
     return;
   }
   const id = crypto.randomUUID();
@@ -96,6 +101,7 @@ async function seedUser(user: {
     role: user.role,
     theme: user.theme,
     hasPettyCash: user.hasPettyCash ?? false,
+    hasCoteroPayments: user.hasCoteroPayments ?? false,
   });
   await db.insert(schema.account).values({
     id: crypto.randomUUID(),
@@ -110,7 +116,7 @@ async function seedUser(user: {
 const seedAdmin = () =>
   seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
-  seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", passwordVar: "SEED_LEIDY_PASSWORD" });
+  seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", hasCoteroPayments: true, passwordVar: "SEED_LEIDY_PASSWORD" });
 const seedGabriella = () =>
   seedUser({ username: "gabriella", name: "Gabriella", role: "assistant", theme: "yellow", passwordVar: "SEED_GABRIELLA_PASSWORD" });
 
