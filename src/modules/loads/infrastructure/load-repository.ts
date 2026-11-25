@@ -1,40 +1,11 @@
-import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { LoadPorts, LoadValues } from "../application/load-commands";
+import { productLabel } from "@/modules/orders/domain/catalog";
+import { loadKgPerBag, loadOrderRows } from "@/modules/orders/infrastructure/order-repository";
 import { findCatalogProducts } from "@/modules/orders/infrastructure/reference-repository";
 import { loadTotals, type LoadLineRow } from "../domain/load-lines";
-import type { LinkedOrder, LoadRow } from "../domain/load-rules";
-
-/** The orders each load picked up, by load id, with the clients and fincas of their lines. */
-async function loadLinkedOrders(): Promise<Map<number, LinkedOrder[]>> {
-  const rows = await db
-    .select({
-      loadId: schema.orders.loadId,
-      orderId: schema.orders.id,
-      bags: schema.orderLines.bags,
-      clientName: schema.clients.name,
-      locationName: schema.clientLocations.name,
-    })
-    .from(schema.orders)
-    .innerJoin(schema.orderLines, eq(schema.orderLines.orderId, schema.orders.id))
-    .innerJoin(schema.clients, eq(schema.clients.id, schema.orderLines.clientId))
-    .leftJoin(schema.clientLocations, eq(schema.clientLocations.id, schema.orderLines.locationId))
-    .where(isNotNull(schema.orders.loadId))
-    .orderBy(asc(schema.orders.id), asc(schema.orderLines.position), asc(schema.orderLines.id));
-
-  const orders = new Map<number, LinkedOrder & { loadId: number }>();
-  for (const r of rows) {
-    if (r.loadId === null) continue;
-    const order = orders.get(r.orderId) ?? { id: r.orderId, loadId: r.loadId, bags: 0, lines: [] };
-    order.bags += r.bags;
-    const known = order.lines.some((l) => l.clientName === r.clientName && l.locationName === r.locationName);
-    if (!known) (order.lines as Array<{ clientName: string; locationName: string | null }>).push({ clientName: r.clientName, locationName: r.locationName });
-    orders.set(r.orderId, order);
-  }
-  const byLoad = new Map<number, LinkedOrder[]>();
-  for (const { loadId, ...order } of orders.values()) byLoad.set(loadId, [...(byLoad.get(loadId) ?? []), order]);
-  return byLoad;
-}
+import { groupLoadOrders, type LoadRow } from "../domain/load-rules";
 
 /** The product lines of every load, by load id, in the order they were typed. */
 async function loadLines(): Promise<Map<number, LoadLineRow[]>> {
@@ -42,6 +13,7 @@ async function loadLines(): Promise<Map<number, LoadLineRow[]>> {
     .select({
       id: schema.loadLines.id,
       loadId: schema.loadLines.loadId,
+      orderId: schema.loadLines.orderId,
       referenceId: schema.loadLines.referenceId,
       referenceName: schema.orderReferences.name,
       referenceCode: schema.orderReferences.code,
@@ -60,11 +32,12 @@ async function loadLines(): Promise<Map<number, LoadLineRow[]>> {
 
 /** Every load, newest day first. */
 export async function loadLoadRows(): Promise<LoadRow[]> {
-  const [rows, linked, lines] = await Promise.all([
+  const [rows, lines] = await Promise.all([
     db.select().from(schema.loads).orderBy(desc(schema.loads.date), desc(schema.loads.id)),
-    loadLinkedOrders(),
     loadLines(),
   ]);
+  const orderIds = [...new Set([...lines.values()].flatMap((ls) => ls.map((l) => l.orderId)))];
+  const orders = await loadOrderRows(orderIds);
   return rows.map((r) => ({
     id: r.id,
     date: r.date,
@@ -74,7 +47,7 @@ export async function loadLoadRows(): Promise<LoadRow[]> {
     ...loadTotals(lines.get(r.id) ?? []),
     lines: lines.get(r.id) ?? [],
     notes: r.notes,
-    orders: linked.get(r.id) ?? [],
+    orders: groupLoadOrders(lines.get(r.id) ?? [], orders),
   }));
 }
 
@@ -89,6 +62,7 @@ const toColumns = (v: LoadValues) => ({
 const toLineColumns = (loadId: number, lines: LoadValues["lines"]) =>
   lines.map((l, position) => ({
     loadId,
+    orderId: l.orderId,
     referenceId: l.referenceId,
     tons: l.tons,
     cost: l.cost,
@@ -99,26 +73,19 @@ const toLineColumns = (loadId: number, lines: LoadValues["lines"]) =>
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** A checked order is no longer pending: aborts the transaction so nothing of the load is stored. */
+/** A checked order stopped being available for the supplier: aborts the transaction so nothing of the load is stored. */
 class OrdersUnavailable extends Error {}
 
-/** Marks the orders as loaded by `loadId`; every one must still be pending. */
-async function linkOrders(tx: Tx, loadId: number, orderIds: readonly number[]) {
+/** No other load of the same supplier may already hold a part of the orders: one load per supplier and order. */
+async function ensureNotLoadedElsewhere(tx: Tx, loadId: number, supplier: LoadValues["supplier"], orderIds: readonly number[]) {
   if (orderIds.length === 0) return;
-  const rows = await tx
-    .update(schema.orders)
-    .set({ status: "cargado", loadId, updatedAt: new Date() })
-    .where(and(inArray(schema.orders.id, [...orderIds]), eq(schema.orders.status, "pendiente")))
-    .returning({ id: schema.orders.id });
-  if (rows.length !== orderIds.length) throw new OrdersUnavailable();
-}
-
-/** Returns every order of the load to pending (the status check holds the invariant status = cargado iff load). */
-async function releaseOrders(tx: Tx, loadId: number) {
-  await tx
-    .update(schema.orders)
-    .set({ status: "pendiente", loadId: null, updatedAt: new Date() })
-    .where(eq(schema.orders.loadId, loadId));
+  const taken = await tx
+    .select({ id: schema.loadLines.id })
+    .from(schema.loadLines)
+    .innerJoin(schema.loads, eq(schema.loads.id, schema.loadLines.loadId))
+    .where(and(inArray(schema.loadLines.orderId, [...orderIds]), eq(schema.loads.supplier, supplier), ne(schema.loadLines.loadId, loadId)))
+    .limit(1);
+  if (taken.length > 0) throw new OrdersUnavailable();
 }
 
 export const loadRepository: LoadPorts = {
@@ -153,13 +120,22 @@ export const loadRepository: LoadPorts = {
 
   findCatalogProducts,
 
-  async findOrdersByIds(ids) {
-    if (ids.length === 0) return [];
-    return db
-      .select({ id: schema.orders.id, status: schema.orders.status, loadId: schema.orders.loadId })
-      .from(schema.orders)
-      .where(inArray(schema.orders.id, ids));
+  async findOrdersForLoad(ids) {
+    const rows = await loadOrderRows(ids);
+    return rows.map((o) => ({
+      id: o.id,
+      status: o.status,
+      loads: o.loads,
+      lines: o.lines.map((l) => ({
+        referenceId: l.referenceId,
+        label: productLabel({ code: l.referenceCode, name: l.referenceName }),
+        supplier: l.supplier,
+        bags: l.bags,
+      })),
+    }));
   },
+
+  getKgPerBag: loadKgPerBag,
 
   async insertLoad(values) {
     try {
@@ -167,7 +143,7 @@ export const loadRepository: LoadPorts = {
         const [load] = await tx.insert(schema.loads).values(toColumns(values)).returning({ id: schema.loads.id });
         if (!load) throw new Error("The load was not stored.");
         await tx.insert(schema.loadLines).values(toLineColumns(load.id, values.lines));
-        await linkOrders(tx, load.id, values.orderIds);
+        await ensureNotLoadedElsewhere(tx, load.id, values.supplier, values.orderIds);
       });
       return true;
     } catch (e) {
@@ -188,9 +164,7 @@ export const loadRepository: LoadPorts = {
         // The lines are rewritten whole: the old ones go first so a kept SIESA number never collides with itself.
         await tx.delete(schema.loadLines).where(eq(schema.loadLines.loadId, id));
         await tx.insert(schema.loadLines).values(toLineColumns(id, values.lines));
-        // The orders of the load become exactly the checked ones: unchecked orders go back to pending.
-        await releaseOrders(tx, id);
-        await linkOrders(tx, id, values.orderIds);
+        await ensureNotLoadedElsewhere(tx, id, values.supplier, values.orderIds);
         return "ok" as const;
       });
     } catch (e) {
@@ -200,11 +174,8 @@ export const loadRepository: LoadPorts = {
   },
 
   async deleteLoad(id) {
-    return db.transaction(async (tx) => {
-      // Before the delete: the foreign key would null `load_id` but leave the order marked as loaded.
-      await releaseOrders(tx, id);
-      const rows = await tx.delete(schema.loads).where(eq(schema.loads.id, id)).returning({ id: schema.loads.id });
-      return rows.length === 1;
-    });
+    // The lines go with the load (cascade); the status of its orders is derived, so they fall back by themselves.
+    const rows = await db.delete(schema.loads).where(eq(schema.loads.id, id)).returning({ id: schema.loads.id });
+    return rows.length === 1;
   },
 };

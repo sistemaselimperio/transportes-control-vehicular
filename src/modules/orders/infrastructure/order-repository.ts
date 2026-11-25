@@ -1,20 +1,40 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notExists, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { OrderPorts, OrderValues } from "../application/order-commands";
-import { DEFAULT_KG_PER_BAG, isValidKgPerBag, type OrderLineRow, type OrderRow } from "../domain/order-rules";
+import { DEFAULT_KG_PER_BAG, deriveOrderLoading, isValidKgPerBag, type OrderLineRow, type OrderLoad, type OrderRow } from "../domain/order-rules";
 import { findCatalogProducts } from "./reference-repository";
 
 const KG_PER_BAG_KEY = "kg_per_bag";
 
-/** Every order with its lines, newest delivery day first. */
-export async function loadOrderRows(): Promise<OrderRow[]> {
+/** The loads that took part of each order, by order id: one per supplier (a load has a single supplier). */
+async function loadOrderLoads(): Promise<Map<number, OrderLoad[]>> {
+  const rows = await db
+    .selectDistinct({ orderId: schema.loadLines.orderId, loadId: schema.loadLines.loadId, supplier: schema.loads.supplier })
+    .from(schema.loadLines)
+    .innerJoin(schema.loads, eq(schema.loads.id, schema.loadLines.loadId))
+    .orderBy(asc(schema.loadLines.orderId), asc(schema.loadLines.loadId));
+  const byOrder = new Map<number, OrderLoad[]>();
+  for (const { orderId, ...load } of rows) byOrder.set(orderId, [...(byOrder.get(orderId) ?? []), load]);
+  return byOrder;
+}
+
+/** An order no load has touched yet: the only kind that can be edited or annulled. */
+const hasNoLoads = (orderId: number) =>
+  notExists(db.select({ one: sql`1` }).from(schema.loadLines).where(eq(schema.loadLines.orderId, orderId)));
+
+/** Every order with its lines and the status derived from its loads, newest delivery day first. */
+/** `ids` narrows it to some orders (the loads read just the ones they take part of). */
+export async function loadOrderRows(ids?: readonly number[]): Promise<OrderRow[]> {
+  if (ids !== undefined && ids.length === 0) return [];
   const orders = await db
     .select()
     .from(schema.orders)
+    .where(ids === undefined ? undefined : inArray(schema.orders.id, [...ids]))
     .orderBy(desc(schema.orders.deliveryDate), desc(schema.orders.id));
   if (orders.length === 0) return [];
 
-  const lines = await db
+  const [lines, loadsByOrder] = await Promise.all([
+    db
     .select({
       id: schema.orderLines.id,
       orderId: schema.orderLines.orderId,
@@ -25,13 +45,17 @@ export async function loadOrderRows(): Promise<OrderRow[]> {
       referenceId: schema.orderLines.referenceId,
       referenceName: schema.orderReferences.name,
       referenceCode: schema.orderReferences.code,
+      supplier: schema.orderReferences.supplier,
       bags: schema.orderLines.bags,
     })
     .from(schema.orderLines)
     .innerJoin(schema.clients, eq(schema.clients.id, schema.orderLines.clientId))
     .leftJoin(schema.clientLocations, eq(schema.clientLocations.id, schema.orderLines.locationId))
     .innerJoin(schema.orderReferences, eq(schema.orderReferences.id, schema.orderLines.referenceId))
-    .orderBy(asc(schema.orderLines.orderId), asc(schema.orderLines.position), asc(schema.orderLines.id));
+    .where(ids === undefined ? undefined : inArray(schema.orderLines.orderId, [...ids]))
+    .orderBy(asc(schema.orderLines.orderId), asc(schema.orderLines.position), asc(schema.orderLines.id)),
+    loadOrderLoads(),
+  ]);
 
   const byOrder = new Map<number, OrderLineRow[]>();
   for (const { orderId, ...line } of lines) {
@@ -40,15 +64,24 @@ export async function loadOrderRows(): Promise<OrderRow[]> {
     byOrder.set(orderId, list);
   }
 
-  return orders.map((o) => ({
-    id: o.id,
-    deliveryDate: o.deliveryDate,
-    timeWindow: o.timeWindow,
-    note: o.note,
-    status: o.status,
-    loadId: o.loadId,
-    lines: byOrder.get(o.id) ?? [],
-  }));
+  return orders.map((o) => {
+    const orderLines = byOrder.get(o.id) ?? [];
+    const loads = loadsByOrder.get(o.id) ?? [];
+    const loading = deriveOrderLoading(
+      o.status,
+      orderLines.map((l) => l.supplier),
+      loads.map((l) => l.supplier),
+    );
+    return {
+      id: o.id,
+      deliveryDate: o.deliveryDate,
+      timeWindow: o.timeWindow,
+      note: o.note,
+      ...loading,
+      loads,
+      lines: orderLines,
+    };
+  });
 }
 
 /** The global kilograms per bag; the default while nobody has set it. */
@@ -97,11 +130,13 @@ export const orderRepository: OrderPorts = {
 
   async findOrder(id) {
     const [row] = await db
-      .select({ status: schema.orders.status, loadId: schema.orders.loadId })
+      .select({ status: schema.orders.status })
       .from(schema.orders)
       .where(eq(schema.orders.id, id))
       .limit(1);
-    return row ?? null;
+    if (!row) return null;
+    const [load] = await db.select({ id: schema.loadLines.id }).from(schema.loadLines).where(eq(schema.loadLines.orderId, id)).limit(1);
+    return { status: row.status, hasLoads: load !== undefined };
   },
 
   async insertOrder(values) {
@@ -118,11 +153,11 @@ export const orderRepository: OrderPorts = {
 
   async replaceOrder(id, values) {
     return db.transaction(async (tx) => {
-      // The status guard makes a concurrent load win: a loaded order is never rewritten.
+      // The status and load guards make a concurrent load win: an order a load took part of is never rewritten.
       const updated = await tx
         .update(schema.orders)
         .set({ deliveryDate: values.deliveryDate, timeWindow: values.timeWindow, note: values.note, updatedAt: new Date() })
-        .where(and(eq(schema.orders.id, id), eq(schema.orders.status, "pendiente")))
+        .where(and(eq(schema.orders.id, id), eq(schema.orders.status, "pendiente"), hasNoLoads(id)))
         .returning({ id: schema.orders.id });
       if (updated.length !== 1) return false;
       await tx.delete(schema.orderLines).where(eq(schema.orderLines.orderId, id));
@@ -135,7 +170,7 @@ export const orderRepository: OrderPorts = {
     const rows = await db
       .update(schema.orders)
       .set({ status: "anulado", updatedAt: new Date() })
-      .where(and(eq(schema.orders.id, id), eq(schema.orders.status, "pendiente")))
+      .where(and(eq(schema.orders.id, id), eq(schema.orders.status, "pendiente"), hasNoLoads(id)))
       .returning({ id: schema.orders.id });
     return rows.length === 1;
   },

@@ -6,7 +6,7 @@ import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { productLabel } from "@/modules/orders/domain/catalog";
-import { orderTotals, ordersTotals, productTotals, type OrderRow } from "@/modules/orders/domain/order-rules";
+import { orderLoadIds, orderTotals, ordersTotals, productTotals, remainingLines, type OrderRow } from "@/modules/orders/domain/order-rules";
 import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { bucketPendingOrders, clientNames, daysLate, PENDING_DAYS, pendingDay, type PendingDay } from "@/modules/orders/domain/order-days";
@@ -75,7 +75,8 @@ function dayLabel(date: string, today: string): string {
 
 /**
  * The orders still waiting for a load, one compact line each in delivery order (late first): a status
- * dot, the number, the day and window, the clients, the bags and "Cargue". A line opens its detail.
+ * dot, the number, the day and window, the clients, the bags and "Cargue". A partially loaded order stays
+ * here with only what is still to load. A line opens its detail.
  */
 export function PendingOrders({
   orders,
@@ -84,7 +85,7 @@ export function PendingOrders({
   canManage,
   onCreateLoad,
 }: {
-  /** Pending orders only. */
+  /** Pending orders, including the partially loaded ones. */
   orders: readonly OrderRow[];
   /** Colombia's current day. */
   today: string;
@@ -92,7 +93,11 @@ export function PendingOrders({
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
 }) {
-  const totals = ordersTotals(orders, kgPerBag);
+  // A partially loaded order counts only for what is still to load.
+  const totals = ordersTotals(
+    orders.map((o) => ({ lines: remainingLines(o) })),
+    kgPerBag,
+  );
   const buckets = bucketPendingOrders(orders, today);
   const sorted = PENDING_DAYS.flatMap((d) => buckets[d]);
   const storedOpen = useSyncExternalStore(subscribe, readOpen, readServerOpen);
@@ -178,8 +183,10 @@ function OrderLine({
   onCreateLoad: (orderId: number) => void;
 }) {
   const [detail, setDetail] = useState(false);
-  const t = orderTotals(o.lines, kgPerBag);
+  const t = orderTotals(remainingLines(o), kgPerBag);
   const names = clientNames(o);
+  const loadedIds = orderLoadIds(o).map((id) => `#${id}`).join(", ");
+  const partialText = o.partial ? `Cargado parcial ${loadedIds} · falta ${o.pendingSuppliers.join(" y ")}` : null;
   const when = pendingDay(o.deliveryDate, today);
   const whenText = [dayLabel(o.deliveryDate, today), o.timeWindow].filter(Boolean).join(" · ");
 
@@ -205,8 +212,12 @@ function OrderLine({
             {t.bags}
             <span className="font-normal text-muted-foreground md:sr-only"> bultos</span>
           </span>
-          <span className="col-start-2 min-w-0 truncate text-muted-foreground md:col-start-auto md:text-foreground" title={names.join(", ")}>
+          <span
+            className="col-start-2 min-w-0 truncate text-muted-foreground md:col-start-auto md:text-foreground"
+            title={[names.join(", "), partialText].filter(Boolean).join(" · ")}
+          >
             {names.join(", ") || "Sin clientes"}
+            {partialText && <span className="num text-xs text-warn-foreground"> · {partialText}</span>}
           </span>
         </button>
         {canManage && (
@@ -228,17 +239,18 @@ function OrderLine({
         title={`Pedido #${o.id}`}
         description={`${whenText} · ${t.bags} bultos · ${tons(t.tons)} t`}
       >
-        <OrderDetail order={o} />
+        <OrderDetail order={o} partialText={partialText} />
       </SlideOver>
     </li>
   );
 }
 
-/** The order's products only, one line each with its bags summed across the clients. */
-function OrderDetail({ order: o }: { order: OrderRow }) {
-  const products = productTotals(o.lines);
+/** What is still to load of the order: one line per product with its bags summed across the clients. */
+function OrderDetail({ order: o, partialText }: { order: OrderRow; partialText: string | null }) {
+  const products = productTotals(remainingLines(o));
   return (
     <div className="space-y-4">
+      {partialText && <p className="num text-sm text-warn-foreground">{partialText}</p>}
       <ul className="divide-y text-sm">
         {products.map((p) => (
           <li key={p.referenceId} className="flex items-baseline justify-between gap-3 py-2">

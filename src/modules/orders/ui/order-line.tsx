@@ -10,14 +10,18 @@ import { formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { productLabel } from "../domain/catalog";
 import { clientNames, daysLate, pendingDay } from "../domain/order-days";
-import { bagsToKg, canEditOrder, kgToTons, ORDER_STATUS_LABELS, orderTotals, type OrderRow, type OrderStatus } from "../domain/order-rules";
+import { bagsToKg, canEditOrder, kgToTons, orderLoadIds, orderStatusLabel, orderTotals, type OrderRow, type OrderStatus } from "../domain/order-rules";
 
-/** Status as quiet text: only a loaded or an annulled order says so; a pending one shows its day. */
+/** Status as quiet text: only a loaded, a partially loaded or an annulled order says so; a pending one shows its day. */
 const STATUS_TEXT: Record<OrderStatus, string> = {
   pendiente: "text-muted-foreground",
   cargado: "font-medium text-ok-foreground",
   anulado: "font-medium text-danger-foreground",
 };
+const PARTIAL_TEXT = "font-medium text-warn-foreground";
+
+/** "#3, #5": the loads that took part of the order. */
+const loadsLabel = (order: OrderRow): string => orderLoadIds(order).map((id) => `#${id}`).join(", ");
 
 /** The pending order's dot: red when late, amber for today, none otherwise. */
 function dotClass(order: OrderRow, today: string): string {
@@ -67,7 +71,9 @@ export function OrderLine({
 }) {
   const [detail, setDetail] = useState(false);
   const totals = orderTotals(order.lines, kgPerBag);
-  const editable = canEditOrder(order.status);
+  // An order a load already took part of is locked, but a partial one still needs its remaining loads.
+  const editable = canEditOrder(order.status, order.loads.length > 0);
+  const loadable = order.status === "pendiente" && canCreateLoad;
   const names = clientNames(order);
   const day = dayText(order, today);
   const annulled = order.status === "anulado";
@@ -78,7 +84,7 @@ export function OrderLine({
         <button
           type="button"
           aria-haspopup="dialog"
-          aria-label={`Pedido ${order.id}, ${ORDER_STATUS_LABELS[order.status]}, ver detalle`}
+          aria-label={`Pedido ${order.id}, ${orderStatusLabel(order)}, ver detalle`}
           onClick={() => setDetail(true)}
           className={cn(
             "grid min-h-14 min-w-0 flex-1 cursor-pointer grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 py-2 pl-4 text-left text-sm transition-colors hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground md:grid-cols-[0.5rem_3.5rem_10rem_minmax(0,1fr)_6rem_4.5rem] md:py-0",
@@ -102,16 +108,16 @@ export function OrderLine({
             <span className="min-w-0 truncate text-muted-foreground md:text-foreground" title={names.join(", ")}>
               {names.join(", ") || "Sin clientes"}
             </span>
-            <span className={cn("shrink-0 text-xs md:text-sm", STATUS_TEXT[order.status])}>
-              {ORDER_STATUS_LABELS[order.status]}
-              {order.loadId !== null && <span className="num font-normal text-muted-foreground"> #{order.loadId}</span>}
+            <span className={cn("shrink-0 text-xs md:text-sm", order.partial ? PARTIAL_TEXT : STATUS_TEXT[order.status])}>
+              {orderStatusLabel(order)}
+              {order.loads.length > 0 && <span className="num font-normal text-muted-foreground"> {loadsLabel(order)}</span>}
             </span>
           </span>
         </button>
 
-        {editable && (canManage || canCreateLoad) && (
+        {(editable || loadable) && (canManage || canCreateLoad) && (
           <div className="flex shrink-0 items-center gap-0.5">
-            {canCreateLoad && (
+            {loadable && (
               <Link
                 href={`/cargues?nuevo=1&pedido=${order.id}`}
                 className={buttonVariants({ variant: "outline", className: "h-11 px-3 md:h-8" })}
@@ -121,7 +127,7 @@ export function OrderLine({
                 <span className="max-sm:sr-only">Cargue</span>
               </Link>
             )}
-            {canManage && (
+            {canManage && editable && (
               <>
                 <Button
                   variant="ghost"
@@ -153,21 +159,21 @@ export function OrderLine({
         open={detail}
         onOpenChange={setDetail}
         title={`Pedido #${order.id}`}
-        description={`${ORDER_STATUS_LABELS[order.status]} · entrega ${day.label}${order.timeWindow ? ` · ${order.timeWindow}` : ""}`}
+        description={`${orderStatusLabel(order)} · entrega ${day.label}${order.timeWindow ? ` · ${order.timeWindow}` : ""}`}
       >
         <OrderDetail
           order={order}
           kgPerBag={kgPerBag}
           actions={
-            editable && (canManage || canCreateLoad) ? (
+            (editable || loadable) && (canManage || canCreateLoad) ? (
               <div className="flex flex-wrap gap-2 border-t pt-4">
-                {canCreateLoad && (
+                {loadable && (
                   <Link href={`/cargues?nuevo=1&pedido=${order.id}`} className={buttonVariants({ className: "h-11 px-4 md:h-10" })}>
                     <Container aria-hidden />
                     Crear cargue
                   </Link>
                 )}
-                {canManage && (
+                {canManage && editable && (
                   <>
                     <Button
                       variant="outline"
@@ -210,7 +216,16 @@ function OrderDetail({ order, kgPerBag, actions }: { order: OrderRow; kgPerBag: 
     <div className="space-y-5">
       <div className="space-y-1 text-sm">
         <p className="font-semibold">{names.join(", ") || "Sin clientes"}</p>
-        {order.loadId !== null && <p className="num text-muted-foreground">Cargue #{order.loadId}</p>}
+        {order.loads.length > 0 && (
+          <p className="num text-muted-foreground">
+            {order.loads.length === 1 ? "Cargue" : "Cargues"} {loadsLabel(order)}
+          </p>
+        )}
+        {order.partial && (
+          <p className="text-warn-foreground">
+            Cargado parcial: falta cargar lo de {order.pendingSuppliers.join(" y ")}.
+          </p>
+        )}
       </div>
 
       <table className="w-full text-sm">
@@ -230,6 +245,12 @@ function OrderDetail({ order, kgPerBag, actions }: { order: OrderRow; kgPerBag: 
                 <td className="py-2 pr-3">
                   {productLabel({ code: line.referenceCode, name: line.referenceName })}
                   {line.locationName && <span className="block text-xs text-muted-foreground">Finca {line.locationName}</span>}
+                  {line.supplier !== null && (
+                    <span className="block text-xs text-muted-foreground">
+                      {line.supplier}
+                      {order.loads.length > 0 && <LineLoadState order={order} supplier={line.supplier} />}
+                    </span>
+                  )}
                 </td>
                 <td className="num py-2 text-right">{formatDecimal(line.bags, 0)}</td>
                 <td className="num py-2 pl-3 text-right">{formatDecimal(kg, 2)}</td>
@@ -252,5 +273,15 @@ function OrderDetail({ order, kgPerBag, actions }: { order: OrderRow; kgPerBag: 
 
       {actions}
     </div>
+  );
+}
+
+/** " · cargado #3" or " · pendiente": where the products of a supplier stand once the order has loads. */
+function LineLoadState({ order, supplier }: { order: OrderRow; supplier: NonNullable<OrderRow["lines"][number]["supplier"]> }) {
+  const load = order.loads.find((l) => l.supplier === supplier);
+  return load ? (
+    <span className="num text-ok-foreground"> · cargado #{load.loadId}</span>
+  ) : (
+    <span className="text-warn-foreground"> · pendiente</span>
   );
 }

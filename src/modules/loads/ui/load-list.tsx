@@ -4,11 +4,10 @@ import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { PlateText } from "@/components/app/plate-text";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { productLabel } from "@/modules/orders/domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { formatCop, summarizeLinkedOrders, type LoadRow } from "../domain/load-rules";
+import { formatCop, loadFooter, type LoadOrderBlock, type LoadRow } from "../domain/load-rules";
 
 /** The plate links to the vehicle's file while the vehicle still exists. */
 function Plate({ row }: { row: LoadRow }) {
@@ -23,64 +22,60 @@ function Plate({ row }: { row: LoadRow }) {
   );
 }
 
-/** "#3, #5 · 75 bultos"; opening it lists the clients and fincas of every order. */
-function LinkedOrders({ orders }: { orders: LoadRow["orders"] }) {
-  if (orders.length === 0) return <span className="text-muted-foreground">—</span>;
-  const { label, bags } = summarizeLinkedOrders(orders);
+/** "Agro Uno (La Esperanza), Agro Dos": the clients and fincas of an order. */
+const clientsText = (order: LoadOrderBlock): string =>
+  order.clients.map((c) => (c.locationName ? `${c.clientName} (${c.locationName})` : c.clientName)).join(", ") || "Sin clientes";
+
+/** One order of the load: its number, clients, delivery day and window, and the products this load takes of it. */
+function OrderBlock({ order }: { order: LoadOrderBlock }) {
   return (
-    <details className="group">
-      <summary className="num cursor-pointer rounded-sm outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
-        {label} · {formatDecimal(bags, 0)} bultos
-      </summary>
-      <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
-        {orders.map((o) => (
-          <li key={o.id}>
-            <span className="num font-medium text-foreground">#{o.id}</span>{" "}
-            {o.lines.map((l) => (l.locationName ? `${l.clientName} (${l.locationName})` : l.clientName)).join(", ")}
+    <li className="space-y-1.5 px-4 py-3 text-sm">
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="num font-semibold">Pedido #{order.id}</span>
+        <span className="min-w-0 text-muted-foreground">{clientsText(order)}</span>
+      </p>
+      <p className="num text-xs text-muted-foreground">
+        Entrega {formatDisplayDate(order.deliveryDate)}
+        {order.timeWindow ? ` · ${order.timeWindow}` : ""}
+      </p>
+      <ul className="divide-y rounded-lg border bg-background text-xs">
+        {order.products.map((p) => (
+          <li key={p.referenceId} className="flex items-baseline justify-between gap-3 px-2.5 py-1.5">
+            <span className="min-w-0">{p.label}</span>
+            <span className="num shrink-0 text-muted-foreground">
+              <span className="font-semibold text-foreground">{formatDecimal(p.bags, 0)}</span> bultos · {formatDecimal(p.tons, 3)} t
+            </span>
           </li>
         ))}
       </ul>
-    </details>
+    </li>
   );
 }
 
-/** The products of a load; opening it lists each with its tons, cost and numbers, and the orders it picked up. */
-function LoadDetails({ row }: { row: LoadRow }) {
+/** The lines of a load as they were typed: product, order, tons, cost and numbers. */
+function LineDetails({ row }: { row: LoadRow }) {
   const count = row.lines.length;
   return (
-    <details className="group">
-      <summary className="cursor-pointer rounded-sm text-sm outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
-        <span className="num">
-          {count} {count === 1 ? "producto" : "productos"}
-        </span>
+    <details className="group px-4 py-2.5">
+      <summary className="num cursor-pointer rounded-sm text-xs text-muted-foreground outline-none marker:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/70">
+        {count} {count === 1 ? "línea" : "líneas"} · costo y números
       </summary>
-      <div className="mt-2 space-y-3">
-        <ul className="space-y-2">
-          {row.lines.map((l) => (
-            <li key={l.id} className="rounded-lg border bg-background p-2.5 text-xs">
-              <p className="text-sm font-medium">
-                {l.referenceName !== null ? productLabel({ code: l.referenceCode, name: l.referenceName }) : <span className="font-normal text-muted-foreground">Sin producto</span>}
-              </p>
-              <p className="num text-muted-foreground">
-                {formatDecimal(l.tons, 3)} t · {formatCop(l.cost)}
-              </p>
-              <p className="num text-muted-foreground">
-                SIESA {l.siesaNumber} · Pedido proveedor {l.orderNumber}
-              </p>
-            </li>
-          ))}
-        </ul>
-        {row.orders.length > 0 && (
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {row.orders.map((o) => (
-              <li key={o.id}>
-                <span className="num font-medium text-foreground">Pedido #{o.id}</span>{" "}
-                {o.lines.map((l) => (l.locationName ? `${l.clientName} (${l.locationName})` : l.clientName)).join(", ")}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ul className="mt-2 space-y-2">
+        {row.lines.map((l) => (
+          <li key={l.id} className="rounded-lg border bg-background p-2.5 text-xs">
+            <p className="text-sm font-medium">
+              {l.referenceName !== null ? productLabel({ code: l.referenceCode, name: l.referenceName }) : <span className="font-normal text-muted-foreground">Sin producto</span>}
+              <span className="num font-normal text-muted-foreground"> · Pedido #{l.orderId}</span>
+            </p>
+            <p className="num text-muted-foreground">
+              {formatDecimal(l.tons, 3)} t · {formatCop(l.cost)}
+            </p>
+            <p className="num text-muted-foreground">
+              SIESA {l.siesaNumber} · Pedido proveedor {l.orderNumber}
+            </p>
+          </li>
+        ))}
+      </ul>
     </details>
   );
 }
@@ -120,10 +115,11 @@ function RowActions({
   );
 }
 
-const HEADERS = ["Fecha", "Proveedor", "Placa", "Toneladas", "Costo", "Productos", "Pedidos"] as const;
-const NUMERIC = new Set<string>(["Toneladas", "Costo"]);
-
-/** Loads as a table from `md`, as cards on phones. Without `canManage` the rows carry no edit / delete. */
+/**
+ * One block per load. Header: plate, date, supplier, total tons and cost. Then each order the load takes
+ * part of, with its clients, delivery day and the products (bags and tons) carried here. Footer: how many
+ * orders and how many bags. Without `canManage` the blocks carry no edit / delete.
+ */
 export function LoadList({
   rows,
   canManage,
@@ -137,92 +133,53 @@ export function LoadList({
 }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No hay cargues para este filtro.</p>;
   return (
-    <>
-      <ul className="grid gap-3 md:hidden">
-        {rows.map((r) => (
-          <li key={r.id} className="space-y-2 rounded-2xl border bg-card p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="font-medium">{r.supplier}</p>
+    <ul className="grid gap-3 lg:grid-cols-2">
+      {rows.map((r) => {
+        const footer = loadFooter(r.orders);
+        return (
+          <li key={r.id} className="panel">
+            <div className="flex items-start justify-between gap-2 border-b bg-muted/60 px-4 py-3">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <Plate row={r} />
+                  <span className="font-medium">{r.supplier}</span>
+                </div>
                 <p className="num text-sm text-muted-foreground">{formatDisplayDate(r.date)}</p>
+                <p className="num text-sm font-semibold">
+                  {formatDecimal(r.tons, 3)} t · {formatCop(r.cost)}
+                </p>
               </div>
               {canManage && (
-                <div className="-mt-2 -mr-2 flex shrink-0 items-center gap-1">
+                <div className="-mt-1 -mr-2 flex shrink-0 items-center gap-1">
                   <RowActions row={r} onEdit={onEdit} onDelete={onDelete} />
                 </div>
               )}
             </div>
-            <p className="num text-sm">
-              {formatDecimal(r.tons, 3)} t · {formatCop(r.cost)}
-            </p>
-            {r.orders.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Pedidos: <LinkedOrders orders={r.orders} />
-              </p>
-            )}
-            <LoadDetails row={r} />
-            {r.notes && <p className="line-clamp-2 text-sm text-muted-foreground">{r.notes}</p>}
-            <div className="border-t pt-2">
-              <Plate row={r} />
-            </div>
-          </li>
-        ))}
-      </ul>
 
-      <div className="panel hidden md:block">
-        <div className="plate-head">
-          <span className="micro-label">{rows.length} cargues</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left">
-              <tr className="border-b">
-                {HEADERS.map((h) => (
-                  <th key={h} scope="col" className={cn("micro-label px-4 py-3 font-medium", NUMERIC.has(h) && "text-right")}>
-                    {h}
-                  </th>
+            {r.orders.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">Sin pedidos.</p>
+            ) : (
+              <ul className="divide-y">
+                {r.orders.map((o) => (
+                  <OrderBlock key={o.id} order={o} />
                 ))}
-                {canManage && (
-                  <th scope="col" className="w-24">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/50">
-                  <td className="num px-4 py-3 whitespace-nowrap">{formatDisplayDate(r.date)}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-medium">{r.supplier}</span>
-                    {r.notes && (
-                      <span className="block max-w-64 truncate text-xs text-muted-foreground" title={r.notes}>
-                        {r.notes}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Plate row={r} />
-                  </td>
-                  <td className="num px-4 py-3 text-right">{formatDecimal(r.tons, 3)}</td>
-                  <td className="num px-4 py-3 text-right whitespace-nowrap">{formatCop(r.cost)}</td>
-                  <td className="px-4 py-3 align-top">
-                    <LoadDetails row={r} />
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <LinkedOrders orders={r.orders} />
-                  </td>
-                  {canManage && (
-                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                      <RowActions row={r} onEdit={onEdit} onDelete={onDelete} />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </>
+              </ul>
+            )}
+
+            <div className="border-t">
+              <LineDetails row={r} />
+            </div>
+            {r.notes && <p className="line-clamp-2 border-t px-4 py-2.5 text-sm text-muted-foreground">{r.notes}</p>}
+
+            <p className="num flex flex-wrap items-center justify-between gap-x-4 border-t bg-muted/40 px-4 py-2.5 text-sm font-semibold">
+              <span>
+                {footer.orders} {footer.orders === 1 ? "pedido" : "pedidos"}
+              </span>
+              <span>{formatDecimal(footer.bags, 0)} bultos</span>
+            </p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

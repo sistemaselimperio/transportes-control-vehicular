@@ -1,6 +1,8 @@
 import { type FindCatalogProducts, productLabel } from "@/modules/orders/domain/catalog";
-import { unavailableOrderIds, type OrderStatus } from "@/modules/orders/domain/order-rules";
+import type { OrderStatus } from "@/modules/orders/domain/order-rules";
+import { allocationErrors, unavailableOrderIds, type AllocationProduct } from "../domain/load-allocation";
 import { firstDuplicate } from "../domain/load-lines";
+import type { LoadSupplier } from "../domain/load-rules";
 import type { LoadInput } from "./load-schemas";
 
 /** A rule of the loads refused the operation; the message is for the user. */
@@ -9,7 +11,15 @@ export class LoadError extends Error {}
 /** What the repository stores: the header with the vehicle link, the lines with their reference ids. */
 export interface LoadValues extends Omit<LoadInput, "lines"> {
   vehicleId: number | null;
-  lines: ReadonlyArray<{ referenceId: number; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
+  lines: ReadonlyArray<{ orderId: number; referenceId: number; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
+}
+
+/** An order as the load needs it: its derived status, the loads that already took part of it and its product lines. */
+export interface OrderForLoad {
+  id: number;
+  status: OrderStatus;
+  loads: ReadonlyArray<{ loadId: number; supplier: LoadSupplier }>;
+  lines: readonly AllocationProduct[];
 }
 
 export interface LoadPorts {
@@ -20,20 +30,21 @@ export interface LoadPorts {
   findTakenSiesa(numbers: string[], exceptId?: number): Promise<string[]>;
   /** The catalog products among `ids`; legacy products (no code) and unknown ids are left out. */
   findCatalogProducts: FindCatalogProducts;
-  /** The orders among `ids` that exist, with their status and the load they belong to. */
-  findOrdersByIds(ids: number[]): Promise<Array<{ id: number; status: OrderStatus; loadId: number | null }>>;
+  /** The orders among `ids` that exist, with their lines and the loads that already took part of them. */
+  findOrdersForLoad(ids: number[]): Promise<OrderForLoad[]>;
+  /** The kilograms per bag in force now. */
+  getKgPerBag(): Promise<number>;
   /**
-   * Stores the load and, in the same transaction, marks `values.orderIds` as loaded. False (nothing
-   * stored) when one of those orders stopped being available meanwhile.
+   * Stores the load with its lines. False (nothing stored) when one of `values.orderIds` stopped being
+   * available for the supplier meanwhile.
    */
   insertLoad(values: LoadValues): Promise<boolean>;
   /**
-   * Updates the load; its orders become exactly `values.orderIds` (the ones unchecked go back to
-   * pending), all in one transaction. "gone" when no load has that id, "orders_unavailable" (nothing
-   * changed) when a checked order stopped being available.
+   * Updates the load and rewrites its lines in one transaction. "gone" when no load has that id,
+   * "orders_unavailable" (nothing changed) when a checked order stopped being available for the supplier.
    */
   updateLoad(id: number, values: LoadValues): Promise<"ok" | "gone" | "orders_unavailable">;
-  /** Deletes the load and returns its orders to pending in the same transaction. False when no load has that id. */
+  /** Deletes the load with its lines (its orders go back to what the other loads leave them as). False when no load has that id. */
   deleteLoad(id: number): Promise<boolean>;
 }
 
@@ -46,7 +57,8 @@ const GONE = "El cargue ya no existe.";
 const PRODUCT_GONE = "Un producto del cargue ya no está en el catálogo.";
 const foreignProduct = (label: string, supplier: string) => `El producto ${label} no es del proveedor ${supplier}.`;
 const NOT_IN_FLEET = "Elige una placa de la flota.";
-export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya pertenece a otro cargue.";
+export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya tiene cargue de este proveedor.";
+const NO_ORDERS = "Elige al menos un pedido.";
 
 export function createLoadCommands(ports: LoadPorts) {
   /** At least one line, no SIESA repeated inside the load or held by another load. */
@@ -76,6 +88,7 @@ export function createLoadCommands(ports: LoadPorts) {
       notes: input.notes,
       orderIds: input.orderIds,
       lines: input.lines.map((l) => ({
+        orderId: l.orderId,
         referenceId: l.referenceId,
         tons: l.tons,
         cost: l.cost,
@@ -85,11 +98,21 @@ export function createLoadCommands(ports: LoadPorts) {
     };
   }
 
-  /** The checked orders must be pending, or already linked to this same load. */
-  async function ensureOrdersAvailable(orderIds: readonly number[], loadId?: number) {
-    if (orderIds.length === 0) return;
-    const found = await ports.findOrdersByIds([...orderIds]);
-    if (unavailableOrderIds(found, orderIds, loadId).length > 0) throw new LoadError(ORDERS_UNAVAILABLE);
+  /**
+   * The checked orders must be loadable by the supplier (not annulled, not loaded for it by another load;
+   * `loadId` is the load being edited), and every checked order must be covered, to the kilogram.
+   */
+  async function ensureOrders(values: LoadValues, loadId?: number) {
+    if (values.orderIds.length === 0) throw new LoadError(NO_ORDERS);
+    const found = await ports.findOrdersForLoad([...values.orderIds]);
+    if (unavailableOrderIds(found, values.orderIds, values.supplier, loadId).length > 0) throw new LoadError(ORDERS_UNAVAILABLE);
+    const errors = allocationErrors({
+      supplier: values.supplier,
+      kgPerBag: await ports.getKgPerBag(),
+      orders: values.orderIds.flatMap((id) => found.filter((o) => o.id === id)),
+      lines: values.lines,
+    });
+    if (errors.length > 0) throw new LoadError(errors.join("; "));
   }
 
   return {
@@ -97,10 +120,9 @@ export function createLoadCommands(ports: LoadPorts) {
       const vehicle = await ports.findVehicleByPlate(input.plate);
       if (!vehicle) throw new LoadError(NOT_IN_FLEET);
       await ensureLines(input);
-      await ensureOrdersAvailable(input.orderIds);
-      if (!(await ports.insertLoad(await prepare(input, { plate: vehicle.plate, vehicleId: vehicle.id })))) {
-        throw new LoadError(ORDERS_UNAVAILABLE);
-      }
+      const values = await prepare(input, { plate: vehicle.plate, vehicleId: vehicle.id });
+      await ensureOrders(values);
+      if (!(await ports.insertLoad(values))) throw new LoadError(ORDERS_UNAVAILABLE);
     },
 
     async update(id: number, input: LoadInput) {
@@ -117,8 +139,9 @@ export function createLoadCommands(ports: LoadPorts) {
         throw new LoadError(NOT_IN_FLEET);
       }
       await ensureLines(input, id);
-      await ensureOrdersAvailable(input.orderIds, id);
-      const result = await ports.updateLoad(id, await prepare(input, owner));
+      const values = await prepare(input, owner);
+      await ensureOrders(values, id);
+      const result = await ports.updateLoad(id, values);
       if (result === "gone") throw new LoadError(GONE);
       if (result === "orders_unavailable") throw new LoadError(ORDERS_UNAVAILABLE);
     },

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { loadIdSchema, loadSchema } from "./load-schemas";
 
-const line = { referenceId: 10, tons: "32,5", cost: "$ 1.500.000", siesaNumber: " FV-100 ", orderNumber: " P-77 " };
+const line = { orderId: 12, referenceId: 10, tons: "32,5", cost: "$ 1.500.000", siesaNumber: " FV-100 ", orderNumber: " P-77 " };
 
 const valid = {
   date: "2026-11-18",
   supplier: "Italcol",
   plate: "abc 123",
   notes: "",
+  orderIds: ["12"],
   lines: JSON.stringify([line]),
 };
 
@@ -24,8 +25,8 @@ describe("loadSchema", () => {
       supplier: "Italcol",
       plate: "ABC-123",
       notes: null,
-      orderIds: [],
-      lines: [{ referenceId: 10, tons: 32.5, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" }],
+      orderIds: [12],
+      lines: [{ orderId: 12, referenceId: 10, tons: 32.5, cost: 1_500_000, siesaNumber: "FV-100", orderNumber: "P-77" }],
     });
   });
 
@@ -40,6 +41,12 @@ describe("loadSchema", () => {
   it("requires at least one line", () => {
     expect(firstIssue({ ...valid, lines: "[]" })).toBe("Agrega al menos un producto al cargue.");
     expect(firstIssue({ ...valid, lines: "no json" })).toBe("Los productos del cargue no son válidos.");
+  });
+
+  it("requires the order of each line", () => {
+    for (const orderId of [null, undefined, 0, 1.5, "12"]) {
+      expect(firstIssue(withLines([{ ...line, orderId }]))).toBe("Cada producto debe pertenecer a un pedido.");
+    }
   });
 
   it("requires a product on each line", () => {
@@ -77,6 +84,10 @@ describe("loadSchema", () => {
 });
 
 describe("loadSchema orderIds", () => {
+  it("requires at least one order", () => {
+    expect(firstIssue({ ...valid, orderIds: [] })).toBe("Elige al menos un pedido.");
+  });
+
   it("parses the checked orders as unique positive ids", () => {
     expect(loadSchema.parse({ ...valid, orderIds: ["3", "5", "3"] }).orderIds).toEqual([3, 5]);
   });

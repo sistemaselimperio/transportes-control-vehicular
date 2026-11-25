@@ -1,3 +1,4 @@
+import type { LoadSupplier } from "@/modules/loads/domain/load-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 
 export const ORDER_STATUSES = ["pendiente", "cargado", "anulado"] as const;
@@ -29,7 +30,15 @@ export interface OrderLineRow {
   referenceName: string;
   /** Null for a product typed inline before the catalog existed. */
   referenceCode: string | null;
+  /** The catalog supplier of the product; null for a legacy product typed inline before the catalog. */
+  supplier: LoadSupplier | null;
   bags: number;
+}
+
+/** A load that took part of the order: each supplier of the order is loaded by at most one load. */
+export interface OrderLoad {
+  loadId: number;
+  supplier: LoadSupplier;
 }
 
 export interface OrderRow {
@@ -39,9 +48,14 @@ export interface OrderRow {
   /** Free text such as "7–11 a.m.". */
   timeWindow: string | null;
   note: string | null;
+  /** Derived from the loads: `cargado` once every supplier of its products has a load. */
   status: OrderStatus;
-  /** The load that picked the order up; set exactly while the status is `cargado`. */
-  loadId: number | null;
+  /** The loads that took part of the order, one per supplier. */
+  loads: readonly OrderLoad[];
+  /** Some but not all of the suppliers of the order are loaded: a pending order shown as "Cargado parcial". */
+  partial: boolean;
+  /** The suppliers of the order that still have no load; empty once loaded or annulled. */
+  pendingSuppliers: readonly LoadSupplier[];
   lines: readonly OrderLineRow[];
 }
 
@@ -90,12 +104,43 @@ export function productTotals(
 
 export const isValidKgPerBag = (value: number): boolean => Number.isFinite(value) && value > 0 && value <= MAX_KG_PER_BAG;
 
-/** Only a pending order can be edited or annulled; a loaded or annulled one is locked. */
-export const canEditOrder = (status: OrderStatus): boolean => status === "pendiente";
+/** Only a pending order that no load has touched can be edited or annulled. */
+export const canEditOrder = (status: OrderStatus, hasLoads = false): boolean => status === "pendiente" && !hasLoads;
 
-/** The invariant of the model: an order is `cargado` exactly when it has a load. */
-export const isStatusConsistent = (status: OrderStatus, loadId: number | null): boolean =>
-  (status === "cargado") === (loadId !== null);
+/**
+ * Status of an order from its loads (the persisted status only tells annulled from the rest): loaded when
+ * every supplier of its products has a load, partially loaded when only some do, pending otherwise.
+ * Products without a supplier (legacy) take no part.
+ */
+export function deriveOrderLoading(
+  persisted: OrderStatus,
+  lineSuppliers: ReadonlyArray<LoadSupplier | null>,
+  loadedSuppliers: readonly LoadSupplier[],
+): { status: OrderStatus; partial: boolean; pendingSuppliers: LoadSupplier[] } {
+  if (persisted === "anulado") return { status: "anulado", partial: false, pendingSuppliers: [] };
+  const suppliers = [...new Set(lineSuppliers.filter((s): s is LoadSupplier => s !== null))];
+  const pendingSuppliers = suppliers.filter((s) => !loadedSuppliers.includes(s));
+  if (suppliers.length > 0 && pendingSuppliers.length === 0) return { status: "cargado", partial: false, pendingSuppliers };
+  return { status: "pendiente", partial: pendingSuppliers.length < suppliers.length, pendingSuppliers };
+}
+
+/** The numbers of the loads that took part of the order, ascending, each once. */
+export const orderLoadIds = (order: Pick<OrderRow, "loads">): number[] =>
+  [...new Set(order.loads.map((l) => l.loadId))].sort((a, b) => a - b);
+
+/** "Cargado parcial" for a partially loaded order, the plain status label otherwise. */
+export const orderStatusLabel = (order: Pick<OrderRow, "status" | "partial">): string =>
+  order.partial ? "Cargado parcial" : ORDER_STATUS_LABELS[order.status];
+
+/** What is still to load of the order: the lines of the suppliers without a load once it is partially loaded. */
+export function remainingLines<T extends Pick<OrderLineRow, "supplier">>(order: {
+  lines: readonly T[];
+  partial: boolean;
+  pendingSuppliers: readonly LoadSupplier[];
+}): readonly T[] {
+  if (!order.partial) return order.lines;
+  return order.lines.filter((l) => l.supplier !== null && order.pendingSuppliers.includes(l.supplier));
+}
 
 export interface OrderFilters {
   statuses: readonly OrderStatus[];
@@ -115,19 +160,3 @@ export function filterOrders<T extends Pick<OrderRow, "status" | "deliveryDate">
 
 /** Tons typed on a load minus the tons its orders add up to; rounded to the kilo. */
 export const tonsDifference = (entered: number, expected: number): number => round(entered - expected, 3);
-
-/**
- * Ids among `requested` that cannot be linked to a load: missing, annulled, or already loaded on a
- * different load. `loadId` is the load being edited, whose own orders stay valid.
- */
-export function unavailableOrderIds(
-  found: ReadonlyArray<{ id: number; status: OrderStatus; loadId: number | null }>,
-  requested: readonly number[],
-  loadId?: number,
-): number[] {
-  return requested.filter((id) => {
-    const order = found.find((o) => o.id === id);
-    if (!order || order.status === "anulado") return true;
-    return order.loadId !== null && order.loadId !== loadId;
-  });
-}

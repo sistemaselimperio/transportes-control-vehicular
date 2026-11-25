@@ -15,7 +15,7 @@ function ports(over: Partial<OrderPorts> = {}): OrderPorts {
     findExistingClientIds: vi.fn(async (ids: number[]) => ids.filter((id) => id !== 99)),
     findLocationOwners: vi.fn(async (ids: number[]) => ids.map((id) => ({ id, clientId: id === 7 ? 3 : 4 }))),
     findCatalogProducts: vi.fn(async (ids: number[]) => ids.filter((id) => id !== 98).map((id) => ({ id, code: `C${id}`, name: `Producto ${id}`, supplier: "Finca" as const }))),
-    findOrder: vi.fn(async () => ({ status: "pendiente" as const, loadId: null })),
+    findOrder: vi.fn(async () => ({ status: "pendiente" as const, hasLoads: false })),
     insertOrder: vi.fn(async () => 1),
     replaceOrder: vi.fn(async () => true),
     annulOrder: vi.fn(async () => true),
@@ -140,9 +140,17 @@ describe("update", () => {
   });
 
   it.each(["cargado", "anulado"] as const)("refuses a %s order", async (status) => {
-    const p = ports({ findOrder: vi.fn(async () => ({ status, loadId: status === "cargado" ? 2 : null })) });
-    await expect(createOrderCommands(p).update(5, input())).rejects.toThrow("Solo se pueden modificar los pedidos pendientes.");
+    const p = ports({ findOrder: vi.fn(async () => ({ status, hasLoads: status === "cargado" })) });
+    await expect(createOrderCommands(p).update(5, input())).rejects.toThrow("Solo se pueden modificar los pedidos pendientes sin cargues.");
     expect(p.replaceOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses a partially loaded order: a load already took part of it", async () => {
+    const p = ports({ findOrder: vi.fn(async () => ({ status: "pendiente" as const, hasLoads: true })) });
+    await expect(createOrderCommands(p).update(5, input())).rejects.toThrow("Solo se pueden modificar los pedidos pendientes sin cargues.");
+    await expect(createOrderCommands(p).annul(5)).rejects.toThrow("Solo se pueden anular los pedidos pendientes sin cargues.");
+    expect(p.replaceOrder).not.toHaveBeenCalled();
+    expect(p.annulOrder).not.toHaveBeenCalled();
   });
 
   it("fails when the order vanished", async () => {
@@ -152,7 +160,7 @@ describe("update", () => {
 
   it("fails when the order got loaded between the check and the write", async () => {
     const p = ports({ replaceOrder: vi.fn(async () => false) });
-    await expect(createOrderCommands(p).update(5, input())).rejects.toThrow("Solo se pueden modificar los pedidos pendientes.");
+    await expect(createOrderCommands(p).update(5, input())).rejects.toThrow("Solo se pueden modificar los pedidos pendientes sin cargues.");
   });
 });
 
@@ -164,14 +172,14 @@ describe("annul", () => {
   });
 
   it("refuses a loaded order", async () => {
-    const p = ports({ findOrder: vi.fn(async () => ({ status: "cargado" as const, loadId: 2 })) });
-    await expect(createOrderCommands(p).annul(5)).rejects.toThrow("Solo se pueden anular los pedidos pendientes.");
+    const p = ports({ findOrder: vi.fn(async () => ({ status: "cargado" as const, hasLoads: true })) });
+    await expect(createOrderCommands(p).annul(5)).rejects.toThrow("Solo se pueden anular los pedidos pendientes sin cargues.");
     expect(p.annulOrder).not.toHaveBeenCalled();
   });
 
   it("fails when the order got loaded between the check and the write", async () => {
     const p = ports({ annulOrder: vi.fn(async () => false) });
-    await expect(createOrderCommands(p).annul(5)).rejects.toThrow("Solo se pueden anular los pedidos pendientes.");
+    await expect(createOrderCommands(p).annul(5)).rejects.toThrow("Solo se pueden anular los pedidos pendientes sin cargues.");
   });
 
   it("fails when the order vanished", async () => {

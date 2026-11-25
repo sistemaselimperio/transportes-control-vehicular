@@ -617,8 +617,10 @@ export const loads = comercial.table(
 
 /**
  * A product of a load, with its own tons, cost, SIESA number (unique across every line) and the
- * supplier's order number. `reference_id` is null only for the lines migrated from the single-product
- * loads; every new or edited line has a product.
+ * supplier's order number. Every line takes its product from exactly one order (`order_id`): an order is
+ * loaded in parts, one load per supplier, and a product may be split across several lines. The tons of
+ * the lines of an (order, product) must add up to bags x kg per bag; the application enforces it.
+ * `reference_id` is null only for lines migrated from the single-product loads.
  */
 export const loadLines = comercial.table(
   "load_lines",
@@ -627,6 +629,10 @@ export const loadLines = comercial.table(
     loadId: integer("load_id")
       .notNull()
       .references(() => loads.id, { onDelete: "cascade" }),
+    /** The order the product is taken from. Orders are annulled, never deleted. */
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
     referenceId: integer("reference_id").references(() => orderReferences.id, { onDelete: "restrict" }),
     tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
     /** Whole pesos (COP). */
@@ -639,6 +645,7 @@ export const loadLines = comercial.table(
   },
   (t) => [
     index("load_lines_load_idx").on(t.loadId),
+    index("load_lines_order_idx").on(t.orderId),
     check("load_lines_tons_positive", sql`${t.tons} > 0`),
     check("load_lines_cost_non_negative", sql`${t.cost} >= 0`),
   ],
@@ -679,8 +686,11 @@ export const orderReferences = comercial.table(
 
 /**
  * A concentrate order ("pedido"): the bags several clients asked for, to be delivered on a day. Only
- * bags are stored; kg and tons are derived with the current kg per bag. A `cargado` order belongs to
- * exactly one load, and only a `pendiente` one can be edited or annulled.
+ * bags are stored; kg and tons are derived with the current kg per bag. It may hold products of several
+ * suppliers and is loaded in parts, one load per supplier (the `load_lines` point back at it). Whether it
+ * is loaded, partially loaded or pending is derived from those loads: the persisted `status` only
+ * distinguishes an annulled order (`anulado`) from the rest. Only an order no load has touched can be
+ * edited or annulled.
  */
 export const orders = comercial.table(
   "orders",
@@ -691,16 +701,12 @@ export const orders = comercial.table(
     timeWindow: text("time_window"),
     note: text(),
     status: orderStatusEnum().notNull().default("pendiente"),
-    /** The load that picked this order up; the order is `cargado` exactly while this is set. */
-    loadId: integer("load_id").references(() => loads.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("orders_delivery_date_idx").on(t.deliveryDate),
     index("orders_status_idx").on(t.status),
-    index("orders_load_idx").on(t.loadId),
-    check("orders_status_matches_load", sql`(${t.status} = 'cargado') = (${t.loadId} is not null)`),
   ],
 );
 

@@ -11,6 +11,7 @@ const line = (over: Partial<OrderLineRow>): OrderLineRow => ({
   referenceId: 1,
   referenceName: "Urea",
   referenceCode: "U01",
+  supplier: "Finca",
   bags: 10,
   ...over,
 });
@@ -21,7 +22,9 @@ const order = (over: Partial<OrderRow>): OrderRow => ({
   timeWindow: null,
   note: null,
   status: "pendiente",
-  loadId: null,
+  loads: [],
+  partial: false,
+  pendingSuppliers: ["Finca"],
   lines: [line({})],
   ...over,
 });

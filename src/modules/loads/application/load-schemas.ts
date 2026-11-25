@@ -26,13 +26,17 @@ const orderIdsField = z
   .array(z.string())
   .default([])
   .refine((ids) => ids.every((v) => /^\d{1,10}$/.test(v.trim()) && Number(v) > 0), "Alguno de los pedidos elegidos no es válido.")
-  .transform((ids) => [...new Set(ids.map((v) => Number(v)))]);
+  .transform((ids) => [...new Set(ids.map((v) => Number(v)))])
+  .refine((ids) => ids.length > 0, "Elige al menos un pedido.");
 
+const ORDER_MISSING = "Cada producto debe pertenecer a un pedido.";
 const PRODUCT_MISSING = "Elige el producto de cada línea.";
 const TONS_INVALID = "Las toneladas de cada producto deben ser un número mayor que cero.";
 
 /** One product of the load; the form sends every value as text. */
 export const loadLineSchema = z.object({
+  /** The order the product is taken from; the command checks it is one of the checked orders. */
+  orderId: z.number(ORDER_MISSING).int(ORDER_MISSING).positive(ORDER_MISSING),
   /** The catalog product; the command checks that it exists and belongs to the load's supplier. */
   referenceId: z.number(PRODUCT_MISSING).int(PRODUCT_MISSING).positive(PRODUCT_MISSING),
   tons: z
@@ -83,7 +87,7 @@ export const loadSchema = z.object({
     .transform((v) => (v.trim() === "" ? "" : normalizePlate(v)))
     .refine((v) => v !== "", "Elige la placa del vehículo."),
   notes: textField.refine((v) => v === null || v.length <= NOTES_MAX, "La observación no puede pasar de 500 caracteres."),
-  /** Concentrate orders (pedidos) this load picks up; optional. */
+  /** Concentrate orders (pedidos) this load takes part of; at least one. */
   orderIds: orderIdsField,
   /** The products of the load, each with its own tons, cost, SIESA and supplier order number. */
   lines: linesField,

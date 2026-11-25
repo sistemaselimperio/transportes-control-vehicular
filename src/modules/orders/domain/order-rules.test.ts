@@ -5,14 +5,16 @@ import {
   DEFAULT_KG_PER_BAG,
   DEFAULT_STATUS_FILTER,
   filterOrders,
-  isStatusConsistent,
+  deriveOrderLoading,
   isValidKgPerBag,
   kgToTons,
   ordersTotals,
   orderTotals,
   productTotals,
   tonsDifference,
-  unavailableOrderIds,
+  orderLoadIds,
+  orderStatusLabel,
+  remainingLines,
   type OrderLineRow,
   type OrderRow,
 } from "./order-rules";
@@ -26,6 +28,7 @@ const line = (over: Partial<OrderLineRow> = {}): OrderLineRow => ({
   referenceId: 1,
   referenceName: "Engorde",
   referenceCode: "114040",
+  supplier: "Finca",
   bags: 50,
   ...over,
 });
@@ -36,7 +39,9 @@ const order = (over: Partial<OrderRow> = {}): OrderRow => ({
   timeWindow: null,
   note: null,
   status: "pendiente",
-  loadId: null,
+  loads: [],
+  partial: false,
+  pendingSuppliers: ["Finca"],
   lines: [line()],
   ...over,
 });
@@ -77,26 +82,98 @@ describe("kg per bag", () => {
 });
 
 describe("status", () => {
-  it("only a pending order can be edited or annulled", () => {
+  it("only a pending order without loads can be edited or annulled", () => {
     expect(canEditOrder("pendiente")).toBe(true);
+    expect(canEditOrder("pendiente", false)).toBe(true);
+    expect(canEditOrder("pendiente", true)).toBe(false);
     expect(canEditOrder("cargado")).toBe(false);
     expect(canEditOrder("anulado")).toBe(false);
   });
+});
 
-  it("is loaded exactly when it has a load", () => {
-    expect(isStatusConsistent("cargado", 4)).toBe(true);
-    expect(isStatusConsistent("cargado", null)).toBe(false);
-    expect(isStatusConsistent("pendiente", null)).toBe(true);
-    expect(isStatusConsistent("pendiente", 4)).toBe(false);
-    expect(isStatusConsistent("anulado", null)).toBe(true);
-    expect(isStatusConsistent("anulado", 4)).toBe(false);
+describe("deriveOrderLoading", () => {
+  it("is pending while no supplier of its products has a load", () => {
+    expect(deriveOrderLoading("pendiente", ["Finca", "Italcol"], [])).toEqual({
+      status: "pendiente",
+      partial: false,
+      pendingSuppliers: ["Finca", "Italcol"],
+    });
+  });
+
+  it("is partially loaded when only some suppliers have a load", () => {
+    expect(deriveOrderLoading("pendiente", ["Finca", "Italcol", "Finca"], ["Italcol"])).toEqual({
+      status: "pendiente",
+      partial: true,
+      pendingSuppliers: ["Finca"],
+    });
+  });
+
+  it("is loaded when every supplier of its products has a load", () => {
+    expect(deriveOrderLoading("pendiente", ["Finca", "Italcol"], ["Italcol", "Finca"])).toEqual({
+      status: "cargado",
+      partial: false,
+      pendingSuppliers: [],
+    });
+  });
+
+  it("is loaded with a single supplier once that supplier has a load", () => {
+    expect(deriveOrderLoading("pendiente", ["Finca", "Finca"], ["Finca"]).status).toBe("cargado");
+  });
+
+  it("keeps an annulled order annulled", () => {
+    expect(deriveOrderLoading("anulado", ["Finca"], [])).toEqual({ status: "anulado", partial: false, pendingSuppliers: [] });
+  });
+
+  it("ignores products without a supplier and never loads an order made only of them", () => {
+    expect(deriveOrderLoading("pendiente", [null], [])).toEqual({ status: "pendiente", partial: false, pendingSuppliers: [] });
+    expect(deriveOrderLoading("pendiente", ["Finca", null], ["Finca"]).status).toBe("cargado");
+  });
+
+  it("treats a legacy persisted loaded status as pending: loads decide it", () => {
+    expect(deriveOrderLoading("cargado", ["Finca"], []).status).toBe("pendiente");
+  });
+});
+
+describe("orderStatusLabel", () => {
+  it("says partially loaded for a partial order", () => {
+    expect(orderStatusLabel({ status: "pendiente", partial: true })).toBe("Cargado parcial");
+    expect(orderStatusLabel({ status: "pendiente", partial: false })).toBe("Pendiente");
+    expect(orderStatusLabel({ status: "cargado", partial: false })).toBe("Cargado");
+  });
+});
+
+describe("orderLoadIds", () => {
+  it("lists the loads of the order once each, ascending", () => {
+    const loads = [
+      { loadId: 9, supplier: "Italcol" as const },
+      { loadId: 4, supplier: "Finca" as const },
+      { loadId: 9, supplier: "Finca" as const },
+    ];
+    expect(orderLoadIds(order({ loads }))).toEqual([4, 9]);
+    expect(orderLoadIds(order())).toEqual([]);
+  });
+});
+
+describe("remainingLines", () => {
+  const lines = [
+    line({ id: 1, supplier: "Finca" }),
+    line({ id: 2, referenceId: 2, supplier: "Italcol" }),
+    line({ id: 3, referenceId: 3, supplier: null }),
+  ];
+
+  it("is every line while nothing has been loaded", () => {
+    expect(remainingLines(order({ lines })).map((l) => l.id)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps only the products of the suppliers still pending once partially loaded", () => {
+    expect(remainingLines(order({ lines, partial: true, pendingSuppliers: ["Italcol"] })).map((l) => l.id)).toEqual([2]);
   });
 });
 
 describe("filterOrders", () => {
   const rows = [
     order({ id: 1, status: "pendiente", deliveryDate: "2026-11-10" }),
-    order({ id: 2, status: "cargado", loadId: 3, deliveryDate: "2026-11-15" }),
+    order({ id: 2, status: "cargado", deliveryDate: "2026-11-15" }),
     order({ id: 3, status: "anulado", deliveryDate: "2026-11-20" }),
   ];
 
@@ -121,27 +198,6 @@ describe("tonsDifference", () => {
     expect(tonsDifference(31, 30)).toBe(1);
     expect(tonsDifference(29.5, 30)).toBe(-0.5);
     expect(tonsDifference(0.3, 0.1 + 0.2)).toBe(0);
-  });
-});
-
-describe("unavailableOrderIds", () => {
-  const found = [
-    { id: 1, status: "pendiente" as const, loadId: null },
-    { id: 2, status: "anulado" as const, loadId: null },
-    { id: 3, status: "cargado" as const, loadId: 8 },
-    { id: 4, status: "cargado" as const, loadId: 9 },
-  ];
-
-  it("flags missing, annulled and orders of another load", () => {
-    expect(unavailableOrderIds(found, [1, 2, 3, 99], 9)).toEqual([2, 3, 99]);
-  });
-
-  it("accepts the orders already linked to this same load", () => {
-    expect(unavailableOrderIds(found, [1, 4], 9)).toEqual([]);
-  });
-
-  it("treats a loaded order as taken when creating a load", () => {
-    expect(unavailableOrderIds(found, [4], undefined)).toEqual([4]);
   });
 });
 

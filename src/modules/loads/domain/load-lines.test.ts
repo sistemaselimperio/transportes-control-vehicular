@@ -4,18 +4,19 @@ import {
   firstDuplicate,
   isDraftComplete,
   loadTotals,
-  orderedVersusLoaded,
   reconcileDrafts,
   suggestLines,
   type LineDraft,
 } from "./load-lines";
 
-const order = (lines: Array<{ id: number; name: string; bags: number }>) => ({
+const order = (id: number, lines: Array<{ id: number; name: string; bags: number }>) => ({
+  id,
   lines: lines.map((l) => ({ referenceId: l.id, referenceName: l.name, referenceCode: `C${l.id}`, bags: l.bags })),
 });
 
 const draft = (over: Partial<LineDraft>): LineDraft => ({
   key: 0,
+  orderId: 1,
   referenceId: null,
   reference: "",
   tons: "",
@@ -50,24 +51,30 @@ describe("firstDuplicate", () => {
 });
 
 describe("suggestLines", () => {
-  it("adds one line per product across the orders, in order of appearance", () => {
+  it("suggests one line per product of each order, in order of appearance", () => {
     const orders = [
-      order([
+      order(7, [
         { id: 1, name: "Engorde 40", bags: 100 },
         { id: 2, name: "Levante", bags: 50 },
       ]),
-      order([{ id: 1, name: "Engorde 40", bags: 80 }]),
+      order(8, [{ id: 1, name: "Engorde 40", bags: 80 }]),
     ];
-    // 180 bags * 40 kg = 7.2 t; 50 bags * 40 kg = 2 t.
+    // 100 bags * 40 kg = 4 t; 50 bags * 40 kg = 2 t; 80 bags * 40 kg = 3.2 t: an order is never mixed with another.
     expect(suggestLines(orders, 40)).toEqual([
-      { referenceId: 1, referenceName: "Engorde 40", referenceCode: "C1", tons: 7.2 },
-      { referenceId: 2, referenceName: "Levante", referenceCode: "C2", tons: 2 },
+      { orderId: 7, referenceId: 1, referenceName: "Engorde 40", referenceCode: "C1", tons: 4 },
+      { orderId: 7, referenceId: 2, referenceName: "Levante", referenceCode: "C2", tons: 2 },
+      { orderId: 8, referenceId: 1, referenceName: "Engorde 40", referenceCode: "C1", tons: 3.2 },
     ]);
+  });
+
+  it("adds the bags of a product repeated inside one order", () => {
+    const orders = [order(7, [{ id: 1, name: "Engorde 40", bags: 60 }, { id: 1, name: "Engorde 40", bags: 40 }])];
+    expect(suggestLines(orders, 40).map((s) => [s.referenceId, s.tons])).toEqual([[1, 4]]);
   });
 
   it("keeps apart two products that share a name", () => {
     const orders = [
-      order([
+      order(7, [
         { id: 1, name: "Terneras Nodriza", bags: 25 },
         { id: 2, name: "Terneras Nodriza", bags: 25 },
       ]),
@@ -85,15 +92,16 @@ describe("suggestLines", () => {
 
 describe("reconcileDrafts", () => {
   const suggestions = [
-    { referenceId: 1, referenceName: "Engorde 40", referenceCode: "114040", tons: 7.2 },
-    { referenceId: 2, referenceName: "Levante", referenceCode: null, tons: 2 },
+    { orderId: 1, referenceId: 1, referenceName: "Engorde 40", referenceCode: "114040", tons: 7.2 },
+    { orderId: 1, referenceId: 2, referenceName: "Levante", referenceCode: null, tons: 2 },
   ];
+  const checked = new Set([1]);
 
-  it("creates an automatic line for each new product, labelled with its code", () => {
-    const next = reconcileDrafts([], suggestions, 0);
-    expect(next.map((d) => [d.referenceId, d.reference, d.tons, d.auto])).toEqual([
-      [1, "114040 · Engorde 40", "7.2", true],
-      [2, "Levante", "2", true],
+  it("creates an automatic line for each product of a checked order, labelled with its code", () => {
+    const next = reconcileDrafts([], suggestions, checked, 0);
+    expect(next.map((d) => [d.orderId, d.referenceId, d.reference, d.tons, d.auto])).toEqual([
+      [1, 1, "114040 · Engorde 40", "7.2", true],
+      [1, 2, "Levante", "2", true],
     ]);
     expect(new Set(next.map((d) => d.key)).size).toBe(2);
   });
@@ -108,54 +116,43 @@ describe("reconcileDrafts", () => {
       siesaNumber: "S-1",
       orderNumber: "P-1",
     });
-    const next = reconcileDrafts([filled], suggestions, 4);
+    const next = reconcileDrafts([filled], suggestions, checked, 4);
     expect(next[0]).toEqual(filled);
     expect(next).toHaveLength(2);
   });
 
+  it("keeps the extra lines a product was split into without suggesting it again", () => {
+    const first = draft({ key: 0, referenceId: 1, tons: "4", auto: false });
+    const second = draft({ key: 1, referenceId: 1, tons: "3.2", auto: false });
+    const next = reconcileDrafts([first, second], suggestions, checked, 2);
+    expect(next.map((d) => [d.key, d.referenceId])).toEqual([[0, 1], [1, 1], [2, 2]]);
+  });
+
   it("refreshes the tons of an untouched automatic line", () => {
     const auto = draft({ key: 0, referenceId: 1, reference: "Engorde 40", tons: "3.6", auto: true });
-    const next = reconcileDrafts([auto], suggestions, 1);
+    const next = reconcileDrafts([auto], suggestions, checked, 1);
     expect(next[0]).toMatchObject({ key: 0, tons: "7.2", auto: true });
   });
 
-  it("drops an untouched automatic line whose product left the orders", () => {
+  it("drops an untouched automatic line whose product left the order", () => {
     const auto = draft({ key: 0, referenceId: 9, reference: "Premium", tons: "1", auto: true });
-    expect(reconcileDrafts([auto], suggestions, 1).map((d) => d.referenceId)).toEqual([1, 2]);
+    expect(reconcileDrafts([auto], suggestions, checked, 1).map((d) => d.referenceId)).toEqual([1, 2]);
   });
 
-  it("keeps manual lines and automatic ones the user already filled in", () => {
-    const manual = draft({ key: 0, referenceId: 7, reference: "Sal mineral", tons: "1" });
-    const edited = draft({ key: 1, referenceId: 9, reference: "Premium", tons: "1", cost: "5", auto: false });
-    const next = reconcileDrafts([manual, edited], [], 2);
-    expect(next).toEqual([manual, edited]);
+  it("drops every line of an order that was unchecked, touched or not", () => {
+    const touched = draft({ key: 0, orderId: 5, referenceId: 1, tons: "1", cost: "5" });
+    const untouched = draft({ key: 1, orderId: 5, referenceId: 2, auto: true });
+    expect(reconcileDrafts([touched, untouched], suggestions, checked, 2).map((d) => d.orderId)).toEqual([1, 1]);
   });
 
-  it("keeps a manual line that has no product yet", () => {
-    const blank = draft({ key: 0 });
-    expect(reconcileDrafts([blank], suggestions, 1).map((d) => d.key)).toEqual([0, 1, 2]);
+  it("keeps the same product of two orders apart", () => {
+    const two = [...suggestions, { orderId: 2, referenceId: 1, referenceName: "Engorde 40", referenceCode: "114040", tons: 1 }];
+    const next = reconcileDrafts([], two, new Set([1, 2]), 0);
+    expect(next.map((d) => [d.orderId, d.referenceId])).toEqual([[1, 1], [1, 2], [2, 1]]);
   });
 
-  it("drops a blank automatic line when no order is checked", () => {
-    expect(reconcileDrafts([draft({ key: 0, referenceId: 1, reference: "Engorde 40", auto: true })], [], 1)).toEqual([]);
-  });
-});
-
-describe("orderedVersusLoaded", () => {
-  const suggestions = [
-    { referenceId: 1, referenceName: "Engorde 40", referenceCode: "114040", tons: 7.2 },
-    { referenceId: 2, referenceName: "Levante", referenceCode: null, tons: 2 },
-  ];
-
-  it("compares the ordered tons with the loaded ones per product", () => {
-    const rows = orderedVersusLoaded(
-      [draft({ referenceId: 1, tons: "7,5" }), draft({ key: 1, referenceId: 1, tons: "0.1" }), draft({ key: 2, referenceId: 3, tons: "9" })],
-      suggestions,
-    );
-    expect(rows).toEqual([
-      { referenceId: 1, label: "114040 · Engorde 40", ordered: 7.2, loaded: 7.6, difference: 0.4 },
-      { referenceId: 2, label: "Levante", ordered: 2, loaded: 0, difference: -2 },
-    ]);
+  it("drops the automatic lines when no order is checked", () => {
+    expect(reconcileDrafts([draft({ key: 0, referenceId: 1, reference: "Engorde 40", auto: true })], [], new Set(), 1)).toEqual([]);
   });
 });
 

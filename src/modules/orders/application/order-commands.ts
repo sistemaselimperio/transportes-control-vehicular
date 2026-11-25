@@ -19,19 +19,20 @@ export interface OrderPorts {
   findLocationOwners(ids: number[]): Promise<Array<{ id: number; clientId: number }>>;
   /** The catalog products among `ids` (those with a code), legacy and missing ones are left out. */
   findCatalogProducts: FindCatalogProducts;
-  findOrder(id: number): Promise<{ status: OrderStatus; loadId: number | null } | null>;
+  /** The persisted status and whether any load already took part of the order. */
+  findOrder(id: number): Promise<{ status: OrderStatus; hasLoads: boolean } | null>;
   /** Stores the order, pending, with its lines; returns its id. */
   insertOrder(values: OrderValues): Promise<number>;
-  /** Replaces the order's data and lines; false when it is gone or no longer pending. */
+  /** Replaces the order's data and lines; false when it is gone, no longer pending or already taken by a load. */
   replaceOrder(id: number, values: OrderValues): Promise<boolean>;
-  /** Marks a pending order as annulled; false when it is gone or no longer pending. */
+  /** Marks a pending order as annulled; false when it is gone, no longer pending or already taken by a load. */
   annulOrder(id: number): Promise<boolean>;
   saveKgPerBag(value: number): Promise<void>;
 }
 
 const GONE = "El pedido ya no existe.";
-const NOT_EDITABLE = "Solo se pueden modificar los pedidos pendientes.";
-const NOT_ANNULLABLE = "Solo se pueden anular los pedidos pendientes.";
+const NOT_EDITABLE = "Solo se pueden modificar los pedidos pendientes sin cargues.";
+const NOT_ANNULLABLE = "Solo se pueden anular los pedidos pendientes sin cargues.";
 const CLIENT_GONE = "Un cliente del pedido ya no existe.";
 const FOREIGN_LOCATION = "La finca elegida no pertenece al cliente.";
 const MANY_CLIENTS = "Un pedido solo puede tener un cliente.";
@@ -75,7 +76,7 @@ export function createOrderCommands(ports: OrderPorts) {
     async update(id: number, input: OrderInput) {
       const stored = await ports.findOrder(id);
       if (!stored) throw new OrderError(GONE);
-      if (!canEditOrder(stored.status)) throw new OrderError(NOT_EDITABLE);
+      if (!canEditOrder(stored.status, stored.hasLoads)) throw new OrderError(NOT_EDITABLE);
       const values = await prepare(input);
       if (!(await ports.replaceOrder(id, values))) throw new OrderError(NOT_EDITABLE);
     },
@@ -83,7 +84,7 @@ export function createOrderCommands(ports: OrderPorts) {
     async annul(id: number) {
       const stored = await ports.findOrder(id);
       if (!stored) throw new OrderError(GONE);
-      if (!canEditOrder(stored.status)) throw new OrderError(NOT_ANNULLABLE);
+      if (!canEditOrder(stored.status, stored.hasLoads)) throw new OrderError(NOT_ANNULLABLE);
       if (!(await ports.annulOrder(id))) throw new OrderError(NOT_ANNULLABLE);
     },
 
