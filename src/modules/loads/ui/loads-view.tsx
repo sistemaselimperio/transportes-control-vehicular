@@ -39,7 +39,7 @@ import { LoadList } from "./load-list";
 import { LoadSummary } from "./load-summary";
 import { PendingLoads } from "./pending-loads";
 
-type LoadsTab = "pendientes" | "historial" | "resumen";
+type LoadsTab = "pendientes" | "saldos" | "historial" | "resumen";
 
 /** Loads page: a tab with the orders still to load, one with the loads made (filters, totals, list) and a notebook-like summary sharing those filters, plus the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
@@ -88,6 +88,8 @@ export function LoadsView({
     () => pendingEntries(buildPendingOrders(orders, kgPerBag), pendingBalances),
     [orders, kgPerBag, pendingBalances],
   );
+  const pendingOrders = useMemo(() => pending.filter((e) => e.kind === "order"), [pending]);
+  const pendingSaldos = useMemo(() => pending.filter((e) => e.kind === "balance"), [pending]);
 
   const editLoad = (load: LoadRow) => {
     // A load made without an order has its own form.
@@ -124,7 +126,8 @@ export function LoadsView({
       <TabBar
         label="Vista de cargues"
         items={[
-          { key: "pendientes", label: "Pendientes", count: pending.length },
+          { key: "pendientes", label: "Pendientes", count: pendingOrders.length },
+          { key: "saldos", label: "Saldos", count: pendingSaldos.length },
           { key: "historial", label: "Historial" },
           { key: "resumen", label: "Resumen" },
         ]}
@@ -135,9 +138,19 @@ export function LoadsView({
       />
 
       <div id="loads-panel" role="tabpanel" aria-labelledby={`loads-tab-${tab}`} className="space-y-5">
-        {tab === "pendientes" ? (
+        {tab === "saldos" ? (
           <PendingLoads
-            entries={pending}
+            entries={pendingSaldos}
+            today={today}
+            canManage={canManage}
+            onCreateLoad={createLoads}
+            onRegisterTrip={setTripFor}
+            onDeleteTrip={setDeletingTrip}
+            emptyText="No hay saldos por llevar."
+          />
+        ) : tab === "pendientes" ? (
+          <PendingLoads
+            entries={pendingOrders}
             today={today}
             canManage={canManage}
             onCreateLoad={createLoads}

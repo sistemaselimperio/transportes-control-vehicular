@@ -50,16 +50,19 @@ export function PendingLoads({
   onCreateFreeLoad,
   onRegisterTrip,
   onDeleteTrip,
+  emptyText = "No hay pedidos pendientes: todo lo pedido ya tiene cargue.",
 }: {
   entries: readonly PendingEntry[];
   /** Colombia's current day. */
   today: string;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
-  /** "Nuevo cargue": a load made without an order. */
-  onCreateFreeLoad: () => void;
+  /** "Nuevo cargue": a load made without an order; without it the button is not shown. */
+  onCreateFreeLoad?: () => void;
   onRegisterTrip: (balance: PendingBalanceRow) => void;
   onDeleteTrip: (trip: BalanceTripRow) => void;
+  /** What the panel says when there is nothing to show. */
+  emptyText?: string;
 }) {
   const orders = entries.flatMap((e) => (e.kind === "order" ? [e.row] : []));
   const balances = entries.flatMap((e) => (e.kind === "balance" ? [e.row] : []));
@@ -71,7 +74,7 @@ export function PendingLoads({
         <h2 id="pending-loads-title" className="sr-only">
           Por cargar
         </h2>
-        {canManage && (
+        {canManage && onCreateFreeLoad && (
           <Button type="button" className="h-11 md:h-9" onClick={onCreateFreeLoad}>
             <Plus aria-hidden /> Nuevo cargue
           </Button>
@@ -92,7 +95,7 @@ export function PendingLoads({
         )}
       </div>
       {entries.length === 0 ? (
-        <p className="panel px-4 py-6 text-center text-sm text-muted-foreground">No hay pedidos pendientes: todo lo pedido ya tiene cargue.</p>
+        <p className="panel px-4 py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
       ) : (
         <ul className="panel divide-y text-sm">
           {entries.map((e) =>
