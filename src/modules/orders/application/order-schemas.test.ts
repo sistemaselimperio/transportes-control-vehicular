@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kgPerBagSchema, MAX_LINES, orderIdSchema, orderSchema } from "./order-schemas";
+import { deliveryDaySchema, deliveryIdsSchema, kgPerBagSchema, MAX_LINES, orderIdSchema, orderSchema } from "./order-schemas";
 
 const payload = { clientId: 3, locationId: 7, lines: [{ referenceId: 12, bags: 50 }] };
 const form = (over: object = {}) => JSON.stringify({ ...payload, ...over });
@@ -89,5 +89,19 @@ describe("orderIdSchema", () => {
     expect(orderIdSchema.safeParse(4).success).toBe(true);
     expect(orderIdSchema.safeParse(0).success).toBe(false);
     expect(orderIdSchema.safeParse("4").success).toBe(false);
+  });
+});
+
+describe("deliveryDaySchema", () => {
+  it("accepts an ISO day and refuses anything else", () => {
+    expect(deliveryDaySchema.parse("2026-11-25")).toBe("2026-11-25");
+    for (const v of ["", "25/11/2026", "2026-13-40", undefined]) expect(deliveryDaySchema.safeParse(v).success).toBe(false);
+  });
+});
+
+describe("deliveryIdsSchema", () => {
+  it("needs at least one positive order number", () => {
+    expect(deliveryIdsSchema.parse([13, 14])).toEqual([13, 14]);
+    for (const v of [[], [0], ["1"], "13"]) expect(deliveryIdsSchema.safeParse(v).success).toBe(false);
   });
 });

@@ -1,4 +1,6 @@
 import type { FindCatalogProducts } from "../domain/catalog";
+import { todayInBogota } from "@/modules/shared/domain/dates";
+import { deliveryBlockReason, type DeliveryBalance } from "../domain/order-delivery";
 import { canEditOrder, isValidKgPerBag, type OrderStatus } from "../domain/order-rules";
 import { DUPLICATE_PRODUCT, type OrderInput } from "./order-schemas";
 
@@ -28,6 +30,16 @@ export interface OrderPorts {
   /** Marks a pending order as annulled; false when it is gone, no longer pending or already taken by a load. */
   annulOrder(id: number): Promise<boolean>;
   saveKgPerBag(value: number): Promise<void>;
+  /** The derived status of the orders among `ids` that exist. */
+  findOrdersForDelivery(ids: number[]): Promise<Array<{ id: number; status: OrderStatus }>>;
+  /** The balances (bags a truck left behind) of the orders, with their trips. */
+  findBalances(orderIds: number[]): Promise<DeliveryBalance[]>;
+  /** The orders a load takes part of; none for a free load. */
+  findLoadOrderIds(loadId: number): Promise<number[]>;
+  /** Marks all the orders as delivered in one go; false (nothing stored) when one of them is gone, annulled or already delivered. */
+  markDelivered(ids: number[], date: string, by: string): Promise<boolean>;
+  /** Clears the delivery of the orders; returns how many were delivered. */
+  clearDelivery(ids: number[]): Promise<number>;
 }
 
 const GONE = "El pedido ya no existe.";
@@ -37,9 +49,14 @@ const CLIENT_GONE = "Un cliente del pedido ya no existe.";
 const FOREIGN_LOCATION = "La finca elegida no pertenece al cliente.";
 const MANY_CLIENTS = "Un pedido solo puede tener un cliente.";
 const MANY_LOCATIONS = "Un pedido solo puede tener una finca.";
+const NOTHING_TO_DELIVER = "Elige al menos un pedido.";
+const FUTURE_DELIVERY = "La fecha de entrega no puede ser futura.";
+const DELIVERY_CHANGED = "Los pedidos cambiaron mientras tanto. Revisa e inténtalo de nuevo.";
+const NOT_DELIVERED = "Los pedidos no están entregados.";
+const LOAD_WITHOUT_ORDERS = "El cargue no tiene pedidos para entregar.";
 const PRODUCT_GONE = "Un producto del pedido ya no está en el catálogo.";
 
-export function createOrderCommands(ports: OrderPorts) {
+export function createOrderCommands(ports: OrderPorts, today: () => string = todayInBogota) {
   /** Checks the lines against the clients, the fincas and the product catalog. */
   async function prepare(input: OrderInput): Promise<OrderValues> {
     const clientIds = [...new Set(input.lines.map((l) => l.clientId))];
@@ -68,7 +85,50 @@ export function createOrderCommands(ports: OrderPorts) {
     };
   }
 
+  /** Delivers the orders all or nothing; the ones already delivered are skipped. Returns how many were delivered now. */
+  async function deliver(ids: readonly number[], date: string, by: string): Promise<number> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) throw new OrderError(NOTHING_TO_DELIVER);
+    if (date > today()) throw new OrderError(FUTURE_DELIVERY);
+    const found = await ports.findOrdersForDelivery(unique);
+    if (unique.some((id) => !found.some((o) => o.id === id))) throw new OrderError(GONE);
+    const open = found.filter((o) => o.status !== "entregado");
+    const balances = await ports.findBalances(open.map((o) => o.id));
+    // With nothing left to deliver the first order explains it ("ya está entregado").
+    for (const order of open.length === 0 ? found.slice(0, 1) : open) {
+      const reason = deliveryBlockReason(order, balances);
+      if (reason !== null) throw new OrderError(reason);
+    }
+    const openIds = open.map((o) => o.id);
+    if (!(await ports.markDelivered(openIds, date, by))) throw new OrderError(DELIVERY_CHANGED);
+    return openIds.length;
+  }
+
+  async function undoDelivery(ids: readonly number[]): Promise<void> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) throw new OrderError(NOTHING_TO_DELIVER);
+    if ((await ports.clearDelivery(unique)) === 0) throw new OrderError(NOT_DELIVERED);
+  }
+
+  async function loadOrderIds(loadId: number): Promise<number[]> {
+    const ids = await ports.findLoadOrderIds(loadId);
+    if (ids.length === 0) throw new OrderError(LOAD_WITHOUT_ORDERS);
+    return ids;
+  }
+
   return {
+    deliver,
+    undoDelivery,
+
+    /** All the orders of a load at once; refused as a whole when one of them cannot be delivered. */
+    async deliverLoad(loadId: number, date: string, by: string): Promise<number> {
+      return deliver(await loadOrderIds(loadId), date, by);
+    },
+
+    async undoLoadDelivery(loadId: number): Promise<void> {
+      await undoDelivery(await loadOrderIds(loadId));
+    },
+
     async create(input: OrderInput): Promise<number> {
       return ports.insertOrder(await prepare(input));
     },

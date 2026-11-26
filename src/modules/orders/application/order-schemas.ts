@@ -75,3 +75,9 @@ export const kgPerBagSchema = z
   .transform((v) => v as number);
 
 export const orderIdSchema = z.number().int().positive();
+
+/** The day an order was delivered, an ISO day typed in the confirmation. */
+export const deliveryDaySchema = dateField("La fecha de entrega");
+
+/** The orders delivered (or restored) together. */
+export const deliveryIdsSchema = z.array(orderIdSchema).min(1, "Elige al menos un pedido.").max(MAX_LINES);

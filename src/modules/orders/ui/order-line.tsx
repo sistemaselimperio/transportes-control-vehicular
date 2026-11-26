@@ -1,21 +1,24 @@
 "use client";
 
-import { Ban, Container, Pencil } from "lucide-react";
+import { Ban, Container, PackageCheck, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatShortDate } from "@/modules/shared/domain/dates";
+import { formatDisplayDate, formatShortDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { productLabel } from "../domain/catalog";
+import { undoOrdersDeliveryAction } from "../application/order-actions";
 import { clientNames, daysLate, pendingDay } from "../domain/order-days";
+import { UndoDeliveryButton } from "./deliver-dialog";
 import { bagsToKg, canEditOrder, kgToTons, orderLoadIds, orderStatusLabel, orderTotals, type OrderRow, type OrderStatus } from "../domain/order-rules";
 
 /** Status as quiet text: only a loaded, a partially loaded or an annulled order says so; a pending one shows its day. */
 const STATUS_TEXT: Record<OrderStatus, string> = {
   pendiente: "text-muted-foreground",
   cargado: "font-medium text-ok-foreground",
+  entregado: "font-medium text-ok-foreground",
   anulado: "font-medium text-danger-foreground",
 };
 const PARTIAL_TEXT = "font-medium text-warn-foreground";
@@ -56,8 +59,12 @@ export function OrderLine({
   kgPerBag,
   canManage,
   canCreateLoad,
+  canDeliver,
+  deliverable,
   onEdit,
   onAnnul,
+  onDeliver,
+  onFlash,
 }: {
   order: OrderRow;
   /** Colombia's current day. */
@@ -66,8 +73,15 @@ export function OrderLine({
   canManage: boolean;
   /** The user manages loads: a pending order offers "Crear cargue". */
   canCreateLoad: boolean;
+  /** The user may deliver orders (and undo it). */
+  canDeliver: boolean;
+  /** The order is loaded completely and has no balance left to carry. */
+  deliverable: boolean;
   onEdit: (order: OrderRow) => void;
   onAnnul: (order: OrderRow) => void;
+  onDeliver: (order: OrderRow) => void;
+  /** Reports the result of undoing a delivery. */
+  onFlash: (message: string) => void;
 }) {
   const [detail, setDetail] = useState(false);
   const totals = orderTotals(order.lines, kgPerBag);
@@ -77,6 +91,11 @@ export function OrderLine({
   const names = clientNames(order);
   const day = dayText(order, today);
   const annulled = order.status === "anulado";
+  const delivered = order.status === "entregado";
+  const canMarkDelivered = canDeliver && deliverable;
+  const canUndoDelivery = canDeliver && delivered;
+  const hasDeliveryAction = canMarkDelivered || canUndoDelivery;
+  const hasActions = ((editable || loadable) && (canManage || canCreateLoad)) || hasDeliveryAction;
 
   return (
     <li>
@@ -110,13 +129,33 @@ export function OrderLine({
             </span>
             <span className={cn("shrink-0 text-xs md:text-sm", order.partial ? PARTIAL_TEXT : STATUS_TEXT[order.status])}>
               {orderStatusLabel(order)}
+              {order.deliveredAt && <span className="num font-normal"> · {formatShortDate(order.deliveredAt)}</span>}
               {order.loads.length > 0 && <span className="num font-normal text-muted-foreground"> {loadsLabel(order)}</span>}
             </span>
           </span>
         </button>
 
-        {(editable || loadable) && (canManage || canCreateLoad) && (
+        {hasActions && (
           <div className="flex shrink-0 items-center gap-0.5">
+            {canMarkDelivered && (
+              <Button
+                variant="outline"
+                className="h-11 px-3 md:h-8"
+                aria-label={`Entregar pedido ${order.id}`}
+                onClick={() => onDeliver(order)}
+              >
+                <PackageCheck aria-hidden />
+                <span className="max-sm:sr-only">Entregar</span>
+              </Button>
+            )}
+            {canUndoDelivery && (
+              <UndoDeliveryButton
+                className="h-11 px-3 md:h-8"
+                label={`Deshacer entrega del pedido ${order.id}`}
+                run={() => undoOrdersDeliveryAction([order.id])}
+                onDone={onFlash}
+              />
+            )}
             {loadable && (
               <Link
                 href={`/cargues?nuevo=1&pedido=${order.id}`}
@@ -165,8 +204,31 @@ export function OrderLine({
           order={order}
           kgPerBag={kgPerBag}
           actions={
-            (editable || loadable) && (canManage || canCreateLoad) ? (
+            hasActions ? (
               <div className="flex flex-wrap gap-2 border-t pt-4">
+                {canMarkDelivered && (
+                  <Button
+                    className="h-11 px-4 md:h-10"
+                    onClick={() => {
+                      setDetail(false);
+                      onDeliver(order);
+                    }}
+                  >
+                    <PackageCheck aria-hidden />
+                    Entregar
+                  </Button>
+                )}
+                {canUndoDelivery && (
+                  <UndoDeliveryButton
+                    className="h-11 px-4 md:h-10"
+                    label={`Deshacer entrega del pedido ${order.id}`}
+                    run={() => undoOrdersDeliveryAction([order.id])}
+                    onDone={(message) => {
+                      setDetail(false);
+                      onFlash(message);
+                    }}
+                  />
+                )}
                 {loadable && (
                   <Link href={`/cargues?nuevo=1&pedido=${order.id}`} className={buttonVariants({ className: "h-11 px-4 md:h-10" })}>
                     <Container aria-hidden />
@@ -220,6 +282,9 @@ function OrderDetail({ order, kgPerBag, actions }: { order: OrderRow; kgPerBag: 
           <p className="num text-muted-foreground">
             {order.loads.length === 1 ? "Cargue" : "Cargues"} {loadsLabel(order)}
           </p>
+        )}
+        {order.deliveredAt && (
+          <p className="num font-medium text-ok-foreground">Entregado el {formatDisplayDate(order.deliveredAt)}</p>
         )}
         {order.partial && (
           <p className="text-warn-foreground">

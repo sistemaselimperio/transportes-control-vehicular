@@ -21,6 +21,7 @@ const order = (over: Partial<OrderRow>): OrderRow => ({
   deliveryDate: "2026-11-24",
   timeWindow: null,
   note: null,
+  deliveredAt: null,
   status: "pendiente",
   loads: [],
   partial: false,
@@ -89,5 +90,15 @@ describe("sortOrdersForList", () => {
       order({ id: 6, status: "pendiente", deliveryDate: "2026-11-21" }),
     ];
     expect(sortOrdersForList(rows).map((o) => o.id)).toEqual([4, 6, 2, 5, 1, 3]);
+  });
+
+  it("keeps the delivered orders between the loaded and the annulled ones", () => {
+    const rows = [
+      order({ id: 1, status: "anulado", deliveryDate: "2026-11-20" }),
+      order({ id: 2, status: "entregado", deliveryDate: "2026-11-20" }),
+      order({ id: 3, status: "cargado", deliveryDate: "2026-11-20" }),
+      order({ id: 4, status: "pendiente", deliveryDate: "2026-11-20" }),
+    ];
+    expect(sortOrdersForList(rows).map((o) => o.id)).toEqual([4, 3, 2, 1]);
   });
 });

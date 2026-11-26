@@ -1,4 +1,4 @@
-import { canManageSection } from "@/lib/permissions";
+import { canDeliverOrders, canManageSection } from "@/lib/permissions";
 import { requireSectionAccess } from "@/lib/session";
 import { listLoadBalances, listLoadRows } from "@/modules/loads/application/load-queries";
 import { LoadsView } from "@/modules/loads/ui/loads-view";
@@ -35,6 +35,7 @@ export default async function Page({
       kgPerBag={kgPerBag}
       presetOrderId={presetOrder?.id ?? null}
       canManage={canManage}
+      canDeliver={canDeliverOrders(role)}
       today={todayInBogota()}
     />
   );

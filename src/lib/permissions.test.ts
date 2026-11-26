@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAssignDrivers,
   canDeleteVehicles,
+  canDeliverOrders,
   canEditVehicleCapacity,
   canEditVehicles,
   canManageVehicleFiles,
@@ -365,6 +366,16 @@ describe("commercial sections", () => {
     for (const role of ["admin", "staff", "assistant", "loader"] as const) {
       expect(canSetKgPerBag(role)).toBe(false);
     }
+  });
+
+  it("lets the superadmin, the dispatcher and the loader deliver orders, and nobody else", () => {
+    for (const role of ["superadmin", "dispatcher", "loader"] as const) expect(canDeliverOrders(role)).toBe(true);
+    for (const role of ["admin", "staff", "assistant"] as const) expect(canDeliverOrders(role)).toBe(false);
+  });
+
+  it("does not let the loader edit orders just because it may deliver them", () => {
+    expect(canDeliverOrders("loader")).toBe(true);
+    expect(canManageSection("loader", "orders")).toBe(false);
   });
 
   it("keeps the whole area closed to the fleet roles and open to the superadmin", () => {

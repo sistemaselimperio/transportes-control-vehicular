@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canDeleteVehicles, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canDeliverOrders, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -21,6 +21,13 @@ export async function requireSession() {
 export async function requireSectionManager(section: Section) {
   const session = await requireSession();
   if (!canManageSection(parseRole(session.user.role), section)) throw new ForbiddenError();
+  return session;
+}
+
+/** Delivering orders (and undoing it): whoever manages the orders or the loads. Throws `ForbiddenError` otherwise. */
+export async function requireOrderDeliverer() {
+  const session = await requireSession();
+  if (!canDeliverOrders(parseRole(session.user.role))) throw new ForbiddenError();
   return session;
 }
 

@@ -35,11 +35,11 @@ export function clientNames(order: Pick<OrderRow, "lines">): string[] {
   return [...seen.values()];
 }
 
-const STATUS_RANK = { pendiente: 0, cargado: 1, anulado: 2 } as const;
+const STATUS_RANK = { pendiente: 0, cargado: 1, entregado: 2, anulado: 3 } as const;
 
 /**
  * The orders page's reading order: what is still to do first (pending, oldest delivery day first),
- * then the history (loaded, then annulled), newest first. Ties keep the order number.
+ * then the history (loaded, delivered, then annulled), newest first. Ties keep the order number.
  */
 export function sortOrdersForList<T extends Pick<OrderRow, "id" | "status" | "deliveryDate">>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => {

@@ -158,6 +158,7 @@ describe("order availability", () => {
 
   it("is not loadable once annulled or once that supplier has a load, but the other supplier still is", () => {
     expect(isOrderLoadable(order({ status: "anulado" }), "Finca")).toBe(false);
+    expect(isOrderLoadable(order({ status: "entregado" }), "Finca")).toBe(false);
     const partial = order({ loads: [{ loadId: 8, supplier: "Finca" }] });
     expect(isOrderLoadable(partial, "Finca")).toBe(false);
     expect(isOrderLoadable(partial, "Italcol")).toBe(true);

@@ -33,7 +33,7 @@ export interface LoadBalanceRow {
 }
 
 /** Bags of the balance not carried yet. */
-export function remainingBags(balance: Pick<LoadBalanceRow, "bags" | "trips">): number {
+export function remainingBags(balance: { bags: number; trips: ReadonlyArray<{ bags: number }> }): number {
   return Math.max(0, balance.bags - balance.trips.reduce((sum, t) => sum + t.bags, 0));
 }
 

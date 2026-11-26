@@ -750,6 +750,10 @@ export const orders = comercial.table(
     timeWindow: text("time_window"),
     note: text(),
     status: orderStatusEnum().notNull().default("pendiente"),
+    /** The day the order was delivered (Colombia ISO day); null while it is not. "Entregado" is derived from it. */
+    deliveredAt: date("delivered_at", { mode: "string" }),
+    /** Who marked it as delivered; null once the user is deleted or the delivery is undone. */
+    deliveredBy: text("delivered_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

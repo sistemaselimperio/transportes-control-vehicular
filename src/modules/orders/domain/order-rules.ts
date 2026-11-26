@@ -1,12 +1,13 @@
 import type { LoadSupplier } from "@/modules/loads/domain/load-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 
-export const ORDER_STATUSES = ["pendiente", "cargado", "anulado"] as const;
+export const ORDER_STATUSES = ["pendiente", "cargado", "entregado", "anulado"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   pendiente: "Pendiente",
   cargado: "Cargado",
+  entregado: "Entregado",
   anulado: "Anulado",
 };
 
@@ -14,7 +15,7 @@ export const isOrderStatus = (value: unknown): value is OrderStatus =>
   typeof value === "string" && (ORDER_STATUSES as readonly string[]).includes(value);
 
 /** What the list shows until the user asks for more: annulled orders stay hidden. */
-export const DEFAULT_STATUS_FILTER: readonly OrderStatus[] = ["pendiente", "cargado"];
+export const DEFAULT_STATUS_FILTER: readonly OrderStatus[] = ["pendiente", "cargado", "entregado"];
 
 /** Kilograms per bag until someone changes the setting. */
 export const DEFAULT_KG_PER_BAG = 40;
@@ -48,8 +49,10 @@ export interface OrderRow {
   /** Free text such as "7–11 a.m.". */
   timeWindow: string | null;
   note: string | null;
-  /** Derived from the loads: `cargado` once every supplier of its products has a load. */
+  /** Derived from the loads: `cargado` once every supplier of its products has a load, `entregado` once it has a delivery day. */
   status: OrderStatus;
+  /** The day the order was delivered (Colombia ISO day); null while it is not delivered. */
+  deliveredAt: IsoDate | null;
   /** The loads that took part of the order, one per supplier. */
   loads: readonly OrderLoad[];
   /** Some but not all of the suppliers of the order are loaded: a pending order shown as "Cargado parcial". */
@@ -110,14 +113,16 @@ export const canEditOrder = (status: OrderStatus, hasLoads = false): boolean => 
 /**
  * Status of an order from its loads (the persisted status only tells annulled from the rest): loaded when
  * every supplier of its products has a load, partially loaded when only some do, pending otherwise.
- * Products without a supplier (legacy) take no part.
+ * Products without a supplier (legacy) take no part. A delivery day makes it delivered, unless annulled.
  */
 export function deriveOrderLoading(
   persisted: OrderStatus,
   lineSuppliers: ReadonlyArray<LoadSupplier | null>,
   loadedSuppliers: readonly LoadSupplier[],
+  deliveredAt: IsoDate | null = null,
 ): { status: OrderStatus; partial: boolean; pendingSuppliers: LoadSupplier[] } {
   if (persisted === "anulado") return { status: "anulado", partial: false, pendingSuppliers: [] };
+  if (deliveredAt !== null) return { status: "entregado", partial: false, pendingSuppliers: [] };
   const suppliers = [...new Set(lineSuppliers.filter((s): s is LoadSupplier => s !== null))];
   const pendingSuppliers = suppliers.filter((s) => !loadedSuppliers.includes(s));
   if (suppliers.length > 0 && pendingSuppliers.length === 0) return { status: "cargado", partial: false, pendingSuppliers };

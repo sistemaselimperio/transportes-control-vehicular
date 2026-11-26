@@ -5,12 +5,12 @@
  * with zod, runs a command and expires the cached reads that show orders.
  */
 import { expireAfterAction } from "@/lib/cache-invalidation";
-import { requireSectionManager } from "@/lib/session";
+import { requireOrderDeliverer, requireSectionManager } from "@/lib/session";
 import { actionFailure } from "@/modules/shared/application/action-failure";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { orderRepository } from "../infrastructure/order-repository";
 import { createOrderCommands, OrderError } from "./order-commands";
-import { kgPerBagSchema, orderIdSchema, orderSchema } from "./order-schemas";
+import { deliveryDaySchema, deliveryIdsSchema, kgPerBagSchema, orderIdSchema, orderSchema } from "./order-schemas";
 
 const commands = createOrderCommands(orderRepository);
 
@@ -57,5 +57,49 @@ export async function setKgPerBagAction(fd: FormData): Promise<ActionResult> {
     const value = kgPerBagSchema.parse(fd.get("kgPerBag") ?? "");
     await commands.setKgPerBag(value);
     return "Kg por bulto actualizado. Los pesos se recalcularon.";
+  });
+}
+
+/**
+ * Delivery has its own guard: whoever manages the orders or the loads may deliver (the loader does not
+ * edit orders). The commands re-validate every order, so a stale screen cannot deliver what is not ready.
+ */
+async function runDelivery(fn: (userId: string) => Promise<string>): Promise<ActionResult> {
+  try {
+    const session = await requireOrderDeliverer();
+    const message = await fn(session.user.id);
+    // A delivery changes the orders and the loads that list them.
+    expireAfterAction({ kind: "load" });
+    return { ok: true, message };
+  } catch (e) {
+    return actionFailure(e, { label: "order delivery", expected: [OrderError] });
+  }
+}
+
+const deliveredMessage = (count: number) => (count === 1 ? "Pedido entregado." : `${count} pedidos entregados.`);
+
+/** Marks orders as delivered on a day (default today is chosen by the form). */
+export async function deliverOrdersAction(ids: number[], date: string): Promise<ActionResult> {
+  return runDelivery(async (userId) => deliveredMessage(await commands.deliver(deliveryIdsSchema.parse(ids), deliveryDaySchema.parse(date), userId)));
+}
+
+export async function undoOrdersDeliveryAction(ids: number[]): Promise<ActionResult> {
+  return runDelivery(async () => {
+    await commands.undoDelivery(deliveryIdsSchema.parse(ids));
+    return "Entrega deshecha.";
+  });
+}
+
+/** All the orders of a load at once, or none. */
+export async function deliverLoadAction(loadId: number, date: string): Promise<ActionResult> {
+  return runDelivery(async (userId) =>
+    deliveredMessage(await commands.deliverLoad(orderIdSchema.parse(loadId), deliveryDaySchema.parse(date), userId)),
+  );
+}
+
+export async function undoLoadDeliveryAction(loadId: number): Promise<ActionResult> {
+  return runDelivery(async () => {
+    await commands.undoLoadDelivery(orderIdSchema.parse(loadId));
+    return "Entrega deshecha.";
   });
 }

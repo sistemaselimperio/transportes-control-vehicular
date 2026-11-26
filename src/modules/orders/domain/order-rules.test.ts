@@ -4,6 +4,8 @@ import {
   canEditOrder,
   DEFAULT_KG_PER_BAG,
   DEFAULT_STATUS_FILTER,
+  ORDER_STATUSES,
+  ORDER_STATUS_LABELS,
   filterOrders,
   deriveOrderLoading,
   isValidKgPerBag,
@@ -38,6 +40,7 @@ const order = (over: Partial<OrderRow> = {}): OrderRow => ({
   deliveryDate: "2026-11-20",
   timeWindow: null,
   note: null,
+  deliveredAt: null,
   status: "pendiente",
   loads: [],
   partial: false,
@@ -167,6 +170,44 @@ describe("remainingLines", () => {
 
   it("keeps only the products of the suppliers still pending once partially loaded", () => {
     expect(remainingLines(order({ lines, partial: true, pendingSuppliers: ["Italcol"] })).map((l) => l.id)).toEqual([2]);
+  });
+});
+
+describe("delivered orders", () => {
+  it("lists the delivered status with its label", () => {
+    expect(ORDER_STATUSES).toContain("entregado");
+    expect(ORDER_STATUS_LABELS.entregado).toBe("Entregado");
+  });
+
+  it("derives delivered from a delivery day, whatever the loading", () => {
+    expect(deriveOrderLoading("cargado", ["Finca"], ["Finca"], "2026-11-25")).toEqual({
+      status: "entregado",
+      partial: false,
+      pendingSuppliers: [],
+    });
+    expect(deriveOrderLoading("pendiente", ["Finca"], ["Finca"], "2026-11-25").status).toBe("entregado");
+  });
+
+  it("keeps an annulled order annulled even with a delivery day", () => {
+    expect(deriveOrderLoading("anulado", ["Finca"], ["Finca"], "2026-11-25").status).toBe("anulado");
+  });
+
+  it("stays loaded without a delivery day", () => {
+    expect(deriveOrderLoading("pendiente", ["Finca"], ["Finca"], null).status).toBe("cargado");
+  });
+
+  it("labels a delivered order as delivered", () => {
+    expect(orderStatusLabel({ status: "entregado", partial: false })).toBe("Entregado");
+  });
+
+  it("shows delivered orders by default and filters them by status", () => {
+    const rows = [order({ id: 1, status: "cargado" }), order({ id: 2, status: "entregado", deliveredAt: "2026-11-25" })];
+    expect(filterOrders(rows, { statuses: DEFAULT_STATUS_FILTER, from: null, to: null }).map((r) => r.id)).toEqual([1, 2]);
+    expect(filterOrders(rows, { statuses: ["entregado"], from: null, to: null }).map((r) => r.id)).toEqual([2]);
+  });
+
+  it("cannot be edited", () => {
+    expect(canEditOrder("entregado")).toBe(false);
   });
 });
 

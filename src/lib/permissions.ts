@@ -149,6 +149,14 @@ export function canSetKgPerBag(role: Role): boolean {
   return canManageSection(role, "orders");
 }
 
+/**
+ * Mark orders as delivered (and undo it): whoever manages the orders or the loads. The loader gets it
+ * without editing orders, since it only reads them.
+ */
+export function canDeliverOrders(role: Role): boolean {
+  return canManageSection(role, "orders") || canManageSection(role, "loads");
+}
+
 /** Create, edit and delete drivers. */
 export function canManageDrivers(role: Role): boolean {
   return canManageSection(role, "drivers");

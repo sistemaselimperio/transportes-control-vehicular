@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { ClientOption } from "@/modules/deliveries/ui/client-picker";
+import { deliverOrdersAction } from "../application/order-actions";
 import type { CatalogProduct } from "../domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
+import { canDeliverOrder, type DeliveryBalance } from "../domain/order-delivery";
 import {
   DEFAULT_STATUS_FILTER,
   filterOrders,
@@ -24,6 +26,7 @@ import {
   type OrderStatus,
 } from "../domain/order-rules";
 import { AnnulOrderDialog } from "./annul-order-dialog";
+import { DeliverDialog, type DeliverTarget } from "./deliver-dialog";
 import { KgPerBagField } from "./kg-per-bag-field";
 import { sortOrdersForList } from "../domain/order-days";
 import { OrderLine } from "./order-line";
@@ -38,6 +41,8 @@ export function OrdersView({
   canManage,
   canSetKgPerBag,
   canCreateLoad,
+  canDeliver,
+  balances,
   today,
 }: {
   rows: readonly OrderRow[];
@@ -48,17 +53,32 @@ export function OrdersView({
   canSetKgPerBag: boolean;
   /** The user manages loads: pending orders offer "Crear cargue". */
   canCreateLoad: boolean;
+  /** The user may deliver orders and undo it. */
+  canDeliver: boolean;
+  /** The bags the loads left behind: an order with some still to carry cannot be delivered. */
+  balances: readonly DeliveryBalance[];
   /** Colombia's current day, read on the server. */
   today: string;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<OrderRow | undefined>();
   const [annulling, setAnnulling] = useState<OrderRow | undefined>();
+  const [delivering, setDelivering] = useState<OrderRow | undefined>();
   const [filters, setFilters] = useState<OrderFilters>({ statuses: DEFAULT_STATUS_FILTER, from: null, to: null });
   const { message, flash } = useFlashMessage();
 
   const shown = useMemo(() => sortOrdersForList(filterOrders(rows, filters)), [rows, filters]);
   const totals = useMemo(() => ordersTotals(shown, kgPerBag), [shown, kgPerBag]);
+
+  const deliverable = useMemo(() => new Set(rows.filter((o) => canDeliverOrder(o, balances)).map((o) => o.id)), [rows, balances]);
+
+  const deliverTarget: DeliverTarget | undefined = delivering && {
+    key: String(delivering.id),
+    title: "Entregar pedido",
+    description: `Pedido #${delivering.id} · ${formatDisplayDate(delivering.deliveryDate)}`,
+    summary: `Se marcará el pedido #${delivering.id} como entregado.`,
+    run: (date) => deliverOrdersAction([delivering.id], date),
+  };
 
   const openForm = (order?: OrderRow) => {
     setEditing(order);
@@ -156,8 +176,12 @@ export function OrdersView({
                 kgPerBag={kgPerBag}
                 canManage={canManage}
                 canCreateLoad={canCreateLoad}
+                canDeliver={canDeliver}
+                deliverable={deliverable.has(order.id)}
                 onEdit={openForm}
                 onAnnul={setAnnulling}
+                onDeliver={setDelivering}
+                onFlash={flash}
               />
             ))}
           </ul>
@@ -173,6 +197,8 @@ export function OrdersView({
       <FlashMessage message={message} />
 
       <AnnulOrderDialog order={annulling} onClose={() => setAnnulling(undefined)} onDone={flash} />
+
+      <DeliverDialog target={deliverTarget} today={today} onClose={() => setDelivering(undefined)} onDone={flash} />
 
       <SlideOver
         open={open}

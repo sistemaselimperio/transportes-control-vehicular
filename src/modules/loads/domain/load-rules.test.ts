@@ -76,6 +76,8 @@ const block = (id: number, bags: number): LoadOrderBlock => ({
   id,
   deliveryDate: "2026-11-20",
   timeWindow: null,
+  status: "cargado",
+  deliveredAt: null,
   clients: [{ clientName: "Cliente", locationName: null }],
   products: [],
   bags,
@@ -113,13 +115,15 @@ describe("groupLoadOrders", () => {
       id: 12,
       deliveryDate: "2026-11-20",
       timeWindow: "7-11 a.m.",
+      status: "entregado",
+      deliveredAt: "2026-11-25",
       lines: [
         orderLine({}),
         orderLine({ referenceId: 2, referenceName: "Levante", referenceCode: "DEF", bags: 25, locationName: "La Esperanza" }),
         orderLine({ referenceId: 3, referenceName: "De otro proveedor", referenceCode: "ZZZ", bags: 10, clientName: "Otro" }),
       ],
     },
-    { id: 9, deliveryDate: "2026-11-18", timeWindow: null, lines: [orderLine({ clientName: "Agro Dos", bags: 50 })] },
+    { id: 9, deliveryDate: "2026-11-18", timeWindow: null, status: "cargado", deliveredAt: null, lines: [orderLine({ clientName: "Agro Dos", bags: 50 })] },
   ];
   const lines = [
     { orderId: 12, referenceId: 1, tons: 1.5 },
@@ -137,6 +141,14 @@ describe("groupLoadOrders", () => {
     expect(blocks.map((b) => [b.id, b.deliveryDate, b.timeWindow])).toEqual([
       [9, "2026-11-18", null],
       [12, "2026-11-20", "7-11 a.m."],
+    ]);
+  });
+
+  it("carries the status and the delivery day of each order", () => {
+    const blocks = groupLoadOrders(lines, orders);
+    expect(blocks.map((b) => [b.id, b.status, b.deliveredAt])).toEqual([
+      [9, "cargado", null],
+      [12, "entregado", "2026-11-25"],
     ]);
   });
 

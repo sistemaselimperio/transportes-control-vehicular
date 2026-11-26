@@ -1,4 +1,5 @@
 import { productLabel } from "@/modules/orders/domain/catalog";
+import type { OrderStatus } from "@/modules/orders/domain/order-rules";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import type { LoadLineRow } from "./load-lines";
 
@@ -23,6 +24,10 @@ export interface LoadOrderBlock {
   deliveryDate: IsoDate;
   /** Free text such as "7–11 a.m.". */
   timeWindow: string | null;
+  /** The derived status of the whole order (`entregado` once delivered). */
+  status: OrderStatus;
+  /** The day the order was delivered; null while it is not. */
+  deliveredAt: IsoDate | null;
   /** The clients and fincas of the products taken, each once. */
   clients: ReadonlyArray<{ clientName: string; locationName: string | null }>;
   products: readonly LoadOrderProduct[];
@@ -35,6 +40,8 @@ export interface LoadOrderSource {
   id: number;
   deliveryDate: IsoDate;
   timeWindow: string | null;
+  status: OrderStatus;
+  deliveredAt: IsoDate | null;
   lines: ReadonlyArray<{
     clientName: string;
     locationName: string | null;
@@ -82,6 +89,8 @@ export function groupLoadOrders(
       id: order.id,
       deliveryDate: order.deliveryDate,
       timeWindow: order.timeWindow,
+      status: order.status,
+      deliveredAt: order.deliveredAt,
       clients,
       products: list,
       bags: list.reduce((sum, p) => sum + p.bags, 0),

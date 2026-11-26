@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notExists, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { OrderPorts, OrderValues } from "../application/order-commands";
 import { DEFAULT_KG_PER_BAG, deriveOrderLoading, isValidKgPerBag, type OrderLineRow, type OrderLoad, type OrderRow } from "../domain/order-rules";
@@ -76,12 +76,14 @@ export async function loadOrderRows(ids?: readonly number[]): Promise<OrderRow[]
       o.status,
       orderLines.map((l) => l.supplier),
       loads.map((l) => l.supplier),
+      o.deliveredAt,
     );
     return {
       id: o.id,
       deliveryDate: o.deliveryDate,
       timeWindow: o.timeWindow,
       note: o.note,
+      deliveredAt: o.deliveredAt,
       ...loading,
       loads,
       lines: orderLines,
@@ -115,6 +117,9 @@ const toLineColumns = (orderId: number, lines: OrderValues["lines"]) =>
 async function insertLines(tx: Tx, orderId: number, lines: OrderValues["lines"]) {
   await tx.insert(schema.orderLines).values(toLineColumns(orderId, lines));
 }
+
+/** Some order of the delivery stopped being deliverable meanwhile: rolls the transaction back. */
+class DeliveryChanged extends Error {}
 
 export const orderRepository: OrderPorts = {
   async findExistingClientIds(ids) {
@@ -188,5 +193,66 @@ export const orderRepository: OrderPorts = {
         target: schema.comercialSettings.key,
         set: { value: String(value), updatedAt: new Date() },
       });
+  },
+
+  async findOrdersForDelivery(ids) {
+    const rows = await loadOrderRows(ids);
+    return rows.map((o) => ({ id: o.id, status: o.status }));
+  },
+
+  async findBalances(orderIds) {
+    if (orderIds.length === 0) return [];
+    const [balances, trips] = await Promise.all([
+      db
+        .select({ id: schema.loadBalances.id, orderId: schema.loadBalances.orderId, bags: schema.loadBalances.bags })
+        .from(schema.loadBalances)
+        .where(inArray(schema.loadBalances.orderId, orderIds)),
+      db
+        .select({ balanceId: schema.loadBalanceTrips.balanceId, bags: schema.loadBalanceTrips.bags })
+        .from(schema.loadBalanceTrips)
+        .innerJoin(schema.loadBalances, eq(schema.loadBalances.id, schema.loadBalanceTrips.balanceId))
+        .where(inArray(schema.loadBalances.orderId, orderIds)),
+    ]);
+    return balances.map((b) => ({
+      orderId: b.orderId,
+      bags: b.bags,
+      trips: trips.filter((t) => t.balanceId === b.id).map((t) => ({ bags: t.bags })),
+    }));
+  },
+
+  async findLoadOrderIds(loadId) {
+    const rows = await db
+      .selectDistinct({ orderId: schema.loadLines.orderId })
+      .from(schema.loadLines)
+      .where(and(eq(schema.loadLines.loadId, loadId), isNotNull(schema.loadLines.orderId)))
+      .orderBy(asc(schema.loadLines.orderId));
+    return rows.flatMap((r) => (r.orderId === null ? [] : [r.orderId]));
+  },
+
+  async markDelivered(ids, date, by) {
+    try {
+      await db.transaction(async (tx) => {
+        const rows = await tx
+          .update(schema.orders)
+          .set({ deliveredAt: date, deliveredBy: by, updatedAt: new Date() })
+          .where(and(inArray(schema.orders.id, ids), ne(schema.orders.status, "anulado"), isNull(schema.orders.deliveredAt)))
+          .returning({ id: schema.orders.id });
+        // All or nothing: one order that changed meanwhile undoes the rest.
+        if (rows.length !== ids.length) throw new DeliveryChanged();
+      });
+      return true;
+    } catch (e) {
+      if (e instanceof DeliveryChanged) return false;
+      throw e;
+    }
+  },
+
+  async clearDelivery(ids) {
+    const rows = await db
+      .update(schema.orders)
+      .set({ deliveredAt: null, deliveredBy: null, updatedAt: new Date() })
+      .where(and(inArray(schema.orders.id, ids), isNotNull(schema.orders.deliveredAt)))
+      .returning({ id: schema.orders.id });
+    return rows.length;
   },
 };

@@ -130,7 +130,7 @@ export function allocationErrors(input: AllocationInput): string[] {
 /** What decides whether a load of some supplier can take an order. */
 export interface LoadableOrder {
   id: number;
-  /** Derived status: an annulled order cannot be loaded. */
+  /** Derived status: an annulled or delivered order cannot be loaded. */
   status: OrderStatus;
   loads: ReadonlyArray<{ loadId: number; supplier: LoadSupplier }>;
   lines: ReadonlyArray<{ supplier: LoadSupplier | null }>;
@@ -141,7 +141,8 @@ export interface LoadableOrder {
  * other load of that supplier. `ownLoadId` is the load being edited, whose own part stays available.
  */
 export function isOrderLoadable(order: LoadableOrder, supplier: LoadSupplier, ownLoadId?: number): boolean {
-  if (order.status === "anulado") return false;
+  // A delivered order is closed: undo its delivery first.
+  if (order.status === "anulado" || order.status === "entregado") return false;
   if (!order.lines.some((l) => l.supplier === supplier)) return false;
   return !order.loads.some((l) => l.supplier === supplier && l.loadId !== ownLoadId);
 }

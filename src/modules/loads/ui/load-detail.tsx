@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, PackageOpen, StickyNote } from "lucide-react";
+import { CalendarDays, MapPin, PackageCheck, PackageOpen, StickyNote } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
@@ -86,6 +86,12 @@ function OrderCard({
           Entrega {formatDisplayDate(order.deliveryDate)}
           {order.timeWindow ? ` · ${order.timeWindow}` : ""}
         </p>
+        {order.deliveredAt && (
+          <p className="num inline-flex items-center gap-1.5 rounded-full bg-ok px-2.5 py-0.5 text-xs font-medium text-ok-foreground">
+            <PackageCheck aria-hidden className="size-3.5" />
+            Entregado · {formatDisplayDate(order.deliveredAt)}
+          </p>
+        )}
       </header>
 
       <div className="space-y-3 px-4 py-3">

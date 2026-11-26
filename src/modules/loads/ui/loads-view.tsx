@@ -8,6 +8,8 @@ import { TabBar } from "@/components/app/tab-bar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { deliverLoadAction } from "@/modules/orders/application/order-actions";
+import { DeliverDialog, type DeliverTarget } from "@/modules/orders/ui/deliver-dialog";
 import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import type { OrderRow } from "@/modules/orders/domain/order-rules";
@@ -50,6 +52,7 @@ export function LoadsView({
   kgPerBag,
   presetOrderId,
   canManage,
+  canDeliver,
   today,
 }: {
   rows: readonly LoadRow[];
@@ -62,6 +65,8 @@ export function LoadsView({
   /** The order whose load form opens at once, from the "Crear cargue" button of the orders page. */
   presetOrderId: number | null;
   canManage: boolean;
+  /** The user may deliver orders and undo it: loads with orders offer "Entregar". */
+  canDeliver: boolean;
   /** Colombia's current day, read on the server. */
   today: string;
 }) {
@@ -74,6 +79,7 @@ export function LoadsView({
   const [freeOpen, setFreeOpen] = useState(false);
   const [editingFree, setEditingFree] = useState<LoadRow | undefined>();
   const [deleting, setDeleting] = useState<LoadRow | undefined>();
+  const [delivering, setDelivering] = useState<LoadRow | undefined>();
   // The balance whose trip is being registered, and the trip being deleted.
   const [tripFor, setTripFor] = useState<PendingBalanceRow | undefined>();
   const [deletingTrip, setDeletingTrip] = useState<BalanceTripRow | undefined>();
@@ -90,6 +96,14 @@ export function LoadsView({
   );
   const pendingOrders = useMemo(() => pending.filter((e) => e.kind === "order"), [pending]);
   const pendingSaldos = useMemo(() => pending.filter((e) => e.kind === "balance"), [pending]);
+
+  const deliverTarget: DeliverTarget | undefined = delivering && {
+    key: String(delivering.id),
+    title: "Entregar cargue",
+    description: `${delivering.supplier} · ${delivering.plate} · ${formatDisplayDate(delivering.date)}`,
+    summary: `Se marcarán como entregados ${delivering.orders.length === 1 ? "el pedido" : "los pedidos"} ${delivering.orders.map((o) => `#${o.id}`).join(", ")} de este cargue.`,
+    run: (date) => deliverLoadAction(delivering.id, date),
+  };
 
   const editLoad = (load: LoadRow) => {
     // A load made without an order has its own form.
@@ -216,9 +230,12 @@ export function LoadsView({
                 rows={shown}
                 balances={balances}
                 canManage={canManage}
+                canDeliver={canDeliver}
                 onEdit={editLoad}
                 onDelete={setDeleting}
                 onDeleteTrip={setDeletingTrip}
+                onDeliver={setDelivering}
+                onFlash={flash}
               />
             ) : (
               <LoadSummary suppliers={summary} />
@@ -228,6 +245,8 @@ export function LoadsView({
       </div>
 
       <FlashMessage message={message} />
+
+      <DeliverDialog target={deliverTarget} today={today} onClose={() => setDelivering(undefined)} onDone={flash} />
 
       <ConfirmDeleteDialog
         open={deleting !== undefined}
