@@ -15,6 +15,7 @@ import { normalizeReceiptNumber } from "../domain/receipt-number";
 import { applyFleetMatch, matchReceiptFleet, type FleetCandidates } from "../domain/fleet-matching";
 import { emptyDraft, type ReceiptDraft } from "../domain/receipt-rules";
 import type { Tariff } from "../domain/tariff";
+import { reloadIfStaleDeployment } from "@/lib/stale-deployment";
 import { renderForReading } from "./page-renditions";
 import { ReceiptReview, type ReviewItem } from "./receipt-review";
 import { useOnWindowFocus, type FleetControl } from "./use-fleet";
@@ -234,6 +235,7 @@ export function ReceiptImport({
       setOpen(true);
       await refreshExisting(found.map((i) => i.draft));
     } catch (e) {
+      if (reloadIfStaleDeployment(e)) return;
       console.error("cotero receipt reading failed", e);
       if (uploaded.length > 0) void discardUploadsAction(uploaded);
       revoke(found);

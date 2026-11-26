@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { optimizeFile } from "@/modules/documents/ui/optimize-file";
 import { formatPesos } from "@/modules/vehicles/ui/vehicle-people-forms";
 import { readServicesFromPhotoAction, saveServicesFromPhotoAction } from "../application/logbook-photo-actions";
+import { reloadIfStaleDeployment } from "@/lib/stale-deployment";
 import type { ServiceDraft } from "../application/service-photo-import";
 import { SERVICE_KIND_LABELS } from "../domain/logbook";
 import { FIELD } from "./logbook-forms";
@@ -95,6 +96,7 @@ export function LogbookPhotoImportFlow({
         if (result.rows.length === 0) return setError("No se encontraron mantenimientos en el archivo. Prueba con una foto más nítida.");
         setRows(result.rows.map((r) => ({ ...r, key: nextKey.current++ })));
       } catch (err) {
+        if (reloadIfStaleDeployment(err)) return;
         console.error("logbook photo read failed", err);
         setError("No se pudo leer el archivo. Revisa que no esté dañado e intenta de nuevo.");
       }

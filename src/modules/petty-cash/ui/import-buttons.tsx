@@ -3,6 +3,7 @@
 import { Check, FileText, Loader2, ScanLine } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { reloadIfStaleDeployment } from "@/lib/stale-deployment";
 import { cn } from "@/lib/utils";
 import { optimizeFile } from "@/modules/documents/ui/optimize-file";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
@@ -68,6 +69,7 @@ export function useInvoiceImport(ledgerId: number, onResult: (result: ActionResu
       setState({ kind, stage: "reading", fileName: file.name });
       onResult(await importExpensesAction(ledgerId, target.path, file.name));
     } catch (e) {
+      if (reloadIfStaleDeployment(e)) return;
       console.error("petty cash import failed", e);
       onResult({ ok: false, error: "No se pudo leer el archivo. Revisa que no esté dañado e intenta de nuevo." });
     } finally {

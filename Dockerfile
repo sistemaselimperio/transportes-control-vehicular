@@ -24,7 +24,9 @@ ENV DATABASE_URL=$DATABASE_URL \
     NEXT_OUTPUT=standalone \
     NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# A fresh deployment id per build: a page left open across a deploy then reloads on its next
+# navigation instead of mixing builds (see `deploymentId` in the Next.js docs).
+RUN NEXT_DEPLOYMENT_ID="$(date +%s)" npm run build
 
 # --- Runtime ---
 FROM base AS runner
