@@ -10,7 +10,7 @@ import { actionFailure } from "@/modules/shared/application/action-failure";
 import type { ActionResult } from "@/modules/vehicles/application/vehicle-actions";
 import { loadRepository } from "../infrastructure/load-repository";
 import { createLoadCommands, LoadError } from "./load-commands";
-import { balanceTripSchema, createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
+import { balanceTripSchema, createLoadsSchema, freeLoadSchema, loadIdSchema, loadSchema } from "./load-schemas";
 
 const commands = createLoadCommands(loadRepository);
 
@@ -31,6 +31,22 @@ export async function createLoadsAction(fd: FormData): Promise<ActionResult> {
     const input = createLoadsSchema.parse(Object.fromEntries(fd.entries()));
     await commands.createForOrder(input);
     return input.blocks.length === 1 ? "Cargue registrado." : `${input.blocks.length} cargues registrados.`;
+  });
+}
+
+/** A load made without an order. */
+export async function createFreeLoadAction(fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    await commands.createFree(freeLoadSchema.parse(Object.fromEntries(fd.entries())));
+    return "Cargue registrado.";
+  });
+}
+
+export async function updateFreeLoadAction(id: number, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const loadId = loadIdSchema.parse(id);
+    await commands.updateFree(loadId, freeLoadSchema.parse(Object.fromEntries(fd.entries())));
+    return "Cargue actualizado.";
   });
 }
 

@@ -37,7 +37,7 @@ export async function loadLoadRows(): Promise<LoadRow[]> {
     db.select().from(schema.loads).orderBy(desc(schema.loads.date), desc(schema.loads.id)),
     loadLines(),
   ]);
-  const orderIds = [...new Set([...lines.values()].flatMap((ls) => ls.map((l) => l.orderId)))];
+  const orderIds = [...new Set([...lines.values()].flatMap((ls) => ls.flatMap((l) => (l.orderId === null ? [] : [l.orderId]))))];
   const orders = await loadOrderRows(orderIds);
   return rows.map((r) => ({
     id: r.id,
@@ -169,7 +169,8 @@ export const loadRepository: LoadPorts = {
       .selectDistinct({ orderId: schema.loadLines.orderId })
       .from(schema.loadLines)
       .where(eq(schema.loadLines.loadId, id));
-    return { ...row, orderIds: orders.map((o) => o.orderId) };
+    // A free load's lines carry no order.
+    return { ...row, orderIds: orders.flatMap((o) => (o.orderId === null ? [] : [o.orderId])) };
   },
 
   async findTakenSiesa(numbers, exceptId) {

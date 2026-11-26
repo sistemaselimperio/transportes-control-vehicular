@@ -21,6 +21,7 @@ import {
   type PendingBalanceRow,
 } from "../domain/load-balance";
 import { buildPendingOrders } from "../domain/load-pending";
+import { isFreeLoad } from "../domain/load-lines";
 import { buildLoadSummary } from "../domain/load-summary";
 import {
   filterLoads,
@@ -32,6 +33,7 @@ import {
   type LoadRow,
 } from "../domain/load-rules";
 import { BalanceTripForm } from "./balance-trip-form";
+import { FreeLoadForm } from "./free-load-form";
 import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
 import { LoadSummary } from "./load-summary";
@@ -68,6 +70,9 @@ export function LoadsView({
   // The order whose loads are being created; an edit takes the orders of its load.
   const [creatingOrderId, setCreatingOrderId] = useState<number | null>(presetOrderId);
   const [editing, setEditing] = useState<LoadRow | undefined>();
+  // The free load (made without an order) side sheet: new, or editing `editingFree`.
+  const [freeOpen, setFreeOpen] = useState(false);
+  const [editingFree, setEditingFree] = useState<LoadRow | undefined>();
   const [deleting, setDeleting] = useState<LoadRow | undefined>();
   // The balance whose trip is being registered, and the trip being deleted.
   const [tripFor, setTripFor] = useState<PendingBalanceRow | undefined>();
@@ -85,9 +90,21 @@ export function LoadsView({
   );
 
   const editLoad = (load: LoadRow) => {
+    // A load made without an order has its own form.
+    if (isFreeLoad(load.lines)) {
+      setEditingFree(load);
+      setFreeOpen(true);
+      return;
+    }
     setEditing(load);
     setCreatingOrderId(null);
     setOpen(true);
+  };
+
+  /** "Nuevo cargue": a load that belongs to no order. */
+  const createFreeLoad = () => {
+    setEditingFree(undefined);
+    setFreeOpen(true);
   };
 
   /** "Cargue" on an order: the loads of all its pending suppliers. */
@@ -124,6 +141,7 @@ export function LoadsView({
             today={today}
             canManage={canManage}
             onCreateLoad={createLoads}
+            onCreateFreeLoad={createFreeLoad}
             onRegisterTrip={setTripFor}
             onDeleteTrip={setDeletingTrip}
           />
@@ -240,6 +258,24 @@ export function LoadsView({
             }}
           />
         )}
+      </SlideOver>
+
+      <SlideOver
+        open={freeOpen}
+        onOpenChange={setFreeOpen}
+        title={editingFree ? "Editar cargue" : "Nuevo cargue"}
+        description={editingFree ? `${editingFree.supplier} · ${formatDisplayDate(editingFree.date)}` : "Sin pedido"}
+      >
+        <FreeLoadForm
+          key={editingFree ? `edit-${editingFree.id}` : "new"}
+          load={editingFree}
+          plates={plates}
+          onCancel={() => setFreeOpen(false)}
+          onDone={(msg) => {
+            flash(msg);
+            setFreeOpen(false);
+          }}
+        />
       </SlideOver>
 
       <SlideOver

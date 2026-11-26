@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, notExists, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { OrderPorts, OrderValues } from "../application/order-commands";
 import { DEFAULT_KG_PER_BAG, deriveOrderLoading, isValidKgPerBag, type OrderLineRow, type OrderLoad, type OrderRow } from "../domain/order-rules";
@@ -12,9 +12,14 @@ async function loadOrderLoads(): Promise<Map<number, OrderLoad[]>> {
     .selectDistinct({ orderId: schema.loadLines.orderId, loadId: schema.loadLines.loadId, supplier: schema.loads.supplier })
     .from(schema.loadLines)
     .innerJoin(schema.loads, eq(schema.loads.id, schema.loadLines.loadId))
+    // The lines of a free load (no order) take part of no order.
+    .where(isNotNull(schema.loadLines.orderId))
     .orderBy(asc(schema.loadLines.orderId), asc(schema.loadLines.loadId));
   const byOrder = new Map<number, OrderLoad[]>();
-  for (const { orderId, ...load } of rows) byOrder.set(orderId, [...(byOrder.get(orderId) ?? []), load]);
+  for (const { orderId, ...load } of rows) {
+    if (orderId === null) continue;
+    byOrder.set(orderId, [...(byOrder.get(orderId) ?? []), load]);
+  }
   return byOrder;
 }
 

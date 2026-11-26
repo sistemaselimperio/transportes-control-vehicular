@@ -2,9 +2,9 @@ import { type FindCatalogProducts, productLabel } from "@/modules/orders/domain/
 import type { OrderStatus } from "@/modules/orders/domain/order-rules";
 import { allocationErrors, loadableSuppliers, unavailableOrderIds, type AllocationProduct } from "../domain/load-allocation";
 import { balanceBagsError, tripBagsError } from "../domain/load-balance";
-import { firstDuplicate, splitCost } from "../domain/load-lines";
+import { firstDuplicate, freeRowsError, round3, splitCost } from "../domain/load-lines";
 import type { LoadSupplier } from "../domain/load-rules";
-import type { BalanceTripInput, CreateLoadsInput, LoadInput } from "./load-schemas";
+import type { BalanceTripInput, CreateLoadsInput, FreeLoadInput, LoadInput } from "./load-schemas";
 
 /** A rule of the loads refused the operation; the message is for the user. */
 export class LoadError extends Error {}
@@ -16,7 +16,8 @@ export class LoadError extends Error {}
 export interface LoadValues extends Omit<LoadInput, "orders"> {
   vehicleId: number | null;
   orderIds: number[];
-  lines: ReadonlyArray<{ orderId: number; referenceId: number; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
+  /** A free load (no order) has lines with neither an order nor a product. */
+  lines: ReadonlyArray<{ orderId: number | null; referenceId: number | null; tons: number; cost: number; siesaNumber: string; orderNumber: string }>;
   /** The bags a truck leaves behind, per order: transport only, with no SIESA, cost or tons. */
   balances: ReadonlyArray<{ orderId: number; bags: number; date: string; plate: string | null; vehicleId: number | null }>;
 }
@@ -105,6 +106,7 @@ const foreignProduct = (label: string, supplier: string) => `El producto ${label
 const NOT_IN_FLEET = "Elige una placa de la flota.";
 export const ORDERS_UNAVAILABLE = "Algún pedido ya no está disponible: está anulado o ya tiene cargue de este proveedor.";
 const NO_ORDERS = "Elige al menos un pedido.";
+export const NOT_A_FREE_LOAD = "Este cargue pertenece a pedidos; edítalo desde sus pedidos.";
 export const BALANCE_TRIPS_REGISTERED = "Este cargue tiene viajes de saldo registrados; bórralos primero.";
 const BALANCE_GONE = "El saldo ya no existe.";
 const BALANCE_DONE = "Este saldo ya se llevó completo.";
@@ -216,10 +218,61 @@ export function createLoadCommands(ports: LoadPorts) {
       supplier: values.supplier,
       kgPerBag,
       orders: values.orderIds.flatMap((id) => found.filter((o) => o.id === id)),
-      lines: values.lines,
+      // Only the lines of an order load reach the allocation: a free load has no order to cover.
+      lines: values.lines.flatMap((l) => (l.orderId === null || l.referenceId === null ? [] : [{ ...l, orderId: l.orderId, referenceId: l.referenceId }])),
     });
 
+  /** A free load: no order, no products; the tons are the kilos over a thousand and the cost is the value as typed. */
+  function freeValues(input: FreeLoadInput, owner: { plate: string; vehicleId: number | null }): LoadValues {
+    return {
+      date: input.date,
+      supplier: input.supplier,
+      notes: input.notes,
+      plate: owner.plate,
+      vehicleId: owner.vehicleId,
+      orderIds: [],
+      balances: [],
+      lines: input.rows.map((r) => ({
+        orderId: null,
+        referenceId: null,
+        tons: round3(r.kg / 1000),
+        cost: r.cost,
+        siesaNumber: r.siesaNumber,
+        orderNumber: r.orderNumber,
+      })),
+    };
+  }
+
+  /** The rows must be complete and their SIESA numbers free (`exceptId` is the load being edited). */
+  async function ensureFreeRows(input: FreeLoadInput, exceptId?: number) {
+    const problem = freeRowsError(input.rows);
+    if (problem !== null) throw new LoadError(problem);
+    await ensureFreeSiesa(
+      input.rows.map((r) => r.siesaNumber),
+      exceptId,
+    );
+  }
+
   return {
+    /** A load made without an order, with one line per SIESA row. */
+    async createFree(input: FreeLoadInput) {
+      const owner = await ownerOf(input.plate);
+      await ensureFreeRows(input);
+      if (!(await ports.insertLoads([freeValues(input, owner)]))) throw new LoadError(ORDERS_CHANGED);
+    },
+
+    /** Edits a free load: its lines are rewritten whole. A load that takes orders cannot be edited here. */
+    async updateFree(id: number, input: FreeLoadInput) {
+      const stored = await ports.findLoad(id);
+      if (!stored) throw new LoadError(GONE);
+      if (stored.orderIds.length > 0) throw new LoadError(NOT_A_FREE_LOAD);
+      const owner = await ownerOf(input.plate, stored);
+      await ensureFreeRows(input, id);
+      const result = await ports.updateLoad(id, freeValues(input, owner));
+      if (result === "gone") throw new LoadError(GONE);
+      if (result === "orders_unavailable") throw new LoadError(ORDERS_CHANGED);
+    },
+
     /**
      * The loads of one order: one per supplier pending in it, saved all together or not at all. The
      * submission must cover exactly the suppliers pending right now.

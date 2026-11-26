@@ -8,7 +8,7 @@ import { productLabel } from "@/modules/orders/domain/catalog";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { remainingBags, type BalanceTripRow, type LoadBalanceRow } from "../domain/load-balance";
-import { groupLinesByOrder } from "../domain/load-lines";
+import { freeLoadRows, groupLinesByOrder, isFreeLoad } from "../domain/load-lines";
 import { formatCop, loadFooter, type LoadOrderBlock, type LoadRow } from "../domain/load-rules";
 import { BalanceTrips } from "./balance-trips";
 
@@ -91,6 +91,22 @@ function LineDetails({ row }: { row: LoadRow }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+/** The SIESA rows of a free load (no order): numbers, kilos and value of each. */
+function FreeRows({ row }: { row: LoadRow }) {
+  return (
+    <ul className="divide-y">
+      {freeLoadRows(row.lines).map((r) => (
+        <li key={`${r.siesaNumber}-${r.orderNumber}`} className="space-y-0.5 px-4 py-3 text-sm">
+          <p className="num font-semibold">SIESA {r.siesaNumber}</p>
+          <p className="num text-xs text-muted-foreground">
+            Pedido proveedor {r.orderNumber} · {formatDecimal(r.kg, 0)} kg · {formatCop(r.cost)}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -179,6 +195,7 @@ export function LoadList({
     <ul className="grid gap-3 lg:grid-cols-2">
       {rows.map((r) => {
         const footer = loadFooter(r.orders);
+        const free = isFreeLoad(r.lines);
         const left = balances.filter((b) => b.loadId === r.id);
         return (
           <li key={r.id} className="panel">
@@ -200,7 +217,9 @@ export function LoadList({
               )}
             </div>
 
-            {r.orders.length === 0 ? (
+            {free ? (
+              <FreeRows row={r} />
+            ) : r.orders.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">Sin pedidos.</p>
             ) : (
               <ul className="divide-y">
@@ -216,16 +235,27 @@ export function LoadList({
               </div>
             )}
 
-            <div className="border-t">
-              <LineDetails row={r} />
-            </div>
+            {!free && (
+              <div className="border-t">
+                <LineDetails row={r} />
+              </div>
+            )}
             {r.notes && <p className="line-clamp-2 border-t px-4 py-2.5 text-sm text-muted-foreground">{r.notes}</p>}
 
             <p className="num flex flex-wrap items-center justify-between gap-x-4 border-t bg-muted/40 px-4 py-2.5 text-sm font-semibold">
-              <span>
-                {footer.orders} {footer.orders === 1 ? "pedido" : "pedidos"}
-              </span>
-              <span>{formatDecimal(footer.bags, 0)} bultos</span>
+              {free ? (
+                <>
+                  <span>Sin pedido</span>
+                  <span>{formatDecimal(Math.round(r.tons * 1000), 0)} kg</span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    {footer.orders} {footer.orders === 1 ? "pedido" : "pedidos"}
+                  </span>
+                  <span>{formatDecimal(footer.bags, 0)} bultos</span>
+                </>
+              )}
             </p>
           </li>
         );

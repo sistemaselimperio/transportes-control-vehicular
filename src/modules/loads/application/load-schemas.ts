@@ -169,6 +169,61 @@ export const createLoadsSchema = z.object({
   blocks: blocksField,
 });
 
+const FREE_ROWS_INVALID = "Las filas del cargue no son válidas.";
+const KG_INVALID = "Los kilos de cada fila deben ser un número entero mayor que cero.";
+const VALUE_INVALID = "El valor de cada fila debe ser mayor que cero.";
+export const MAX_FREE_ROWS = 50;
+
+/** One SIESA of a free load: its numbers, whole kilos and whole pesos (typed with separators). */
+export const freeRowSchema = z.object({
+  siesaNumber: reference("Ingresa el número SIESA de cada fila."),
+  orderNumber: reference("Ingresa el número de pedido proveedor de cada fila."),
+  kg: z
+    .string(KG_INVALID)
+    .transform((v) => v.trim())
+    .refine((v) => /^\d{1,8}$/.test(v) && Number(v) > 0, KG_INVALID)
+    .transform(Number),
+  cost: z
+    .string(VALUE_INVALID)
+    .transform((v) => v.replace(/[$\s.,]/g, ""))
+    .refine((v) => /^\d{1,13}$/.test(v) && Number(v) > 0, VALUE_INVALID)
+    .transform(Number),
+});
+
+/** The rows travel as one JSON field; a SIESA number cannot repeat among them. */
+const freeRowsField = z
+  .string()
+  .default("[]")
+  .transform((raw, ctx) => {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      ctx.addIssue({ code: "custom", message: FREE_ROWS_INVALID });
+      return z.NEVER;
+    }
+  })
+  .pipe(
+    z
+      .array(freeRowSchema, FREE_ROWS_INVALID)
+      .min(1, "Agrega al menos un SIESA.")
+      .max(MAX_FREE_ROWS, `Un cargue no puede tener más de ${MAX_FREE_ROWS} filas.`)
+      .superRefine((rows, ctx) => {
+        const siesa = firstDuplicate(rows.map((r) => r.siesaNumber));
+        if (siesa !== null) ctx.addIssue({ code: "custom", message: `El número SIESA ${siesa} está repetido en el cargue.` });
+      }),
+  );
+
+/** A load made without an order: the supplier, the day, the plate and one row per SIESA. */
+export const freeLoadSchema = z.object({
+  date: dateField("La fecha"),
+  supplier: loadSchema.shape.supplier,
+  plate: loadSchema.shape.plate,
+  notes: loadSchema.shape.notes,
+  rows: freeRowsField,
+});
+
+export type FreeLoadInput = z.infer<typeof freeLoadSchema>;
+
 export type CreateLoadsInput = z.infer<typeof createLoadsSchema>;
 export type LoadBlockInput = CreateLoadsInput["blocks"][number];
 

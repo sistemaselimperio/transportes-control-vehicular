@@ -49,12 +49,13 @@ const round3 = (value: number): number => Math.round(value * 1000) / 1000 + 0;
 
 /** One block per order named by the load lines, by order number: its products taken here, their bags and tons. */
 export function groupLoadOrders(
-  lines: ReadonlyArray<{ orderId: number; referenceId: number | null; tons: number }>,
+  lines: ReadonlyArray<{ orderId: number | null; referenceId: number | null; tons: number }>,
   orders: readonly LoadOrderSource[],
 ): LoadOrderBlock[] {
   const byOrder = new Map<number, Map<number, number>>();
   for (const l of lines) {
-    if (l.referenceId === null) continue;
+    // Free loads (no order) and old lines without a product take part of no order.
+    if (l.orderId === null || l.referenceId === null) continue;
     const products = byOrder.get(l.orderId) ?? new Map<number, number>();
     products.set(l.referenceId, (products.get(l.referenceId) ?? 0) + l.tons);
     byOrder.set(l.orderId, products);

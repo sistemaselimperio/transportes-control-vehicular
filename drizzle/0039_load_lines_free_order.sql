@@ -1,0 +1,1 @@
+ALTER TABLE "comercial"."load_lines" ALTER COLUMN "order_id" DROP NOT NULL;

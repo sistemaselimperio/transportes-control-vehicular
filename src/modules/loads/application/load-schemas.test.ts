@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceTripSchema, createLoadsSchema, loadIdSchema, loadSchema } from "./load-schemas";
+import { balanceTripSchema, createLoadsSchema, freeLoadSchema, loadIdSchema, loadSchema } from "./load-schemas";
 
 const product = { referenceId: 10, tons: "32,5" };
 const order = { orderId: 12, siesaNumber: " FV-100 ", orderNumber: " P-77 ", cost: "$ 1.500.000", lines: [product] };
@@ -203,5 +203,45 @@ describe("balanceTripSchema", () => {
 
   it("rejects a new date that is not a date", () => {
     expect(balanceTripSchema.safeParse({ ...trip, nextDate: "mañana" }).success).toBe(false);
+  });
+});
+
+describe("freeLoadSchema", () => {
+  const row = { siesaNumber: " S-1 ", orderNumber: " P-1 ", kg: "12500", cost: "$ 25.000.000" };
+  const free = { date: "2026-11-18", supplier: "Finca", plate: "abc 123", notes: "", rows: JSON.stringify([row]) };
+  const withRows = (rows: unknown[]) => ({ ...free, rows: JSON.stringify(rows) });
+  const issue = (input: unknown) => {
+    const r = freeLoadSchema.safeParse(input);
+    return r.success ? null : r.error.issues[0]?.message;
+  };
+
+  it("parses a valid form", () => {
+    expect(freeLoadSchema.parse(free)).toEqual({
+      date: "2026-11-18",
+      supplier: "Finca",
+      plate: "ABC-123",
+      notes: null,
+      rows: [{ siesaNumber: "S-1", orderNumber: "P-1", kg: 12_500, cost: 25_000_000 }],
+    });
+  });
+
+  it("needs at least one row and rejects malformed JSON", () => {
+    expect(issue(withRows([]))).toBe("Agrega al menos un SIESA.");
+    expect(issue({ ...free, rows: "{" })).toBe("Las filas del cargue no son válidas.");
+  });
+
+  it("needs SIESA, pedido, whole kilos above zero and a value above zero", () => {
+    expect(issue(withRows([{ ...row, siesaNumber: " " }]))).toBe("Ingresa el número SIESA de cada fila.");
+    expect(issue(withRows([{ ...row, orderNumber: "" }]))).toBe("Ingresa el número de pedido proveedor de cada fila.");
+    expect(issue(withRows([{ ...row, kg: "0" }]))).toBe("Los kilos de cada fila deben ser un número entero mayor que cero.");
+    expect(issue(withRows([{ ...row, kg: "1,5" }]))).toBe("Los kilos de cada fila deben ser un número entero mayor que cero.");
+    expect(issue(withRows([{ ...row, cost: "$ 0" }]))).toBe("El valor de cada fila debe ser mayor que cero.");
+    expect(issue(withRows([{ ...row, cost: "" }]))).toBe("El valor de cada fila debe ser mayor que cero.");
+  });
+
+  it("refuses a repeated SIESA, and the supplier and plate are required", () => {
+    expect(issue(withRows([row, { ...row, orderNumber: "P-2" }]))).toBe("El número SIESA S-1 está repetido en el cargue.");
+    expect(issue({ ...free, supplier: "Otro" })).toBe("Elige el proveedor.");
+    expect(issue({ ...free, plate: "" })).toBe("Elige la placa del vehículo.");
   });
 });

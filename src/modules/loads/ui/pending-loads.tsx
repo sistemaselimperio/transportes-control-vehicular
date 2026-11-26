@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Truck } from "lucide-react";
+import { ChevronRight, Plus, Truck } from "lucide-react";
 import { useState } from "react";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export function PendingLoads({
   today,
   canManage,
   onCreateLoad,
+  onCreateFreeLoad,
   onRegisterTrip,
   onDeleteTrip,
 }: {
@@ -55,6 +56,8 @@ export function PendingLoads({
   today: string;
   canManage: boolean;
   onCreateLoad: (orderId: number) => void;
+  /** "Nuevo cargue": a load made without an order. */
+  onCreateFreeLoad: () => void;
   onRegisterTrip: (balance: PendingBalanceRow) => void;
   onDeleteTrip: (trip: BalanceTripRow) => void;
 }) {
@@ -68,6 +71,11 @@ export function PendingLoads({
         <h2 id="pending-loads-title" className="sr-only">
           Por cargar
         </h2>
+        {canManage && (
+          <Button type="button" className="h-11 md:h-9" onClick={onCreateFreeLoad}>
+            <Plus aria-hidden /> Nuevo cargue
+          </Button>
+        )}
         {entries.length > 0 && (
           <p className="num text-sm text-muted-foreground">
             {[

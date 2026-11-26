@@ -622,7 +622,8 @@ export const loads = comercial.table(
  * order's cost is split across them); a SIESA number belongs to exactly one (load, order), which the
  * application enforces because no unique index can express it. The tons of the lines of an
  * (order, product) must add up to bags x kg per bag; the application enforces it as well.
- * `reference_id` is null only for lines migrated from the single-product loads.
+ * `reference_id` is null only for lines migrated from the single-product loads. `order_id` is null only on a
+ * free load (a load made without an order), whose lines also have no product.
  */
 export const loadLines = comercial.table(
   "load_lines",
@@ -632,9 +633,7 @@ export const loadLines = comercial.table(
       .notNull()
       .references(() => loads.id, { onDelete: "cascade" }),
     /** The order the product is taken from. Orders are annulled, never deleted. */
-    orderId: integer("order_id")
-      .notNull()
-      .references(() => orders.id, { onDelete: "restrict" }),
+    orderId: integer("order_id").references(() => orders.id, { onDelete: "restrict" }),
     referenceId: integer("reference_id").references(() => orderReferences.id, { onDelete: "restrict" }),
     tons: numeric({ precision: 10, scale: 3, mode: "number" }).notNull(),
     /** Whole pesos (COP). */

@@ -97,3 +97,17 @@ describe("buildLoadSummary", () => {
     ]);
   });
 });
+
+describe("buildLoadSummary with a free load", () => {
+  it("includes the SIESA rows of a load without orders", () => {
+    const summary = buildLoadSummary([
+      load(7, { plate: "XYZ987", lines: [{ ...line("F-1", "P-9", 1.5, 3_000_000), orderId: null, referenceId: null }] }),
+    ]);
+    expect(summary[0]?.days[0]?.vehicles[0]).toEqual({
+      plate: "XYZ987",
+      kg: 1500,
+      cost: 3_000_000,
+      rows: [{ loadId: 7, siesaNumber: "F-1", orderNumber: "P-9", kg: 1500, cost: 3_000_000 }],
+    });
+  });
+});

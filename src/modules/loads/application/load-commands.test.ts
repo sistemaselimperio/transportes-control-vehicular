@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLoadCommands, LoadError, ORDERS_CHANGED, type LoadPorts, type OrderForLoad } from "./load-commands";
-import type { BalanceTripInput, CreateLoadsInput, LoadInput } from "./load-schemas";
+import type { BalanceTripInput, CreateLoadsInput, FreeLoadInput, LoadInput } from "./load-schemas";
 
 // Order 12 asks for 750 Finca bags of product 10: at 40 kg per bag that is exactly 30 t.
 const block = { orderId: 12, siesaNumber: "FV-100", orderNumber: "P-77", cost: 1_500_000, lines: [{ referenceId: 10, tons: 30 }] };
@@ -562,5 +562,79 @@ describe("removeBalanceTrip", () => {
     await expect(createLoadCommands(ports({ deleteBalanceTrip: vi.fn(async () => false) })).removeBalanceTrip(7)).rejects.toThrow(
       "El viaje ya no existe.",
     );
+  });
+});
+
+describe("free loads", () => {
+  const freeInput = (over: Partial<FreeLoadInput> = {}): FreeLoadInput => ({
+    date: "2026-11-18",
+    supplier: "Italcol",
+    plate: "ABC-123",
+    notes: "Sin pedido",
+    rows: [
+      { siesaNumber: "I-1", orderNumber: "P-1", kg: 12_500, cost: 25_000_000 },
+      { siesaNumber: "I-2", orderNumber: "P-2", kg: 8_000, cost: 16_000_000 },
+    ],
+    ...over,
+  });
+
+  it("stores one line per row with no order or product, tons from kilos and the cost as typed", async () => {
+    const p = ports();
+    await createLoadCommands(p).createFree(freeInput());
+    expect(p.findOrdersForLoad).not.toHaveBeenCalled();
+    expect(p.findCatalogProducts).not.toHaveBeenCalled();
+    expect(p.insertLoads).toHaveBeenCalledWith([
+      {
+        date: "2026-11-18",
+        supplier: "Italcol",
+        plate: "ABC-123",
+        vehicleId: 9,
+        notes: "Sin pedido",
+        orderIds: [],
+        balances: [],
+        lines: [
+          { orderId: null, referenceId: null, tons: 12.5, cost: 25_000_000, siesaNumber: "I-1", orderNumber: "P-1" },
+          { orderId: null, referenceId: null, tons: 8, cost: 16_000_000, siesaNumber: "I-2", orderNumber: "P-2" },
+        ],
+      },
+    ]);
+  });
+
+  it("refuses a plate outside the fleet, an empty load and incomplete rows", async () => {
+    const p = ports();
+    await expect(createLoadCommands(p).createFree(freeInput({ plate: "ZZZ-999" }))).rejects.toThrow("Elige una placa de la flota.");
+    await expect(createLoadCommands(p).createFree(freeInput({ rows: [] }))).rejects.toThrow("Agrega al menos un SIESA.");
+    await expect(
+      createLoadCommands(p).createFree(freeInput({ rows: [{ siesaNumber: "I-1", orderNumber: "P-1", kg: 0, cost: 10 }] })),
+    ).rejects.toThrow("Completa el SIESA");
+    expect(p.insertLoads).not.toHaveBeenCalled();
+  });
+
+  it("refuses a SIESA repeated in the load or already held by another load", async () => {
+    const p = ports({ findTakenSiesa: vi.fn(async () => ["I-2"]) });
+    await expect(createLoadCommands(p).createFree(freeInput())).rejects.toThrow("Ya existe un cargue con el número SIESA I-2.");
+    await expect(
+      createLoadCommands(ports()).createFree(
+        freeInput({
+          rows: [
+            { siesaNumber: "I-1", orderNumber: "P-1", kg: 1, cost: 1 },
+            { siesaNumber: "I-1", orderNumber: "P-2", kg: 1, cost: 1 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow("El número SIESA I-1 está repetido en el cargue.");
+    expect(p.insertLoads).not.toHaveBeenCalled();
+  });
+
+  it("updates a free load, ignoring its own SIESA numbers", async () => {
+    const p = ports({ findLoad: vi.fn(async () => ({ plate: "ABC-123", vehicleId: 9, orderIds: [] })) });
+    await createLoadCommands(p).updateFree(5, freeInput());
+    expect(p.findTakenSiesa).toHaveBeenCalledWith(["I-1", "I-2"], 5);
+    expect(p.updateLoad).toHaveBeenCalledWith(5, expect.objectContaining({ orderIds: [], balances: [], supplier: "Italcol" }));
+  });
+
+  it("refuses to edit a missing load or one that takes orders as a free load", async () => {
+    await expect(createLoadCommands(ports({ findLoad: vi.fn(async () => null) })).updateFree(5, freeInput())).rejects.toThrow("El cargue ya no existe.");
+    await expect(createLoadCommands(ports()).updateFree(5, freeInput())).rejects.toThrow("Este cargue pertenece a pedidos");
   });
 });

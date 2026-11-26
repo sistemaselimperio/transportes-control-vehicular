@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstDuplicate, groupLinesByOrder, loadTotals, splitCost, suggestLines, type LoadLineRow } from "./load-lines";
+import { firstDuplicate, freeLoadRows, freeRowsError, groupLinesByOrder, isFreeLoad, loadTotals, splitCost, suggestLines, type LoadLineRow } from "./load-lines";
 
 const order = (id: number, lines: Array<{ id: number; name: string; bags: number }>) => ({
   id,
@@ -127,5 +127,48 @@ describe("groupLinesByOrder", () => {
   it("lists every distinct SIESA of an order made line by line", () => {
     const [group] = groupLinesByOrder([row({ id: 1, siesaNumber: "S-1" }), row({ id: 2, siesaNumber: "S-9" }), row({ id: 3, siesaNumber: "S-1" })]);
     expect(group?.siesaNumbers).toEqual(["S-1", "S-9"]);
+  });
+});
+
+describe("free loads (lines without an order)", () => {
+  it("detects a free load: it has lines and none belongs to an order", () => {
+    expect(isFreeLoad([row({ orderId: null, referenceId: null })])).toBe(true);
+    expect(isFreeLoad([row({ orderId: null }), row({ orderId: 3 })])).toBe(false);
+    expect(isFreeLoad([row({ orderId: 3 })])).toBe(false);
+    expect(isFreeLoad([])).toBe(false);
+  });
+
+  it("groupLinesByOrder skips the lines without an order", () => {
+    const groups = groupLinesByOrder([row({ orderId: null }), row({ id: 2, orderId: 5 })]);
+    expect(groups.map((g) => g.orderId)).toEqual([5]);
+  });
+
+  it("builds one row per (SIESA, supplier order) with whole kilos and the summed cost", () => {
+    const rows = freeLoadRows([
+      row({ orderId: null, siesaNumber: "S-1", orderNumber: "P-1", tons: 1.2345, cost: 100 }),
+      row({ id: 2, orderId: null, siesaNumber: "S-1", orderNumber: "P-1", tons: 0.5, cost: 50 }),
+      row({ id: 3, orderId: null, siesaNumber: "S-2", orderNumber: "P-1", tons: 2, cost: 70 }),
+    ]);
+    expect(rows).toEqual([
+      { siesaNumber: "S-1", orderNumber: "P-1", kg: 1735, cost: 150 },
+      { siesaNumber: "S-2", orderNumber: "P-1", kg: 2000, cost: 70 },
+    ]);
+  });
+});
+
+describe("freeRowsError", () => {
+  const ok = { siesaNumber: "S-1", orderNumber: "P-1", kg: 1000, cost: 5000 };
+  it("accepts complete rows", () => expect(freeRowsError([ok])).toBeNull());
+  it("needs at least one row", () => expect(freeRowsError([])).toBe("Agrega al menos un SIESA."));
+  it("needs SIESA, pedido, kilos and value in every row", () => {
+    const message = "Completa el SIESA, el pedido proveedor, los kilos y el valor de cada fila.";
+    expect(freeRowsError([{ ...ok, siesaNumber: " " }])).toBe(message);
+    expect(freeRowsError([{ ...ok, orderNumber: "" }])).toBe(message);
+    expect(freeRowsError([{ ...ok, kg: 0 }])).toBe(message);
+    expect(freeRowsError([{ ...ok, cost: 0 }])).toBe(message);
+    expect(freeRowsError([{ ...ok, kg: 1.5 }])).toBe(message);
+  });
+  it("refuses a repeated SIESA", () => {
+    expect(freeRowsError([ok, { ...ok, orderNumber: "P-2" }])).toBe("El número SIESA S-1 está repetido en el cargue.");
   });
 });

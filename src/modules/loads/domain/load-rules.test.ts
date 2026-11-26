@@ -128,6 +128,10 @@ describe("groupLoadOrders", () => {
     { orderId: 9, referenceId: 1, tons: 2 },
   ];
 
+  it("ignores the lines without an order (free loads)", () => {
+    expect(groupLoadOrders([{ orderId: null, referenceId: null, tons: 3 }], orders)).toEqual([]);
+  });
+
   it("gives one block per order of the load, by order number, with its day and window", () => {
     const blocks = groupLoadOrders(lines, orders);
     expect(blocks.map((b) => [b.id, b.deliveryDate, b.timeWindow])).toEqual([
