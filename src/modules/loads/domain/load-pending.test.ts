@@ -19,8 +19,8 @@ const orderLine = (clientId: number, referenceId: number, supplier: LoadSupplier
   id: ++lineId,
   clientId,
   clientName: `Cliente ${clientId}`,
-  locationId: null,
-  locationName: null,
+  locationId: null as number | null,
+  locationName: null as string | null,
   referenceId,
   referenceName: `Producto ${referenceId}`,
   referenceCode: `C${referenceId}`,
@@ -112,6 +112,25 @@ describe("buildPendingOrders", () => {
     expect(only?.parts.map((p) => [p.supplier, p.pending])).toEqual([
       ["Finca", false],
       ["Contegral", true],
+    ]);
+  });
+
+  it("names the fincas of each client of the pending parts, each once", () => {
+    const at = (clientId: number, referenceId: number, supplier: LoadSupplier, locationName: string | null) => ({
+      ...orderLine(clientId, referenceId, supplier, 10),
+      locationName,
+    });
+    const [row] = buildPendingOrders(
+      [
+        order(5, "2026-11-18", [at(1, 1, "Finca", "La Esperanza"), at(1, 2, "Finca", "El Recreo"), at(1, 3, "Finca", "La Esperanza"), at(2, 1, "Finca", null), at(3, 5, "Contegral", "Loaded")], {
+          pendingSuppliers: ["Finca"],
+        }),
+      ],
+      40,
+    );
+    expect(row?.places).toEqual([
+      { clientName: "Cliente 1", fincas: ["La Esperanza", "El Recreo"] },
+      { clientName: "Cliente 2", fincas: [] },
     ]);
   });
 

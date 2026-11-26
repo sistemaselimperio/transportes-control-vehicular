@@ -162,6 +162,7 @@ describe("pendingEntries", () => {
     timeWindow: null,
     suppliers: ["Finca"],
     clients: [],
+    places: [],
     bags: 1,
     tons: 0.04,
     parts: [],

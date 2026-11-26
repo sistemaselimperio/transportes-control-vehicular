@@ -166,7 +166,18 @@ function OrderItem({
       )}
       <SlideOver open={open} onOpenChange={setOpen} title={`Pedido #${o.id}`} description={whenText}>
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">{o.clients.join(", ") || "Sin clientes"}</p>
+          {o.places.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin clientes</p>
+          ) : (
+            <ul className="space-y-1.5 text-sm">
+              {o.places.map((place) => (
+                <li key={place.clientName}>
+                  <p className="text-muted-foreground">{place.clientName}</p>
+                  <p className="font-medium">{place.fincas.join(", ") || "Sin finca"}</p>
+                </li>
+              ))}
+            </ul>
+          )}
           {o.parts.map((part) => (
             <section key={part.supplier} aria-label={part.supplier} className="space-y-1">
               <h3 className="flex items-baseline justify-between gap-3 border-b pb-1 text-sm font-semibold">

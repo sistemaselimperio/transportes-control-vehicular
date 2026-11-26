@@ -76,6 +76,24 @@ export function orderParts(order: PendingSource, kgPerBag: number): PendingOrder
   });
 }
 
+/** A client of the order and the fincas its products go to. */
+export interface ClientPlace {
+  clientName: string;
+  /** Each finca once, in order of appearance; empty when no line names one. */
+  fincas: string[];
+}
+
+/** The clients of the lines, each once, with their fincas. */
+function placesOf(lines: ReadonlyArray<Pick<OrderRow["lines"][number], "clientId" | "clientName" | "locationName">>): ClientPlace[] {
+  const places = new Map<number, ClientPlace>();
+  for (const l of lines) {
+    const place = places.get(l.clientId) ?? { clientName: l.clientName, fincas: [] };
+    if (l.locationName && !place.fincas.includes(l.locationName)) place.fincas.push(l.locationName);
+    places.set(l.clientId, place);
+  }
+  return [...places.values()];
+}
+
 /** One order that still has a part to load. */
 export interface PendingOrderRow {
   id: number;
@@ -85,6 +103,8 @@ export interface PendingOrderRow {
   suppliers: LoadSupplier[];
   /** Clients of the pending parts. */
   clients: string[];
+  /** Clients of the pending parts with their fincas, for the detail. */
+  places: ClientPlace[];
   /** Bags and tons of the pending parts. */
   bags: number;
   tons: number;
@@ -106,6 +126,7 @@ export function buildPendingOrders(orders: readonly PendingSource[], kgPerBag: n
         timeWindow: o.timeWindow,
         suppliers,
         clients: clientNames({ lines }),
+        places: placesOf(lines),
         bags,
         tons: tonsOfBags(bags, kgPerBag),
         parts: orderParts(o, kgPerBag),
