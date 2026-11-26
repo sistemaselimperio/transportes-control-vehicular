@@ -335,6 +335,12 @@ export function createLoadCommands(ports: LoadPorts) {
 
     async remove(id: number) {
       if ((await ports.countLoadTrips(id)) > 0) throw new LoadError(BALANCE_TRIPS_REGISTERED);
+      // A delivered order must keep the load that carried it: its delivery is undone first.
+      const stored = await ports.findLoad(id);
+      if (stored && stored.orderIds.length > 0) {
+        const delivered = (await ports.findOrdersForLoad(stored.orderIds)).filter((o) => o.status === "entregado").map((o) => `#${o.id}`);
+        if (delivered.length > 0) throw new LoadError(`El cargue tiene pedidos entregados (${delivered.join(", ")}): deshaz la entrega antes de eliminarlo.`);
+      }
       if (!(await ports.deleteLoad(id))) throw new LoadError(GONE);
     },
 

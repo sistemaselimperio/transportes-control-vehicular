@@ -365,6 +365,17 @@ describe("update", () => {
 });
 
 describe("remove", () => {
+  it("refuses to delete a load whose orders were delivered, naming them", async () => {
+    const p = ports({
+      findLoad: vi.fn(async () => ({ plate: "ABC-123", vehicleId: 9, orderIds: [12, 13] })),
+      findOrdersForLoad: vi.fn(async () => [order({ status: "entregado" }), order({ id: 13, status: "cargado" })]),
+    });
+    await expect(createLoadCommands(p).remove(3)).rejects.toThrow(
+      "El cargue tiene pedidos entregados (#12): deshaz la entrega antes de eliminarlo.",
+    );
+    expect(p.deleteLoad).not.toHaveBeenCalled();
+  });
+
   it("deletes and reports a missing load", async () => {
     const p = ports();
     await createLoadCommands(p).remove(3);
