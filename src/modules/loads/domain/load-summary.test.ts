@@ -45,13 +45,14 @@ describe("buildLoadSummary", () => {
         days: [
           {
             date: "2026-11-20",
-            loads: [
+            vehicles: [
               {
-                loadId: 1,
                 plate: "J51978",
+                kg: 18_880,
+                cost: 36_982_958,
                 rows: [
-                  { siesaNumber: "1611117", orderNumber: "175826", kg: 10_520, cost: 20_554_228 },
-                  { siesaNumber: "1611129", orderNumber: "175830", kg: 8_360, cost: 16_428_730 },
+                  { loadId: 1, siesaNumber: "1611117", orderNumber: "175826", kg: 10_520, cost: 20_554_228 },
+                  { loadId: 1, siesaNumber: "1611129", orderNumber: "175830", kg: 8_360, cost: 16_428_730 },
                 ],
               },
             ],
@@ -70,7 +71,7 @@ describe("buildLoadSummary", () => {
     ]);
 
     expect(summary.map((s) => s.supplier)).toEqual(["Finca", "Contegral"]);
-    expect(summary[0].days.map((d) => [d.date, d.loads.map((l) => l.loadId)])).toEqual([
+    expect(summary[0].days.map((d) => [d.date, d.vehicles[0].rows.map((r) => r.loadId)])).toEqual([
       ["2026-11-20", [3, 4]],
       ["2026-11-18", [2]],
     ]);
@@ -79,7 +80,20 @@ describe("buildLoadSummary", () => {
   it("rounds the kilos to whole numbers and leaves out loads without lines", () => {
     const summary = buildLoadSummary([load(1, { lines: [line("A", "1", 0.8, 1_663_662), line("A", "1", 0.0004, 0)] }), load(2, { lines: [] })]);
 
-    expect(summary[0].days[0].loads).toHaveLength(1);
-    expect(summary[0].days[0].loads[0].rows[0].kg).toBe(800);
+    expect(summary[0].days[0].vehicles[0].rows).toHaveLength(1);
+    expect(summary[0].days[0].vehicles[0].rows[0].kg).toBe(800);
+  });
+
+  it("puts the loads of a day under one entry per plate, in order of first appearance", () => {
+    const summary = buildLoadSummary([
+      load(1, { plate: "TZR573", lines: [line("A", "1", 12.8, 100)] }),
+      load(2, { plate: "H1K368", lines: [line("B", "2", 16, 200)] }),
+      load(3, { plate: "TZR573", lines: [line("C", "3", 2, 50)] }),
+    ]);
+
+    expect(summary[0].days[0].vehicles.map((v) => [v.plate, v.rows.map((r) => r.siesaNumber), v.kg, v.cost])).toEqual([
+      ["TZR573", ["A", "C"], 14_800, 150],
+      ["H1K368", ["B"], 16_000, 200],
+    ]);
   });
 });

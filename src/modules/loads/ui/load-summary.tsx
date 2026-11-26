@@ -1,12 +1,53 @@
+import { ChevronRight } from "lucide-react";
 import { PlateText } from "@/components/app/plate-text";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import type { SummarySupplier } from "../domain/load-summary";
+import type { SummaryVehicle, SummarySupplier } from "../domain/load-summary";
 import { formatCop } from "../domain/load-rules";
 
 const HEADERS = ["Peso (kg)", "Valor", "SIESA", "Pedido"] as const;
 
-/** Read-only summary of the loads, laid out like the notebook: plate, kilos, value, SIESA and supplier order. */
+/** One plate of a day: a collapsible row with its totals that opens the table of its SIESA. */
+function VehicleDetails({ vehicle: v }: { vehicle: SummaryVehicle }) {
+  return (
+    <details className="group">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2 text-sm outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/70 [&::-webkit-details-marker]:hidden">
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+        <span className="plate font-medium">
+          <PlateText plate={v.plate} />
+        </span>
+        <span className="num ml-auto text-right text-xs text-muted-foreground">
+          {v.rows.length} SIESA · {formatDecimal(v.kg, 0)} kg · {formatCop(v.cost)}
+        </span>
+      </summary>
+      <div className="overflow-x-auto pb-2">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-y">
+              {HEADERS.map((h) => (
+                <th key={h} scope="col" className="micro-label px-4 py-2 text-right font-medium">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {v.rows.map((row) => (
+              <tr key={`${row.loadId}-${row.siesaNumber}-${row.orderNumber}`} className="hover:bg-muted/50">
+                <td className="num whitespace-nowrap px-4 py-2 text-right">{formatDecimal(row.kg, 0)}</td>
+                <td className="num whitespace-nowrap px-4 py-2 text-right">{formatCop(row.cost)}</td>
+                <td className="num whitespace-nowrap px-4 py-2 text-right">{row.siesaNumber}</td>
+                <td className="num whitespace-nowrap px-4 py-2 text-right">{row.orderNumber}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+/** Read-only summary of the loads, laid out like the notebook: per supplier and day, one collapsible entry per plate with kilos, value, SIESA and supplier order. */
 export function LoadSummary({ suppliers }: { suppliers: readonly SummarySupplier[] }) {
   if (suppliers.length === 0) return <p className="text-sm text-muted-foreground">No hay cargues para este filtro.</p>;
 
@@ -17,48 +58,16 @@ export function LoadSummary({ suppliers }: { suppliers: readonly SummarySupplier
           <h2 id={`summary-${s.supplier}`} className="border-b bg-muted/60 px-4 py-3 text-sm font-semibold">
             {s.supplier}
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left">
-                <tr className="border-b">
-                  <th scope="col" className="micro-label px-4 py-3 font-medium">
-                    Placa
-                  </th>
-                  {HEADERS.map((h) => (
-                    <th key={h} scope="col" className="micro-label px-4 py-3 text-right font-medium">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {s.days.map((day) => (
-                <tbody key={day.date} className="border-b last:border-b-0">
-                  <tr className="bg-muted/30">
-                    <th scope="colgroup" colSpan={HEADERS.length + 1} className="num px-4 py-2 text-left text-xs font-medium text-muted-foreground">
-                      {formatDisplayDate(day.date)}
-                    </th>
-                  </tr>
-                  {day.loads.flatMap((load) =>
-                    load.rows.map((row, i) => (
-                      <tr key={`${load.loadId}-${row.siesaNumber}-${row.orderNumber}`} className={i === 0 ? "border-t hover:bg-muted/50" : "hover:bg-muted/50"}>
-                        <td className="whitespace-nowrap px-4 py-2 font-medium">
-                          {i === 0 && (
-                            <span className="plate">
-                              <PlateText plate={load.plate} />
-                            </span>
-                          )}
-                        </td>
-                        <td className="num whitespace-nowrap px-4 py-2 text-right">{formatDecimal(row.kg, 0)}</td>
-                        <td className="num whitespace-nowrap px-4 py-2 text-right">{formatCop(row.cost)}</td>
-                        <td className="num whitespace-nowrap px-4 py-2 text-right">{row.siesaNumber}</td>
-                        <td className="num whitespace-nowrap px-4 py-2 text-right">{row.orderNumber}</td>
-                      </tr>
-                    )),
-                  )}
-                </tbody>
-              ))}
-            </table>
-          </div>
+          {s.days.map((day) => (
+            <div key={day.date} className="border-b last:border-b-0">
+              <h3 className="num bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground">{formatDisplayDate(day.date)}</h3>
+              <div className="divide-y">
+                {day.vehicles.map((v) => (
+                  <VehicleDetails key={v.plate} vehicle={v} />
+                ))}
+              </div>
+            </div>
+          ))}
         </section>
       ))}
     </div>
