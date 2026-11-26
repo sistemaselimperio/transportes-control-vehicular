@@ -44,7 +44,7 @@ function RowActions({
       <Button
         variant="ghost"
         size="icon"
-        className="size-11 md:size-9"
+        className="size-11 rounded-none first:rounded-l-lg md:size-9"
         aria-label={`Editar cargue de ${row.supplier} del ${formatDisplayDate(row.date)}`}
         title="Editar"
         onClick={() => onEdit(row)}
@@ -54,7 +54,7 @@ function RowActions({
       <Button
         variant="ghost"
         size="icon"
-        className="size-11 text-destructive md:size-9"
+        className="size-11 rounded-none rounded-r-lg text-destructive md:size-9"
         aria-label={`Eliminar cargue de ${row.supplier} del ${formatDisplayDate(row.date)}`}
         title="Eliminar"
         onClick={() => onDelete(row)}
@@ -94,6 +94,8 @@ function LoadCard({
   const mine = left.filter((b) => b.loadId === r.id);
   const toCarry = mine.reduce((sum, b) => sum + remainingBags(b), 0);
   const delivery = loadDeliveryState(r.orders, left);
+  // Loads with orders offer "Entregar" / "Deshacer entrega" to who may deliver.
+  const deliverable = canDeliver && !free && r.orders.length > 0;
   // The amber of a pending balance wins over the green of a delivered load.
   return (
     <li className={cn("panel", toCarry > 0 ? "border-l-4 border-l-warn" : delivery.delivered && "border-l-4 border-l-ok")} title={toCarry > 0 ? `Faltan ${formatDecimal(toCarry, 0)} bultos del saldo` : undefined}>
@@ -104,13 +106,37 @@ function LoadCard({
             <span className="font-medium">{r.supplier}</span>
           </div>
           <p className="num text-sm text-muted-foreground">{formatDisplayDate(r.date)}</p>
-          <p className="num text-sm font-semibold">
+          <p className="num whitespace-nowrap text-sm font-semibold">
             {formatDecimal(r.tons, 3)} t · {formatCop(r.cost)}
           </p>
         </div>
-        {canManage && (
-          <div className="-mt-1 -mr-2 flex shrink-0 items-center gap-1">
-            <RowActions row={r} onEdit={onEdit} onDelete={onDelete} />
+        {(canManage || deliverable) && (
+          <div role="group" aria-label="Acciones del cargue" className="-mt-1 -mr-1 flex shrink-0 items-center divide-x overflow-hidden rounded-lg border bg-background">
+            {deliverable &&
+              (delivery.delivered ? (
+                <UndoDeliveryButton
+                  iconOnly
+                  className="size-11 rounded-none first:rounded-l-lg md:size-9"
+                  label={`Deshacer entrega del cargue de ${r.supplier} del ${formatDisplayDate(r.date)}`}
+                  run={() => undoLoadDeliveryAction(r.id)}
+                  onDone={onFlash}
+                />
+              ) : (
+                <span title={delivery.reason ?? "Entregar"} className="flex">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-11 rounded-none rounded-l-lg text-ok-foreground md:size-9"
+                    disabled={!delivery.deliverable}
+                    aria-label={`Entregar cargue de ${r.supplier} del ${formatDisplayDate(r.date)}${delivery.reason ? `: ${delivery.reason}` : ""}`}
+                    onClick={() => onDeliver(r)}
+                  >
+                    <PackageCheck aria-hidden />
+                  </Button>
+                </span>
+              ))}
+            {canManage && <RowActions row={r} onEdit={onEdit} onDelete={onDelete} />}
           </div>
         )}
       </div>
@@ -130,45 +156,6 @@ function LoadCard({
           <span className="sr-only">Ver detalle</span>
         </span>
       </button>
-
-      {canDeliver && !free && r.orders.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2">
-          {delivery.delivered ? (
-            <>
-              <p className="flex items-center gap-1.5 text-sm font-medium text-ok-foreground">
-                <PackageCheck aria-hidden className="size-4" />
-                Entregado
-              </p>
-              <UndoDeliveryButton
-                className="h-11 px-3 md:h-8"
-                label={`Deshacer entrega del cargue de ${r.supplier} del ${formatDisplayDate(r.date)}`}
-                run={() => undoLoadDeliveryAction(r.id)}
-                onDone={onFlash}
-              />
-            </>
-          ) : (
-            <>
-              <p id={`load-${r.id}-delivery`} className="min-w-0 flex-1 text-xs text-muted-foreground">
-                {delivery.reason ?? ""}
-              </p>
-              <span title={delivery.reason}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 px-3 md:h-8"
-                  disabled={!delivery.deliverable}
-                  aria-describedby={delivery.reason ? `load-${r.id}-delivery` : undefined}
-                  aria-label={`Entregar cargue de ${r.supplier} del ${formatDisplayDate(r.date)}`}
-                  onClick={() => onDeliver(r)}
-                >
-                  <PackageCheck aria-hidden />
-                  Entregar
-                </Button>
-              </span>
-            </>
-          )}
-        </div>
-      )}
 
       <SlideOver open={open} onOpenChange={setOpen} title={`Cargue ${r.supplier} · ${r.plate}`} description={formatDisplayDate(r.date)}>
         <LoadDetail row={r} balances={mine} onDeleteTrip={canManage ? onDeleteTrip : undefined} />

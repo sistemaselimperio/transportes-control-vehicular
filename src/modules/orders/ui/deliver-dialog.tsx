@@ -113,20 +113,25 @@ export function UndoDeliveryButton({
   onDone,
   label,
   className,
+  iconOnly = false,
 }: {
   run: () => Promise<ActionResult>;
   onDone: (message: string) => void;
   /** Accessible name, naming the order or the load. */
   label: string;
   className?: string;
+  /** Only the icon, with the text as tooltip (for a group of icon actions). */
+  iconOnly?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={iconOnly ? "ghost" : "outline"}
+      size={iconOnly ? "icon" : undefined}
       className={className}
       aria-label={label}
+      title={iconOnly ? "Deshacer entrega" : undefined}
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
@@ -136,7 +141,7 @@ export function UndoDeliveryButton({
       }
     >
       {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Undo2 aria-hidden />}
-      <span className="max-sm:sr-only">Deshacer entrega</span>
+      {!iconOnly && <span className="max-sm:sr-only">Deshacer entrega</span>}
     </Button>
   );
 }
