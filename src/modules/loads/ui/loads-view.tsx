@@ -21,6 +21,7 @@ import {
   type PendingBalanceRow,
 } from "../domain/load-balance";
 import { buildPendingOrders } from "../domain/load-pending";
+import { buildLoadSummary } from "../domain/load-summary";
 import {
   filterLoads,
   formatCop,
@@ -33,11 +34,12 @@ import {
 import { BalanceTripForm } from "./balance-trip-form";
 import { LoadForm } from "./load-form";
 import { LoadList } from "./load-list";
+import { LoadSummary } from "./load-summary";
 import { PendingLoads } from "./pending-loads";
 
-type LoadsTab = "pendientes" | "historial";
+type LoadsTab = "pendientes" | "historial" | "resumen";
 
-/** Loads page: a tab with the orders still to load and one with the loads made (filters, totals, list), plus the create / edit side sheet and the delete confirmation. */
+/** Loads page: a tab with the orders still to load, one with the loads made (filters, totals, list) and a notebook-like summary sharing those filters, plus the create / edit side sheet and the delete confirmation. */
 export function LoadsView({
   rows,
   balances,
@@ -75,6 +77,7 @@ export function LoadsView({
 
   const shown = useMemo(() => filterLoads(rows, filters), [rows, filters]);
   const totals = useMemo(() => totalsOfLoads(shown), [shown]);
+  const summary = useMemo(() => buildLoadSummary(shown), [shown]);
   const pendingBalances = useMemo(() => buildPendingBalances(balances, orders), [balances, orders]);
   const pending = useMemo(
     () => pendingEntries(buildPendingOrders(orders, kgPerBag), pendingBalances),
@@ -106,6 +109,7 @@ export function LoadsView({
         items={[
           { key: "pendientes", label: "Pendientes", count: pending.length },
           { key: "historial", label: "Historial" },
+          { key: "resumen", label: "Resumen" },
         ]}
         active={tab}
         onSelect={setTab}
@@ -176,14 +180,18 @@ export function LoadsView({
               {totals.count} de {rows.length} cargues · {formatDecimal(totals.tons, 3)} t · {formatCop(totals.cost)}
             </p>
 
-            <LoadList
-              rows={shown}
-              balances={balances}
-              canManage={canManage}
-              onEdit={editLoad}
-              onDelete={setDeleting}
-              onDeleteTrip={setDeletingTrip}
-            />
+            {tab === "historial" ? (
+              <LoadList
+                rows={shown}
+                balances={balances}
+                canManage={canManage}
+                onEdit={editLoad}
+                onDelete={setDeleting}
+                onDeleteTrip={setDeletingTrip}
+              />
+            ) : (
+              <LoadSummary suppliers={summary} />
+            )}
           </>
         )}
       </div>
