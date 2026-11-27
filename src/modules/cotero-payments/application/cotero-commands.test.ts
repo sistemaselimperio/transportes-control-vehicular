@@ -49,9 +49,9 @@ function ports(over: Partial<CoteroPorts> = {}): CoteroPorts {
     listTariffs: vi.fn(async () => [{ validFrom: "2026-01-01", pricePerTon: 9800 }]),
     findExistingNumbers: vi.fn(async () => [] as string[]),
     insertReceipts: vi.fn(async (_userId: string, rows: unknown[]) => rows.map((_, i) => 100 + i)),
-    findReceipt: vi.fn(async () => ({ id: 5, status: "pending" as const, filePath: `recibos/2026/11/${UUID}.jpg` as string | null, pageNumber: 2 as number | null })),
+    findReceipt: vi.fn(async () => ({ id: 5, status: "pending" as const, filePath: `recibos/2026/11/${UUID}.jpg` as string | null, pageNumber: 2 as number | null, settlementId: null as number | null })),
     updateReceipt: vi.fn(async () => undefined),
-    deleteReceipt: vi.fn(async () => undefined),
+    deleteReceipt: vi.fn(async () => ({ removedProofPath: null }) as { removedProofPath: string | null } | null),
     countReceiptsWithFile: vi.fn(async () => 0),
     insertTariff: vi.fn(async () => undefined),
     findReceiptsForSettlement: vi.fn(async () => [candidate({ id: 1 }), candidate({ id: 2, amount: 50000 })]),
@@ -59,6 +59,8 @@ function ports(over: Partial<CoteroPorts> = {}): CoteroPorts {
     createSettlement: vi.fn(async () => ({ id: 70, number: 7 }) as { id: number; number: number } | null),
     findSettlement: vi.fn(async () => ({ id: 3, status: "open" as const })),
     annulSettlement: vi.fn(async () => true),
+    deleteSettlement: vi.fn(async () => ({ proofPath: null }) as { proofPath: string | null } | null),
+    countSettlementsWithProof: vi.fn(async () => 0),
     paySettlement: vi.fn(async () => true),
     ...over,
   };
@@ -166,7 +168,7 @@ describe("updateReceipt", () => {
 
   it("refuses a receipt that is settled or paid", async () => {
     for (const status of ["settled", "paid"] as const) {
-      const p = ports({ findReceipt: vi.fn(async () => ({ id: 5, status, filePath: null, pageNumber: null })) });
+      const p = ports({ findReceipt: vi.fn(async () => ({ id: 5, status, filePath: null, pageNumber: null, settlementId: null })) });
       await expect(createCoteroCommands(p, storage()).updateReceipt(5, item())).rejects.toThrow(CoteroError);
       expect(p.updateReceipt).not.toHaveBeenCalled();
     }
@@ -198,10 +200,65 @@ describe("deleteReceipt", () => {
     expect(s.remove).not.toHaveBeenCalled();
   });
 
-  it("refuses a settled receipt", async () => {
-    const p = ports({ findReceipt: vi.fn(async () => ({ id: 5, status: "settled" as const, filePath: null, pageNumber: null })) });
-    await expect(createCoteroCommands(p, storage()).deleteReceipt(5)).rejects.toThrow(CoteroError);
-    expect(p.deleteReceipt).not.toHaveBeenCalled();
+  it("deletes a receipt that belongs to a settlement, whatever its status", async () => {
+    for (const status of ["settled", "paid"] as const) {
+      const p = ports({ findReceipt: vi.fn(async () => ({ id: 5, status, filePath: null, pageNumber: null, settlementId: 3 })) });
+      await createCoteroCommands(p, storage()).deleteReceipt(5);
+      expect(p.deleteReceipt).toHaveBeenCalledWith(5);
+    }
+  });
+
+  it("removes the proof of the settlement that was deleted with its last receipt", async () => {
+    const proof = `recibos/comprobantes/2026/11/${UUID}.jpg`;
+    const s = storage();
+    const p = ports({ deleteReceipt: vi.fn(async () => ({ removedProofPath: proof })) });
+    await createCoteroCommands(p, s).deleteReceipt(5);
+    expect(s.remove).toHaveBeenCalledWith([proof]);
+  });
+
+  it("keeps that proof while another settlement still points at it", async () => {
+    const s = storage();
+    const p = ports({ deleteReceipt: vi.fn(async () => ({ removedProofPath: "x.jpg" })), countSettlementsWithProof: vi.fn(async () => 1) });
+    await createCoteroCommands(p, s).deleteReceipt(5);
+    expect(s.remove).not.toHaveBeenCalledWith(["x.jpg"]);
+  });
+
+  it("refuses a receipt that does not exist or vanished meanwhile", async () => {
+    await expect(createCoteroCommands(ports({ findReceipt: vi.fn(async () => null) }), storage()).deleteReceipt(5)).rejects.toThrow(/ya no existe/);
+    const p = ports({ deleteReceipt: vi.fn(async () => null) });
+    const s = storage();
+    await expect(createCoteroCommands(p, s).deleteReceipt(5)).rejects.toThrow(CoteroError);
+    expect(s.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteSettlement", () => {
+  it("deletes a settlement in any status", async () => {
+    for (const status of ["open", "paid", "annulled"] as const) {
+      const p = ports({ findSettlement: vi.fn(async () => ({ id: 3, status })) });
+      await createCoteroCommands(p, storage()).deleteSettlement(3);
+      expect(p.deleteSettlement).toHaveBeenCalledWith(3);
+    }
+  });
+
+  it("removes its proof file when nothing else points at it", async () => {
+    const proof = `recibos/comprobantes/2026/11/${UUID}.jpg`;
+    const s = storage();
+    await createCoteroCommands(ports({ deleteSettlement: vi.fn(async () => ({ proofPath: proof })) }), s).deleteSettlement(3);
+    expect(s.remove).toHaveBeenCalledWith([proof]);
+  });
+
+  it("keeps a proof file that is still referenced and does nothing when there is no proof", async () => {
+    const s = storage();
+    await createCoteroCommands(ports({ deleteSettlement: vi.fn(async () => ({ proofPath: "x.jpg" })), countSettlementsWithProof: vi.fn(async () => 1) }), s).deleteSettlement(3);
+    await createCoteroCommands(ports(), s).deleteSettlement(3);
+    expect(s.remove).not.toHaveBeenCalled();
+  });
+
+  it("reports a settlement that does not exist or was deleted meanwhile", async () => {
+    await expect(createCoteroCommands(ports({ findSettlement: vi.fn(async () => null) }), storage()).deleteSettlement(3)).rejects.toThrow(/no existe/);
+    const p = ports({ deleteSettlement: vi.fn(async () => null) });
+    await expect(createCoteroCommands(p, storage()).deleteSettlement(3)).rejects.toThrow(CoteroError);
   });
 });
 

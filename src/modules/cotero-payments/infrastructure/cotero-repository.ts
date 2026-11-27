@@ -4,7 +4,7 @@ import type { CoteroPorts, NewReceipt } from "../application/cotero-commands";
 import { toFleetCandidates, type FleetCandidates } from "../domain/fleet-matching";
 import type { ReceiptRow } from "../domain/receipt-rules";
 import type { CoteroProfileRow, SettlementRow, TariffRow } from "../domain/settlement-rows";
-import { isPaymentMethod, type PaymentMethod } from "../domain/settlement-rules";
+import { isPaymentMethod, settlementTotal, type PaymentMethod } from "../domain/settlement-rules";
 
 const {
   coteroReceipts: receipts,
@@ -190,7 +190,7 @@ export const coteroRepository: CoteroPorts = {
 
   async findReceipt(id) {
     const [row] = await db
-      .select({ id: receipts.id, status: receipts.status, filePath: receipts.filePath, pageNumber: receipts.pageNumber })
+      .select({ id: receipts.id, status: receipts.status, filePath: receipts.filePath, pageNumber: receipts.pageNumber, settlementId: receipts.settlementId })
       .from(receipts)
       .where(eq(receipts.id, id))
       .limit(1);
@@ -208,11 +208,21 @@ export const coteroRepository: CoteroPorts = {
   },
 
   async deleteReceipt(id) {
-    const deleted = await db
-      .delete(receipts)
-      .where(and(eq(receipts.id, id), eq(receipts.status, "pending")))
-      .returning({ id: receipts.id });
-    if (deleted.length === 0) throw new ReceiptsNotPending();
+    return db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(receipts).where(eq(receipts.id, id)).returning({ settlementId: receipts.settlementId });
+      if (!deleted) return null;
+      if (deleted.settlementId === null) return { removedProofPath: null };
+      // The settlement row is locked so two receipts deleted at once each see the other's removal.
+      const [settlement] = await tx.select({ id: settlements.id }).from(settlements).where(eq(settlements.id, deleted.settlementId)).for("update");
+      if (!settlement) return { removedProofPath: null };
+      const left = await tx.select({ amount: receipts.amount }).from(receipts).where(eq(receipts.settlementId, settlement.id));
+      if (left.length > 0) {
+        await tx.update(settlements).set({ total: settlementTotal(left.map((r) => r.amount)) }).where(eq(settlements.id, settlement.id));
+        return { removedProofPath: null };
+      }
+      const [removed] = await tx.delete(settlements).where(eq(settlements.id, settlement.id)).returning({ proofPath: settlements.proofPath });
+      return { removedProofPath: removed?.proofPath ?? null };
+    });
   },
 
   async countReceiptsWithFile(path) {
@@ -308,6 +318,21 @@ export const coteroRepository: CoteroPorts = {
       await tx.update(receipts).set({ status: "pending", settlementId: null, updatedAt: new Date() }).where(eq(receipts.settlementId, id));
       return true;
     });
+  },
+
+  async deleteSettlement(id) {
+    return db.transaction(async (tx) => {
+      const [settlement] = await tx.select({ proofPath: settlements.proofPath }).from(settlements).where(eq(settlements.id, id)).for("update");
+      if (!settlement) return null;
+      await tx.update(receipts).set({ status: "pending", settlementId: null, updatedAt: new Date() }).where(eq(receipts.settlementId, id));
+      await tx.delete(settlements).where(eq(settlements.id, id));
+      return { proofPath: settlement.proofPath };
+    });
+  },
+
+  async countSettlementsWithProof(path) {
+    const [row] = await db.select({ n: count() }).from(settlements).where(eq(settlements.proofPath, path));
+    return Number(row?.n ?? 0);
   },
 
   async paySettlement(id, payment) {

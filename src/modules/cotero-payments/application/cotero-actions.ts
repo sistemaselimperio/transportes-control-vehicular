@@ -182,6 +182,13 @@ export async function annulSettlementAction(id: number): Promise<ActionResult> {
   });
 }
 
+export async function deleteSettlementAction(id: number): Promise<ActionResult> {
+  return run(async () => {
+    await commands.deleteSettlement(idSchema.parse(id));
+    return "Liquidación eliminada: sus recibos vuelven a estar pendientes.";
+  });
+}
+
 export async function paySettlementAction(id: number, input: unknown): Promise<ActionResult> {
   return run(async () => {
     await commands.paySettlement(idSchema.parse(id), paySchema.parse(input));

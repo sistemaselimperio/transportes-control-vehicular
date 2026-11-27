@@ -92,12 +92,13 @@ function ReceiptTableRow({ r, onEdit, onDelete }: { r: ReceiptRow; onEdit: (row:
           ) : (
             <span className="px-2 text-xs text-muted-foreground">Sin archivo</span>
           )}
-          {r.status === "pending" && (
-            <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1">
+            {r.status === "pending" && (
               <Button variant="ghost" size="icon" className="size-11 md:size-9" aria-label={`Editar recibo ${r.receiptNumber}`} title="Editar" onClick={() => onEdit(r)}>
                 <Pencil aria-hidden />
               </Button>
-              <Button
+            )}
+            <Button
                 variant="ghost"
                 size="icon"
                 className="size-11 text-destructive md:size-9"
@@ -107,8 +108,7 @@ function ReceiptTableRow({ r, onEdit, onDelete }: { r: ReceiptRow; onEdit: (row:
               >
                 <Trash2 aria-hidden />
               </Button>
-            </span>
-          )}
+          </span>
         </div>
       </td>
     </tr>

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   assertCanAnnul,
-  assertCanDeleteReceipt,
   assertCanEditReceipt,
   assertCanPay,
   assertCanSettle,
@@ -10,16 +9,14 @@ import {
   receiptStatusAfterAnnul,
   receiptStatusAfterPay,
   receiptStatusOnSettle,
+  settlementTotal,
 } from "./settlement-rules";
 
 describe("receipt edits", () => {
-  it("only pending receipts can be edited or deleted", () => {
+  it("only pending receipts can be edited", () => {
     expect(() => assertCanEditReceipt("pending")).not.toThrow();
     expect(() => assertCanEditReceipt("settled")).toThrow(CoteroError);
     expect(() => assertCanEditReceipt("paid")).toThrow(CoteroError);
-    expect(() => assertCanDeleteReceipt("pending")).not.toThrow();
-    expect(() => assertCanDeleteReceipt("settled")).toThrow(CoteroError);
-    expect(() => assertCanDeleteReceipt("paid")).toThrow(CoteroError);
   });
 });
 
@@ -67,5 +64,12 @@ describe("isPaymentMethod", () => {
     for (const m of ["efectivo", "transferencia", "nequi", "daviplata", "otro"]) expect(isPaymentMethod(m)).toBe(true);
     expect(isPaymentMethod("cheque")).toBe(false);
     expect(isPaymentMethod("")).toBe(false);
+  });
+});
+
+describe("settlementTotal", () => {
+  it("adds the written amounts of the receipts", () => {
+    expect(settlementTotal([100000, 50000, 325498])).toBe(475498);
+    expect(settlementTotal([])).toBe(0);
   });
 });

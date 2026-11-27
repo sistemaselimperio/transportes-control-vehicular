@@ -1,13 +1,14 @@
 "use client";
 
-import { AlertTriangle, Banknote, Download, Paperclip, Printer, Undo2 } from "lucide-react";
+import { AlertTriangle, Banknote, Download, Paperclip, Printer, Trash2, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ActionForm } from "@/components/app/action-form";
 import { SlideOver } from "@/components/app/slide-over";
 import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { annulSettlementAction } from "../application/cotero-actions";
+import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dialog";
+import { annulSettlementAction, deleteSettlementAction } from "../application/cotero-actions";
 import { formatVehiclePlate } from "../domain/plates";
 import type { ReceiptRow } from "../domain/receipt-rules";
 import type { SettlementRow } from "../domain/settlement-rows";
@@ -28,6 +29,7 @@ export function SettlementList({
   onDone: (message: string) => void;
 }) {
   const [annulling, setAnnulling] = useState<SettlementRow | undefined>();
+  const [deleting, setDeleting] = useState<SettlementRow | undefined>();
   const byId = useMemo(() => {
     const map = new Map<number, ReceiptRow[]>();
     for (const r of receipts) if (r.settlementId !== null) map.set(r.settlementId, [...(map.get(r.settlementId) ?? []), r]);
@@ -115,20 +117,24 @@ export function SettlementList({
                     </a>
                   )}
                 </div>
-                {s.status !== "annulled" && (
-                  <div className="flex items-center gap-1">
-                    {s.status === "open" && (
-                      <Button variant="outline" className="h-11 px-3 md:h-9" onClick={() => onPay(s)}>
-                        <Banknote aria-hidden />
-                        Registrar pago
-                      </Button>
-                    )}
+                <div className="flex items-center gap-1">
+                  {s.status === "open" && (
+                    <Button variant="outline" className="h-11 px-3 md:h-9" onClick={() => onPay(s)}>
+                      <Banknote aria-hidden />
+                      Registrar pago
+                    </Button>
+                  )}
+                  {s.status !== "annulled" && (
                     <Button variant="ghost" className="h-11 px-3 text-destructive md:h-9" onClick={() => setAnnulling(s)}>
                       <Undo2 aria-hidden />
                       Anular
                     </Button>
-                  </div>
-                )}
+                  )}
+                  <Button variant="ghost" className="h-11 px-3 text-destructive md:h-9" onClick={() => setDeleting(s)}>
+                    <Trash2 aria-hidden />
+                    Eliminar
+                  </Button>
+                </div>
               </div>
             </li>
           );
@@ -162,6 +168,20 @@ export function SettlementList({
           </ActionForm>
         )}
       </SlideOver>
+
+      <ConfirmDeleteDialog
+        open={deleting !== undefined}
+        title="Eliminar liquidación"
+        description={deleting && `Liquidación ${deleting.number} · ${deleting.coteroName}`}
+        warning={
+          deleting
+            ? `La liquidación ${deleting.number} se elimina para siempre${deleting.receiptCount > 0 ? " y sus recibos vuelven a Pendiente" : ""}. ${deleting.hasProof ? "La foto del comprobante de pago también se elimina. " : ""}Un comprobante ya impreso dejará de coincidir.`
+            : ""
+        }
+        action={() => (deleting ? deleteSettlementAction(deleting.id) : Promise.resolve({ ok: false as const, error: "Sin liquidación." }))}
+        onClose={() => setDeleting(undefined)}
+        onDone={onDone}
+      />
     </>
   );
 }

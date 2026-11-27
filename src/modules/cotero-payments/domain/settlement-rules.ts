@@ -28,13 +28,8 @@ export function assertCanEditReceipt(status: ReceiptStatus): void {
   }
 }
 
-export function assertCanDeleteReceipt(status: ReceiptStatus): void {
-  if (status !== "pending") {
-    throw new CoteroError(
-      status === "settled" ? "El recibo ya está en una liquidación: anúlala para eliminarlo." : "El recibo ya está pagado y no se puede eliminar.",
-    );
-  }
-}
+/** A settlement's total is the sum of the written amounts of the receipts it holds. */
+export const settlementTotal = (amounts: readonly number[]): number => amounts.reduce((sum, amount) => sum + amount, 0);
 
 /** A settlement takes only pending receipts, and at least one. */
 export function assertCanSettle(statuses: readonly ReceiptStatus[]): void {

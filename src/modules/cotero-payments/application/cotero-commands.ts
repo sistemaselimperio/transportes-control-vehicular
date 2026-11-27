@@ -15,11 +15,11 @@ import {
 } from "../domain/receipt-rules";
 import {
   assertCanAnnul,
-  assertCanDeleteReceipt,
   assertCanEditReceipt,
   assertCanPay,
   assertCanSettle,
   CoteroError,
+  settlementTotal,
   type PaymentMethod,
   type ReceiptStatus,
   type SettlementStatus,
@@ -78,9 +78,14 @@ export interface CoteroPorts {
   findExistingNumbers(numbers: string[], exceptId?: number): Promise<string[]>;
   /** All or nothing. Returns the new ids, in the order of `rows`. */
   insertReceipts(userId: string, rows: NewReceipt[]): Promise<number[]>;
-  findReceipt(id: number): Promise<{ id: number; status: ReceiptStatus; filePath: string | null; pageNumber: number | null } | null>;
+  findReceipt(id: number): Promise<{ id: number; status: ReceiptStatus; filePath: string | null; pageNumber: number | null; settlementId: number | null } | null>;
   updateReceipt(id: number, row: NewReceipt): Promise<void>;
-  deleteReceipt(id: number): Promise<void>;
+  /**
+   * In one transaction deletes the receipt in any status. When it belonged to a settlement, that settlement's
+   * total is recalculated from the receipts left, or the settlement is deleted with its last receipt (and
+   * `removedProofPath` is its proof file). Null (nothing changed) when the receipt was already gone.
+   */
+  deleteReceipt(id: number): Promise<{ removedProofPath: string | null } | null>;
   countReceiptsWithFile(path: string): Promise<number>;
   insertTariff(userId: string, tariff: TariffInput): Promise<void>;
   findReceiptsForSettlement(ids: number[]): Promise<SettlementCandidate[]>;
@@ -93,6 +98,12 @@ export interface CoteroPorts {
   findSettlement(id: number): Promise<{ id: number; status: SettlementStatus } | null>;
   /** Open or paid to annulled, receipts back to pending. False (nothing changed) when it was already annulled. */
   annulSettlement(id: number): Promise<boolean>;
+  /**
+   * In one transaction deletes the settlement in any status and sends its receipts back to pending.
+   * Returns its proof file path, or null (nothing changed) when it was already gone.
+   */
+  deleteSettlement(id: number): Promise<{ proofPath: string | null } | null>;
+  countSettlementsWithProof(path: string): Promise<number>;
   /** Legacy: settlements created before payment moved into the settle step may still be open. Open to paid, receipts to paid. False when it was not open. */
   paySettlement(id: number, payment: PayInput): Promise<boolean>;
 }
@@ -148,6 +159,13 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
     ...file,
   });
 
+  /** Removes a settlement's proof file once no settlement points at it; a storage failure never undoes the deletion. */
+  async function removeUnreferencedProof(path: string | null): Promise<void> {
+    if (path && (await ports.countSettlementsWithProof(path)) === 0) {
+      await storage.remove([path]).catch((err) => console.error("cotero proof file removal failed", err));
+    }
+  }
+
   return {
     /** Validates the whole batch first; stores all of it or none. Returns how many were stored and their ids. */
     async createReceipts(userId: string, items: readonly ReceiptBatchItem[]): Promise<{ count: number; ids: number[] }> {
@@ -180,15 +198,19 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       await ports.updateReceipt(id, row);
     },
 
-    /** Only a pending receipt. Its file goes too, unless another receipt of the same page still shows it. */
+    /**
+     * Any status. A receipt of a settlement leaves it (see `CoteroPorts.deleteReceipt`). Its file goes too,
+     * unless another receipt of the same page still shows it; so does the proof of a settlement deleted with it.
+     */
     async deleteReceipt(id: number): Promise<void> {
       const current = await ports.findReceipt(id);
       if (!current) throw new CoteroError(RECEIPT_GONE);
-      assertCanDeleteReceipt(current.status);
-      await ports.deleteReceipt(id);
+      const deleted = await ports.deleteReceipt(id);
+      if (!deleted) throw new CoteroError(RECEIPT_GONE);
       if (current.filePath && (await ports.countReceiptsWithFile(current.filePath)) === 0) {
         await storage.remove([current.filePath]).catch((err) => console.error("cotero receipt file removal failed", err));
       }
+      await removeUnreferencedProof(deleted.removedProofPath);
     },
 
     async createTariff(userId: string, tariff: TariffInput): Promise<void> {
@@ -210,7 +232,7 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       const newestFirst = [...receipts].sort((a, b) => b.date.localeCompare(a.date));
       const name = newestFirst[0].coteroName;
       const document = typedDocument ?? newestFirst.find((r) => r.coteroDocument !== null)?.coteroDocument ?? null;
-      const total = receipts.reduce((sum, r) => sum + r.amount, 0);
+      const total = settlementTotal(receipts.map((r) => r.amount));
       if (total > MAX_PESOS) throw new CoteroError("El total de la liquidación es demasiado grande.");
       // A cédula typed now is remembered in the profile, but the receipts keep the key they were saved under.
       const key = input.coteroKey;
@@ -238,6 +260,14 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       if (!settlement) throw new CoteroError(SETTLEMENT_GONE);
       assertCanAnnul(settlement.status);
       if (!(await ports.annulSettlement(id))) throw new CoteroError(SETTLEMENT_CHANGED);
+    },
+
+    /** Any status: its receipts go back to pending and its proof file is removed. */
+    async deleteSettlement(id: number): Promise<void> {
+      if (!(await ports.findSettlement(id))) throw new CoteroError(SETTLEMENT_GONE);
+      const deleted = await ports.deleteSettlement(id);
+      if (!deleted) throw new CoteroError(SETTLEMENT_CHANGED);
+      await removeUnreferencedProof(deleted.proofPath);
     },
 
     async paySettlement(id: number, payment: PayInput): Promise<void> {

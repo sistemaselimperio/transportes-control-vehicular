@@ -299,7 +299,15 @@ export function CoteroPaymentsView({
         open={deleting !== undefined}
         title="Eliminar recibo"
         description={deleting && `${deleting.receiptNumber} · ${deleting.coteroName}`}
-        warning={deleting ? `Se eliminará el recibo ${deleting.receiptNumber}${deleting.filePath ? " y su archivo, si ningún otro recibo lo usa" : ""}.` : ""}
+        warning={
+          deleting
+            ? `Se eliminará el recibo ${deleting.receiptNumber}${deleting.filePath ? " y su archivo, si ningún otro recibo lo usa" : ""}.${
+                deleting.settlementId !== null
+                  ? ` También sale de la Liquidación ${deleting.settlementNumber}: su total se recalcula (o se elimina si era su único recibo) y un comprobante ya impreso dejará de coincidir.`
+                  : ""
+              }`
+            : ""
+        }
         action={() => (deleting ? deleteReceiptAction(deleting.id) : Promise.resolve({ ok: false as const, error: "Sin recibo." }))}
         onClose={() => setDeleting(undefined)}
         onDone={flash}
