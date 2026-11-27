@@ -11,7 +11,7 @@ const EXACT: CSSProperties = { printColorAdjust: "exact", WebkitPrintColorAdjust
 
 const CELL = "border border-black px-2 py-1.5 text-[13px] leading-tight";
 
-/** The settlement voucher a cotero signs: the same sheet as the Excel one, laid out to print on a letter page. */
+/** The settlement voucher for accounting: the same sheet as the Excel one, laid out to print on a letter page. */
 export function SettlementVoucher({ voucher }: { voucher: Voucher }) {
   const { lines } = voucher;
   return (
@@ -92,11 +92,6 @@ export function SettlementVoucher({ voucher }: { voucher: Voucher }) {
           </tr>
         </tbody>
       </table>
-
-      <div className="mt-24 w-72 border-t border-black pt-1 text-[13px] leading-snug">
-        <p className="font-bold">Firma del cotero</p>
-        <p className="mt-1">C.C. {voucher.document || "______________________"}</p>
-      </div>
     </article>
   );
 }

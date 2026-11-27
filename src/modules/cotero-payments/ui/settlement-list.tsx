@@ -115,12 +115,14 @@ export function SettlementList({
                     </a>
                   )}
                 </div>
-                {s.status === "open" && (
+                {s.status !== "annulled" && (
                   <div className="flex items-center gap-1">
-                    <Button variant="outline" className="h-11 px-3 md:h-9" onClick={() => onPay(s)}>
-                      <Banknote aria-hidden />
-                      Registrar pago
-                    </Button>
+                    {s.status === "open" && (
+                      <Button variant="outline" className="h-11 px-3 md:h-9" onClick={() => onPay(s)}>
+                        <Banknote aria-hidden />
+                        Registrar pago
+                      </Button>
+                    )}
                     <Button variant="ghost" className="h-11 px-3 text-destructive md:h-9" onClick={() => setAnnulling(s)}>
                       <Undo2 aria-hidden />
                       Anular
@@ -154,7 +156,7 @@ export function SettlementList({
             <div className="flex gap-3 rounded-xl border border-destructive/20 bg-destructive-faint p-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
               <p className="font-medium">
-                Los {annulling.receiptCount} recibos de esta liquidación vuelven a estar pendientes y podrás liquidarlos de nuevo. El número {annulling.number} no se reutiliza.
+                Los {annulling.receiptCount} recibos de esta liquidación vuelven a estar en Pendiente y podrás liquidarlos de nuevo.{annulling.status === "paid" ? " El pago registrado deja de contar." : ""} El número {annulling.number} no se reutiliza.
               </p>
             </div>
           </ActionForm>

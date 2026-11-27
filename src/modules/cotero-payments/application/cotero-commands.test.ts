@@ -220,6 +220,8 @@ describe("createSettlement", () => {
     document: "",
     paymentMethod: "nequi" as const,
     paymentAccount: "3001234567",
+    paidAt: "2026-11-29",
+    proofPath: null as string | null,
     today: "2026-11-30",
   };
 
@@ -236,6 +238,8 @@ describe("createSettlement", () => {
         coteroDocument: "1056507092",
         paymentMethod: "nequi",
         paymentAccount: "3001234567",
+        paidAt: "2026-11-29",
+        proofPath: null,
         total: 150000,
         receiptIds: [1, 2],
       }),
@@ -247,6 +251,13 @@ describe("createSettlement", () => {
       paymentMethod: "nequi",
       paymentAccount: "3001234567",
     });
+  });
+
+  it("stores the payment and its proof with the settlement, which is born paid", async () => {
+    const p = ports();
+    const proofPath = `recibos/comprobantes/2026/11/${UUID}.jpg`;
+    await createCoteroCommands(p, storage()).createSettlement(USER, { ...input, proofPath });
+    expect(p.createSettlement).toHaveBeenCalledWith(USER, expect.objectContaining({ paidAt: "2026-11-29", paymentMethod: "nequi", proofPath }));
   });
 
   it("uses the cédula typed in the form over the ones of the receipts", async () => {
@@ -288,13 +299,19 @@ describe("annulSettlement", () => {
     expect(p.annulSettlement).toHaveBeenCalledWith(3);
   });
 
-  it("never annuls a paid settlement", async () => {
+  it("annuls a paid settlement too", async () => {
     const p = ports({ findSettlement: vi.fn(async () => ({ id: 3, status: "paid" as const })) });
-    await expect(createCoteroCommands(p, storage()).annulSettlement(3)).rejects.toThrow(/pagada/);
+    await createCoteroCommands(p, storage()).annulSettlement(3);
+    expect(p.annulSettlement).toHaveBeenCalledWith(3);
+  });
+
+  it("never annuls an annulled settlement", async () => {
+    const p = ports({ findSettlement: vi.fn(async () => ({ id: 3, status: "annulled" as const })) });
+    await expect(createCoteroCommands(p, storage()).annulSettlement(3)).rejects.toThrow(/anulada/);
     expect(p.annulSettlement).not.toHaveBeenCalled();
   });
 
-  it("reports a settlement that was paid meanwhile", async () => {
+  it("reports a settlement that was annulled meanwhile", async () => {
     const p = ports({ annulSettlement: vi.fn(async () => false) });
     await expect(createCoteroCommands(p, storage()).annulSettlement(3)).rejects.toThrow(CoteroError);
   });

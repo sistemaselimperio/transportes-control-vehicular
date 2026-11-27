@@ -134,7 +134,7 @@ export function CoteroPaymentsView({
 
       {voucherOffer && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3">
-          <p className="text-sm font-medium">{voucherOffer.message} Imprime el comprobante para que el cotero lo firme.</p>
+          <p className="text-sm font-medium">{voucherOffer.message} Imprime el comprobante para contabilidad.</p>
           <div className="flex items-center gap-2">
             <a
               href={`/pagos-coteros/liquidaciones/${voucherOffer.id}/imprimir`}
@@ -312,6 +312,7 @@ export function CoteroPaymentsView({
         profiles={profiles}
         presetKey={settlementCotero}
         presetIds={settlementIds}
+        today={today}
         onDone={(created, settlementId) => {
           flash(created);
           setVoucherOffer(settlementId === null ? null : { id: settlementId, message: created });

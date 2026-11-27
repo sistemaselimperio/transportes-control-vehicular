@@ -7,19 +7,21 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { formatDisplayDate } from "@/modules/shared/domain/dates";
 import { formatDecimal } from "@/modules/shared/domain/decimal";
-import { createSettlementAction } from "../application/cotero-actions";
+import { createSettlementAction, discardUploadsAction } from "../application/cotero-actions";
 import { groupByCotero } from "../domain/cotero-identity";
 import { formatVehiclePlate } from "../domain/plates";
 import { totalsOfReceipts, type ReceiptRow } from "../domain/receipt-rules";
 import type { CoteroProfileRow } from "../domain/settlement-rows";
 import { isPaymentMethod, PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type PaymentMethod } from "../domain/settlement-rules";
 import { formatCop } from "./format";
+import { uploadProof } from "./proof-upload";
 
 function Form({
   pending,
   profiles,
   presetKey,
   presetIds,
+  today,
   onDone,
   onCancel,
 }: {
@@ -27,6 +29,7 @@ function Form({
   profiles: readonly CoteroProfileRow[];
   presetKey: string | null;
   presetIds: readonly number[] | null;
+  today: string;
   onDone: (message: string, settlementId: number | null) => void;
   onCancel: () => void;
 }) {
@@ -45,7 +48,9 @@ function Form({
   const isOn = (id: number) => overrides.get(id) ?? (only ? only.has(id) : true);
   const initialProfile = profileOf(coteroKey);
   const [document, setDocument] = useState(initialProfile?.document ?? groupOf(coteroKey)?.document ?? "");
-  const [method, setMethod] = useState<PaymentMethod | "">(initialProfile?.paymentMethod ?? "");
+  const [method, setMethod] = useState<PaymentMethod>(initialProfile?.paymentMethod ?? "efectivo");
+  const [paidAt, setPaidAt] = useState(today);
+  const [proof, setProof] = useState<File | null>(null);
   const [account, setAccount] = useState(initialProfile?.paymentAccount ?? "");
 
   const group = groupOf(coteroKey);
@@ -59,7 +64,7 @@ function Form({
     setOnly(null);
     setOverrides(new Map());
     setDocument(profile?.document ?? groupOf(key)?.document ?? "");
-    setMethod(profile?.paymentMethod ?? "");
+    setMethod(profile?.paymentMethod ?? "efectivo");
     setAccount(profile?.paymentAccount ?? "");
   }
 
@@ -74,18 +79,27 @@ function Form({
   return (
     <ActionForm
       action={async () => {
+        let proofPath: string | null = null;
+        if (proof) {
+          const uploaded = await uploadProof(proof);
+          if (!uploaded.ok) return uploaded;
+          proofPath = uploaded.path;
+        }
         const result = await createSettlementAction({
           coteroKey,
           receiptIds: chosen.map((r) => r.id),
           document,
           paymentMethod: method,
           paymentAccount: account,
+          paidAt,
+          proofPath,
         });
         if (result.ok) createdId.current = result.settlementId;
+        else if (proofPath) void discardUploadsAction([proofPath]);
         return result;
       }}
-      submitLabel={chosen.length === 0 ? "Liquidar" : `Liquidar ${formatCop(totals.amount)}`}
-      pendingLabel="Liquidando…"
+      submitLabel={chosen.length === 0 ? "Liquidar y pagar" : `Liquidar y pagar ${formatCop(totals.amount)}`}
+      pendingLabel="Guardando…"
       onDone={(message) => onDone(message, createdId.current)}
       onCancel={onCancel}
     >
@@ -140,14 +154,13 @@ function Form({
         <Input id="settle-document" inputMode="numeric" autoComplete="off" className="h-11 md:h-9" value={document} onChange={(e) => setDocument(e.target.value)} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Forma de pago" htmlFor="settle-method">
+        <Field label="Forma de pago" htmlFor="settle-method" required>
           <NativeSelect
             id="settle-method"
             className="h-11 md:h-9"
             value={method}
-            onChange={(e) => setMethod(isPaymentMethod(e.target.value) ? e.target.value : "")}
+            onChange={(e) => isPaymentMethod(e.target.value) && setMethod(e.target.value)}
           >
-            <option value="">Sin definir</option>
             {PAYMENT_METHODS.map((m) => (
               <option key={m} value={m}>
                 {PAYMENT_METHOD_LABELS[m]}
@@ -159,6 +172,18 @@ function Form({
           <Input id="settle-account" autoComplete="off" className="h-11 md:h-9" value={account} onChange={(e) => setAccount(e.target.value)} />
         </Field>
       </div>
+      <Field label="Fecha de pago" htmlFor="settle-paid-at" required>
+        <Input id="settle-paid-at" type="date" className="h-11 md:h-9" value={paidAt} max={today} onChange={(e) => setPaidAt(e.target.value)} />
+      </Field>
+      <Field label="Comprobante (foto o PDF)" htmlFor="settle-proof" hint="Opcional.">
+        <Input
+          id="settle-proof"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="h-auto py-2"
+          onChange={(e) => setProof(e.target.files?.[0] ?? null)}
+        />
+      </Field>
     </ActionForm>
   );
 }
@@ -171,6 +196,7 @@ export function SettlementCreate({
   profiles,
   presetKey,
   presetIds,
+  today,
   onDone,
 }: {
   open: boolean;
@@ -181,17 +207,19 @@ export function SettlementCreate({
   presetKey: string | null;
   /** Receipts to start checked (the ones just saved); null: all the pending ones of the cotero. */
   presetIds: readonly number[] | null;
+  today: string;
   /** Called once the settlement exists, with its id so its voucher can be offered. */
   onDone: (message: string, settlementId: number | null) => void;
 }) {
   const pending = useMemo(() => receipts.filter((r) => r.status === "pending"), [receipts]);
   return (
-    <SlideOver open={open} onOpenChange={onOpenChange} title="Liquidar a un cotero" description="Elige los recibos pendientes que entran en la liquidación." wide>
+    <SlideOver open={open} onOpenChange={onOpenChange} title="Liquidar a un cotero" description="Elige los recibos pendientes: la liquidación queda pagada al guardar." wide>
       <Form
         pending={pending}
         profiles={profiles}
         presetKey={presetKey}
         presetIds={presetIds}
+        today={today}
         onCancel={() => onOpenChange(false)}
         onDone={(message, settlementId) => {
           onDone(message, settlementId);

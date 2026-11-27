@@ -272,12 +272,15 @@ export const coteroRepository: CoteroPorts = {
             paymentMethod: settlement.paymentMethod,
             paymentAccount: settlement.paymentAccount,
             total: settlement.total,
+            status: "paid",
+            paidAt: settlement.paidAt,
+            proofPath: settlement.proofPath,
             createdBy: userId,
           })
           .returning({ id: settlements.id, number: settlements.number });
         const taken = await tx
           .update(receipts)
-          .set({ status: "settled", settlementId: created.id, updatedAt: new Date() })
+          .set({ status: "paid", settlementId: created.id, updatedAt: new Date() })
           .where(and(inArray(receipts.id, settlement.receiptIds), eq(receipts.status, "pending")))
           .returning({ id: receipts.id });
         if (taken.length !== settlement.receiptIds.length) throw new ReceiptsNotPending();
@@ -299,7 +302,7 @@ export const coteroRepository: CoteroPorts = {
       const annulled = await tx
         .update(settlements)
         .set({ status: "annulled", annulledAt: new Date() })
-        .where(and(eq(settlements.id, id), eq(settlements.status, "open")))
+        .where(and(eq(settlements.id, id), inArray(settlements.status, ["open", "paid"])))
         .returning({ id: settlements.id });
       if (annulled.length === 0) return false;
       await tx.update(receipts).set({ status: "pending", settlementId: null, updatedAt: new Date() }).where(eq(receipts.settlementId, id));

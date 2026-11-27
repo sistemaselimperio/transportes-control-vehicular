@@ -40,9 +40,9 @@ describe("settling receipts", () => {
 });
 
 describe("settlement state", () => {
-  it("can be annulled only while it is open (not paid, not already annulled)", () => {
+  it("can be annulled while open or paid, never twice", () => {
     expect(() => assertCanAnnul("open")).not.toThrow();
-    expect(() => assertCanAnnul("paid")).toThrow(CoteroError);
+    expect(() => assertCanAnnul("paid")).not.toThrow();
     expect(() => assertCanAnnul("annulled")).toThrow(CoteroError);
   });
 
@@ -57,8 +57,8 @@ describe("settlement state", () => {
     expect(receiptStatusAfterPay()).toBe("paid");
   });
 
-  it("explains why a paid settlement is closed", () => {
-    expect(() => assertCanAnnul("paid")).toThrow(/pagada/i);
+  it("explains that an annulled settlement cannot be annulled again", () => {
+    expect(() => assertCanAnnul("annulled")).toThrow(/anulada/i);
   });
 });
 

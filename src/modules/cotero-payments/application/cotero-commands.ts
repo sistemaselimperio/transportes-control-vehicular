@@ -53,8 +53,11 @@ export interface NewSettlement {
   coteroKey: string;
   coteroName: string;
   coteroDocument: string | null;
-  paymentMethod: PaymentMethod | null;
+  paymentMethod: PaymentMethod;
   paymentAccount: string | null;
+  /** The payment is made with the settlement: it is stored already paid. */
+  paidAt: string;
+  proofPath: string | null;
   total: number;
   receiptIds: number[];
 }
@@ -83,14 +86,14 @@ export interface CoteroPorts {
   findReceiptsForSettlement(ids: number[]): Promise<SettlementCandidate[]>;
   upsertProfile(profile: CoteroProfileValues): Promise<void>;
   /**
-   * In one transaction: takes the next number, stores the settlement and marks its receipts settled.
+   * In one transaction: takes the next number, stores the settlement already paid and marks its receipts paid.
    * Null (nothing stored) when one of them stopped being pending meanwhile.
    */
   createSettlement(userId: string, settlement: NewSettlement): Promise<{ id: number; number: number } | null>;
   findSettlement(id: number): Promise<{ id: number; status: SettlementStatus } | null>;
-  /** Open to annulled, receipts back to pending. False (nothing changed) when it was not open. */
+  /** Open or paid to annulled, receipts back to pending. False (nothing changed) when it was already annulled. */
   annulSettlement(id: number): Promise<boolean>;
-  /** Open to paid, receipts to paid. False (nothing changed) when it was not open. */
+  /** Legacy: settlements created before payment moved into the settle step may still be open. Open to paid, receipts to paid. False when it was not open. */
   paySettlement(id: number, payment: PayInput): Promise<boolean>;
 }
 
@@ -192,7 +195,7 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       await ports.insertTariff(userId, tariff);
     },
 
-    /** Settles the chosen pending receipts of one cotero; remembers the cotero's cédula and payment details. */
+    /** Settles and pays the chosen pending receipts of one cotero; remembers the cotero's cédula and payment details. */
     async createSettlement(userId: string, input: SettlementInput & { today: string }): Promise<{ id: number; number: number }> {
       const receipts = await ports.findReceiptsForSettlement(input.receiptIds);
       if (receipts.length !== input.receiptIds.length) throw new CoteroError(RECEIPT_GONE);
@@ -220,6 +223,8 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
         coteroDocument: document,
         paymentMethod: input.paymentMethod,
         paymentAccount: input.paymentAccount,
+        paidAt: input.paidAt,
+        proofPath: input.proofPath,
         total,
         receiptIds: receipts.map((r) => r.id),
       });
@@ -227,7 +232,7 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       return created;
     },
 
-    /** Only while it is open; a paid settlement is closed. */
+    /** Open or paid; its receipts go back to pending. */
     async annulSettlement(id: number): Promise<void> {
       const settlement = await ports.findSettlement(id);
       if (!settlement) throw new CoteroError(SETTLEMENT_GONE);

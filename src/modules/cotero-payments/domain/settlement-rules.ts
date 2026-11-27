@@ -46,9 +46,8 @@ export function assertCanSettle(statuses: readonly ReceiptStatus[]): void {
 
 export const receiptStatusOnSettle = (): ReceiptStatus => "settled";
 
-/** Annulling is only possible before the payment; a paid settlement is closed. */
+/** An open or a paid settlement can be annulled (its receipts go back to pending); an annulled one is done. */
 export function assertCanAnnul(status: SettlementStatus): void {
-  if (status === "paid") throw new CoteroError("La liquidación ya está pagada y no se puede anular.");
   if (status === "annulled") throw new CoteroError("La liquidación ya está anulada.");
 }
 

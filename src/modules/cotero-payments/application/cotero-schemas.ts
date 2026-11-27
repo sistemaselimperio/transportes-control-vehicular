@@ -71,6 +71,13 @@ const optionalText = (max: number) =>
     .transform((v) => v.trim())
     .transform((v) => (v === "" ? null : v));
 
+const proofPath = z
+  .string()
+  .nullable()
+  .default(null)
+  .refine((v) => v === null || isProofPath(v), "El comprobante no es válido. Súbelo de nuevo.");
+
+/** A settlement is created already paid: it carries the payment (date, method, optional proof). */
 export const settlementSchema = z.object({
   coteroKey: z.string().min(1, "Elige el cotero.").max(200),
   receiptIds: z
@@ -79,8 +86,10 @@ export const settlementSchema = z.object({
     .max(500)
     .transform((ids) => [...new Set(ids)]),
   document: z.string().max(30).default(""),
-  paymentMethod: z.union([paymentMethod, z.literal("")]).default("").transform((v) => (v === "" ? null : v)),
+  paymentMethod,
   paymentAccount: optionalText(100),
+  paidAt: dateField("La fecha de pago"),
+  proofPath,
 });
 
 export type SettlementInput = z.infer<typeof settlementSchema>;
@@ -88,11 +97,7 @@ export type SettlementInput = z.infer<typeof settlementSchema>;
 export const paySchema = z.object({
   paidAt: dateField("La fecha de pago"),
   paymentMethod,
-  proofPath: z
-    .string()
-    .nullable()
-    .default(null)
-    .refine((v) => v === null || isProofPath(v), "El comprobante no es válido. Súbelo de nuevo."),
+  proofPath,
 });
 
 export type PayInput = z.infer<typeof paySchema>;

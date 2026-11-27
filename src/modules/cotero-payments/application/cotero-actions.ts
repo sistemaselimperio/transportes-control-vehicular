@@ -170,7 +170,7 @@ export async function createSettlementAction(input: unknown): Promise<CreateSett
   const result = await run(async (userId) => {
     const created = await commands.createSettlement(userId, { ...settlementSchema.parse(input), today: todayInBogota() });
     settlementId = created.id;
-    return `Liquidación ${created.number} creada.`;
+    return `Liquidación ${created.number} creada y pagada.`;
   });
   return result.ok ? { ...result, settlementId } : result;
 }

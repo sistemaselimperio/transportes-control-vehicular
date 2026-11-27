@@ -5,20 +5,11 @@ import { ActionForm, Field } from "@/components/app/action-form";
 import { SlideOver } from "@/components/app/slide-over";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/modules/documents/domain/vehicle-file-rules";
-import { optimizeFile } from "@/modules/documents/ui/optimize-file";
-import { discardUploadsAction, paySettlementAction, prepareUploadsAction } from "../application/cotero-actions";
+import { discardUploadsAction, paySettlementAction } from "../application/cotero-actions";
 import type { SettlementRow } from "../domain/settlement-rows";
 import { isPaymentMethod, PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type PaymentMethod } from "../domain/settlement-rules";
 import { formatCop } from "./format";
-
-async function uploadToStorage(uploadUrl: string, file: File): Promise<boolean> {
-  const body = new FormData();
-  body.append("cacheControl", "3600");
-  body.append("", file);
-  const res = await fetch(uploadUrl, { method: "PUT", body, headers: { "x-upsert": "false" } });
-  return res.ok;
-}
+import { uploadProof } from "./proof-upload";
 
 function Form({ settlement, today, onDone, onCancel }: { settlement: SettlementRow; today: string; onDone: (message: string) => void; onCancel: () => void }) {
   const [paidAt, setPaidAt] = useState(today);
@@ -29,15 +20,9 @@ function Form({ settlement, today, onDone, onCancel }: { settlement: SettlementR
   async function pay() {
     let proofPath: string | null = null;
     if (proof) {
-      if (!(ALLOWED_MIME as readonly string[]).includes(proof.type)) return { ok: false as const, error: "El comprobante debe ser PDF, JPG, PNG o WebP." };
-      const stored = await optimizeFile(proof);
-      if (stored.size > MAX_FILE_BYTES) return { ok: false as const, error: "El comprobante supera el límite de 4 MB." };
-      const target = await prepareUploadsAction([{ kind: "proof", mimeType: stored.type, size: stored.size }]);
-      if (!target.ok) return { ok: false as const, error: target.error };
-      if (!(await uploadToStorage(target.uploads[0].uploadUrl, stored))) {
-        return { ok: false as const, error: "No se pudo subir el comprobante. Intenta de nuevo." };
-      }
-      proofPath = target.uploads[0].path;
+      const uploaded = await uploadProof(proof);
+      if (!uploaded.ok) return uploaded;
+      proofPath = uploaded.path;
     }
     const result = await paySettlementAction(settlement.id, { paidAt, paymentMethod: method, proofPath });
     if (!result.ok && proofPath) void discardUploadsAction([proofPath]);
@@ -62,7 +47,7 @@ function Form({ settlement, today, onDone, onCancel }: { settlement: SettlementR
           ))}
         </NativeSelect>
       </Field>
-      <Field label="Comprobante (foto o PDF)" htmlFor="pay-proof" hint="Opcional. Una liquidación pagada queda cerrada y ya no se puede anular.">
+      <Field label="Comprobante (foto o PDF)" htmlFor="pay-proof" hint="Opcional.">
         <Input
           id="pay-proof"
           type="file"
@@ -75,7 +60,7 @@ function Form({ settlement, today, onDone, onCancel }: { settlement: SettlementR
   );
 }
 
-/** Side sheet to record the payment of an open settlement. */
+/** Side sheet to record the payment of a legacy open settlement (new ones are created already paid). */
 export function SettlementPay({
   settlement,
   today,
