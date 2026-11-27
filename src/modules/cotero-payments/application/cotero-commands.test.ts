@@ -15,7 +15,6 @@ const item = (over: Partial<ReceiptBatchItem> = {}): ReceiptBatchItem => ({
   tons: "33.213",
   vehiclePlate: "ABC-123",
   trailerPlate: "",
-  crew: "",
   coteroName: "Juan Perez",
   coteroDocument: "1056507092",
   driverName: "Pedro",

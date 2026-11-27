@@ -19,7 +19,6 @@ const draft = (over: Partial<ReceiptDraft> = {}): ReceiptDraft => ({
   tons: "33.213",
   vehiclePlate: "abc 123",
   trailerPlate: "R 21396",
-  crew: "H2",
   coteroName: "  Juan   Perez ",
   coteroDocument: "1.056.507.092",
   driverName: "Pedro Gomez",
@@ -39,7 +38,6 @@ describe("parseDraft", () => {
       tons: 33.213,
       vehiclePlate: "ABC123",
       trailerPlate: "R21396",
-      crew: "H2",
       coteroName: "Juan Perez",
       coteroDocument: "1056507092",
       coteroKey: "doc:1056507092",
@@ -49,12 +47,11 @@ describe("parseDraft", () => {
   });
 
   it("leaves the optional fields empty", () => {
-    const result = parseDraft(draft({ remissions: "", trailerPlate: "", crew: " ", coteroDocument: "" }));
+    const result = parseDraft(draft({ remissions: "", trailerPlate: "", coteroDocument: "" }));
     expect(result.issues).toEqual([]);
     expect(result.values).toMatchObject({
       remissions: [],
       trailerPlate: null,
-      crew: null,
       coteroDocument: null,
       coteroKey: "name:juanperez",
     });
@@ -192,7 +189,6 @@ const row = (over: Partial<ReceiptRow>): ReceiptRow => ({
   tons: 10,
   vehiclePlate: "ABC123",
   trailerPlate: null,
-  crew: null,
   coteroKey: "doc:111111",
   coteroName: "Juan Perez",
   coteroDocument: "111111",

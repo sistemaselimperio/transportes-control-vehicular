@@ -17,7 +17,6 @@ export const receiptDraftSchema = z.object({
   tons: text(30, "Las toneladas"),
   vehiclePlate: text(20, "La placa"),
   trailerPlate: text(20, "La placa del trailer"),
-  crew: text(40, "La cuadrilla"),
   coteroName: text(120, "El nombre del cotero"),
   coteroDocument: text(30, "La cédula"),
   driverName: text(120, "El nombre del conductor"),

@@ -21,7 +21,6 @@ export interface ReceiptRow {
   /** Stored form ("ABC123"); shown with `formatVehiclePlate`. */
   vehiclePlate: string;
   trailerPlate: string | null;
-  crew: string | null;
   coteroKey: string;
   coteroName: string;
   coteroDocument: string | null;
@@ -49,7 +48,6 @@ export interface ReceiptDraft {
   tons: string;
   vehiclePlate: string;
   trailerPlate: string;
-  crew: string;
   coteroName: string;
   coteroDocument: string;
   driverName: string;
@@ -76,7 +74,6 @@ export interface ReceiptValues {
   tons: number;
   vehiclePlate: string;
   trailerPlate: string | null;
-  crew: string | null;
   coteroName: string;
   coteroDocument: string | null;
   coteroKey: string;
@@ -92,7 +89,6 @@ export const DRAFT_FIELD_LABELS: Record<DraftField, string> = {
   tons: "Toneladas",
   vehiclePlate: "Placa",
   trailerPlate: "Placa del trailer",
-  crew: "Cuadrilla",
   coteroName: "Cotero",
   coteroDocument: "Cédula",
   driverName: "Conductor",
@@ -118,7 +114,6 @@ export const emptyDraft = (date = ""): ReceiptDraft => ({
   tons: "",
   vehiclePlate: "",
   trailerPlate: "",
-  crew: "",
   coteroName: "",
   coteroDocument: "",
   driverName: "",
@@ -127,7 +122,7 @@ export const emptyDraft = (date = ""): ReceiptDraft => ({
 
 /**
  * Validates and normalizes a draft. `values` is null while any `issues` remain. The destination, the
- * remissions, the trailer, the crew and the cédula are optional (that the plates and the driver exist in
+ * remissions, the trailer and the cédula are optional (that the plates and the driver exist in
  * the fleet is checked apart, by `resolveFleetRefs`).
  */
 export function parseDraft(draft: ReceiptDraft): { values: ReceiptValues | null; issues: DraftIssue[] } {
@@ -170,7 +165,6 @@ export function parseDraft(draft: ReceiptDraft): { values: ReceiptValues | null;
   if (key === null) return { values: null, issues: [{ field: "coteroName", kind: "missing" }] };
 
   const trailerPlate = normalizeVehiclePlate(draft.trailerPlate);
-  const crew = canonicalName(draft.crew);
   return {
     issues,
     values: {
@@ -181,7 +175,6 @@ export function parseDraft(draft: ReceiptDraft): { values: ReceiptValues | null;
       tons,
       vehiclePlate,
       trailerPlate: trailerPlate === "" ? null : trailerPlate,
-      crew: crew === "" ? null : crew,
       coteroName,
       coteroDocument,
       coteroKey: key,

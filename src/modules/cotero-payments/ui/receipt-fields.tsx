@@ -10,7 +10,7 @@ import type { FleetControl } from "./use-fleet";
 const CONTROL = "h-10 md:h-9";
 
 /**
- * The twelve fields of a receipt, controlled; a field with an issue is marked and says what is wrong. The
+ * The eleven fields of a receipt, controlled; a field with an issue is marked and says what is wrong. The
  * plates and the driver are tied to the fleet (`fleet`): they suggest while typing and say when one is not
  * in it; `corrected` holds what the AI read for the ones the fleet corrected.
  */
@@ -86,7 +86,6 @@ export function ReceiptFields({
       {text("amount", "Liquidación ($)", { required: true, inputMode: "numeric", hint: "El valor escrito en el recibo." })}
       {fleetField("vehiclePlate", "Placa del vehículo", "vehicle", true)}
       {fleetField("trailerPlate", "Placa del trailer", "trailer")}
-      {text("crew", "Cuadrilla")}
       {fleetField("driverName", "Conductor", "driver", true)}
       {text("coteroName", "Nombre del cotero", { required: true, className: "sm:col-span-2", list: "cotero-names" })}
       {text("coteroDocument", "Cédula del cotero", { className: "sm:col-span-2", inputMode: "numeric", hint: "Junto a la firma; identifica al cotero aunque el nombre cambie." })}

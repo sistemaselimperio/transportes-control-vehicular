@@ -19,7 +19,6 @@ function draftOf(row: ReceiptRow): ReceiptDraft {
     tons: String(row.tons),
     vehiclePlate: formatVehiclePlate(row.vehiclePlate),
     trailerPlate: row.trailerPlate ? formatVehiclePlate(row.trailerPlate) : "",
-    crew: row.crew ?? "",
     coteroName: row.coteroName,
     coteroDocument: row.coteroDocument ?? "",
     driverName: row.driverName,

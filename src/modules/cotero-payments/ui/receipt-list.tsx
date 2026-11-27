@@ -40,7 +40,6 @@ export function ReceiptList({
               </div>
               <p className="num text-sm text-muted-foreground">
                 {formatDisplayDate(r.date)}
-                {r.crew ? ` · Cuadrilla ${r.crew}` : ""}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">

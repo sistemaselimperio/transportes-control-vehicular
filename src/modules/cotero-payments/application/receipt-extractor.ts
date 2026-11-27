@@ -18,7 +18,6 @@ export const extractedReceiptSchema = z.object({
   tons: z.number().nullable(),
   vehiclePlate: z.string().nullable(),
   trailerPlate: z.string().nullable(),
-  crew: z.string().nullable(),
   coteroName: z.string().nullable(),
   /** The cédula written next to the signature. */
   coteroDocument: z.string().nullable(),
@@ -58,7 +57,6 @@ Campos de cada recibo:
 - "tons": el "TOTAL DE TONELADAS" como número en TONELADAS. En este formato el punto separa los decimales de las toneladas ("33.213" es 33.213 toneladas). Si está escrito en kilos (por ejemplo "12.880 Kg"), conviértelo a toneladas (12.88).
 - "vehiclePlate": la "PLACA DEL VEHÍCULO": 3 letras y 3 números ("ABC123").
 - "trailerPlate": la "PLACA DEL TRAILER", por ejemplo "R 21396". Null si está vacía.
-- "crew": la "CUADRILLA" (por ejemplo "H2"). Null si está vacía.
 - "coteroName": el "NOMBRE COTERO".
 - "coteroDocument": la cédula escrita junto a la FIRMA del cotero, solo dígitos (por ejemplo 1056507092). Null si no aparece.
 - "driverName": el "NOMBRE DEL CONDUCTOR".
@@ -81,7 +79,6 @@ export function toDraft(item: ExtractedReceipt): ReceiptDraft {
     tons: item.tons === null ? "" : String(item.tons),
     vehiclePlate: optional(item.vehiclePlate),
     trailerPlate: optional(item.trailerPlate),
-    crew: optional(item.crew),
     coteroName: optional(item.coteroName),
     coteroDocument: optional(item.coteroDocument),
     driverName: optional(item.driverName),

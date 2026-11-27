@@ -18,7 +18,6 @@ const extracted = (over: Partial<ExtractedReceipt> = {}): ExtractedReceipt => ({
   tons: 33.213,
   vehiclePlate: "ABC 123",
   trailerPlate: "R 21396",
-  crew: "H2",
   coteroName: "Juan Perez",
   coteroDocument: "1056507092",
   driverName: "Pedro Gomez",
@@ -30,7 +29,7 @@ describe("extractionSchema", () => {
   it("accepts an array of receipts with nullable fields", () => {
     const parsed = extractionSchema.parse({
       receipts: [
-        { ...extracted(), crew: null, trailerPlate: null, coteroDocument: null, amount: null, tons: null, date: null },
+        { ...extracted(), trailerPlate: null, coteroDocument: null, amount: null, tons: null, date: null },
       ],
     });
     expect(parsed.receipts).toHaveLength(1);
@@ -52,7 +51,6 @@ describe("toDraft", () => {
       tons: "33.213",
       vehiclePlate: "ABC 123",
       trailerPlate: "R 21396",
-      crew: "H2",
       coteroName: "Juan Perez",
       coteroDocument: "1056507092",
       driverName: "Pedro Gomez",
