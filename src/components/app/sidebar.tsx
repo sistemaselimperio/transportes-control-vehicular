@@ -4,6 +4,7 @@ import {
   Bell,
   Banknote,
   HardHat,
+  Hourglass,
   Building2,
   ClipboardCheck,
   ClipboardList,
@@ -45,10 +46,15 @@ type NavItem = {
   requiresPettyCash?: boolean;
   /** Same for the cotero payments flag. */
   requiresCoteroPayments?: boolean;
+  /** Same for the enturnamientos flags (either one). */
+  requiresTurns?: boolean;
 };
 
 const PETTY_CASH_PATH = "/caja";
 const COTERO_PAYMENTS_PATH = "/pagos-coteros";
+const TURNS_PATH = "/enturnamientos";
+/** Enturnamientos is hidden from the menu for everyone until rollout; flag holders still reach it by URL. */
+const SHOW_TURNS_IN_NAV = false;
 
 /** A group only renders for a role that can open at least one of its entries. */
 type NavGroup = { label: string; items: ReadonlyArray<NavItem> };
@@ -84,16 +90,21 @@ const SECTIONS: ReadonlyArray<NavGroup> = [
       { href: "/cargues", label: "Cargues", icon: Container },
     ],
   },
+  {
+    label: "Despacho",
+    items: [{ href: TURNS_PATH, label: "Enturnamientos", icon: Hourglass, requiresTurns: true }],
+  },
 ];
 
 /**
  * Whether the user can open at least one entry of the group. A group with no open entry is hidden
  * whole, so a role never sees a block of locked items from another domain.
  */
-function groupVisible(group: NavGroup, role: Role, hasPettyCash: boolean, hasCoteroPayments: boolean): boolean {
+function groupVisible(group: NavGroup, role: Role, hasPettyCash: boolean, hasCoteroPayments: boolean, hasTurns: boolean): boolean {
   return group.items.some((item) => {
     if (item.requiresPettyCash) return canUsePettyCash(hasPettyCash);
     if (item.requiresCoteroPayments) return canUseCoteroPayments(hasCoteroPayments);
+    if (item.requiresTurns) return SHOW_TURNS_IN_NAV && hasTurns;
     const target = sectionOfPath(item.href);
     return target !== null && canViewSection(role, target);
   });
@@ -117,6 +128,7 @@ interface BodyProps {
   role: Role;
   hasPettyCash: boolean;
   hasCoteroPayments: boolean;
+  hasTurns: boolean;
   grupo: OwnerGroup | null;
   /** Query string of the current page, kept when only the group changes. */
   currentQuery: string;
@@ -140,7 +152,7 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
   return qs ? `${path}?${qs}` : path;
 }
 
-function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
+function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, hasTurns, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
@@ -161,15 +173,15 @@ function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, grupo, c
   return (
     <>
       <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
-        {SECTIONS.filter((section) => groupVisible(section, role, hasPettyCash, hasCoteroPayments)).map((section) => (
+        {SECTIONS.filter((section) => groupVisible(section, role, hasPettyCash, hasCoteroPayments, hasTurns)).map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
-            {section.items.filter((item) => (!item.requiresPettyCash || canUsePettyCash(hasPettyCash)) && (!item.requiresCoteroPayments || canUseCoteroPayments(hasCoteroPayments))).map((item) => {
+            {section.items.filter((item) => (!item.requiresPettyCash || canUsePettyCash(hasPettyCash)) && (!item.requiresCoteroPayments || canUseCoteroPayments(hasCoteroPayments)) && (!item.requiresTurns || (SHOW_TURNS_IN_NAV && hasTurns))).map((item) => {
               const target = sectionOfPath(item.href);
               const Icon = item.icon;
               // Inside a visible group, the entries the role cannot open stay in place, disabled.
               // Petty cash is not a role section: its entry only renders for users that have access.
-              if (!item.requiresPettyCash && !item.requiresCoteroPayments && (target == null || !canViewSection(role, target))) {
+              if (!item.requiresPettyCash && !item.requiresCoteroPayments && !item.requiresTurns && (target == null || !canViewSection(role, target))) {
                 return (
                   <div
                     key={item.href}
@@ -320,12 +332,14 @@ export function Sidebar({
   role,
   hasPettyCash,
   hasCoteroPayments,
+  hasTurns,
   expiredCounts,
 }: {
   userName: string;
   role: Role;
   hasPettyCash: boolean;
   hasCoteroPayments: boolean;
+  hasTurns: boolean;
   /** Only the roles that can open the alerts page get the counts. */
   expiredCounts: ExpiredVehicleCounts | null;
 }) {
@@ -341,6 +355,7 @@ export function Sidebar({
     role,
     hasPettyCash,
     hasCoteroPayments,
+    hasTurns,
     grupo,
     currentQuery,
     userName,

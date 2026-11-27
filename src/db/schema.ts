@@ -813,6 +813,10 @@ export const user = transportes.table("user", {
   hasPettyCash: boolean("has_petty_cash").notNull().default(false),
   /** Only users with this flag see and use the cotero payments (see `src/modules/cotero-payments`). */
   hasCoteroPayments: boolean("has_cotero_payments").notNull().default(false),
+  /** Administers the enturnamientos: jornadas, window, order and any turn (see `src/modules/turns`). */
+  canAdminTurns: boolean("can_admin_turns").notNull().default(false),
+  /** Enturns vehicles (and cancels own turns) while a jornada window is open. */
+  canEnturn: boolean("can_enturn").notNull().default(false),
   /** Only users with this flag are warned on "Hoy" (and in the nav badge) about a trip programmed on a parked vehicle. */
   receivesParkedTripAlerts: boolean("receives_parked_trip_alerts").notNull().default(false),
 });
@@ -1072,5 +1076,49 @@ export const coteroReceipts = transportes.table(
     index("cotero_receipts_settlement_idx").on(t.settlementId),
     check("cotero_receipts_amount_positive", sql`${t.amount} > 0`),
     check("cotero_receipts_tons_positive", sql`${t.tons} > 0`),
+  ],
+);
+
+/* ------------------- Enturnamientos (vehicle turn queue) ------------------- */
+
+/** One jornada per calendar day: the window (Bogotá instants) in which enturnadoras may enturn. */
+export const turnDays = transportes.table(
+  "turn_days",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** The Bogotá day the queue is for. */
+    date: date({ mode: "string" }).notNull(),
+    opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
+    closesAt: timestamp("closes_at", { withTimezone: true }).notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("turn_days_date_uq").on(t.date), check("turn_days_window_valid", sql`${t.opensAt} < ${t.closesAt}`)],
+);
+
+/** A vehicle in the queue of a jornada; cancelling keeps the row (soft) and frees the vehicle. */
+export const turns = transportes.table(
+  "turns",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    turnDayId: integer("turn_day_id")
+      .notNull()
+      .references(() => turnDays.id, { onDelete: "cascade" }),
+    vehicleId: integer("vehicle_id")
+      .notNull()
+      .references(() => vehicles.id, { onDelete: "cascade" }),
+    /** Free text, optional. */
+    destination: text(),
+    /** 1-based place in the queue among the active turns. */
+    position: integer().notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    uniqueIndex("turns_day_vehicle_active_uq").on(t.turnDayId, t.vehicleId).where(sql`${t.cancelledAt} is null`),
+    index("turns_day_idx").on(t.turnDayId),
   ],
 );

@@ -215,6 +215,25 @@ export function canUseCoteroPayments(flag: unknown): boolean {
 }
 
 /**
+ * The enturnamientos (vehicle turn queue) are outside the role matrix too: two flags on the user
+ * decide. `canAdminTurns` administers (jornadas, window, order, any turn) and implies everything an
+ * enturnadora does; `canEnturn` enturns and cancels her own turns while the window is open. Each is
+ * closed for anything but `true`.
+ */
+export function canAdminTurns(flag: unknown): boolean {
+  return flag === true;
+}
+
+export function canEnturn(flag: unknown): boolean {
+  return flag === true;
+}
+
+/** Sees the enturnamientos page: administers them or enturns. */
+export function canUseTurns(adminFlag: unknown, enturnFlag: unknown): boolean {
+  return canAdminTurns(adminFlag) || canEnturn(enturnFlag);
+}
+
+/**
  * The parked-vehicle trip warning ("Vehículo quieto con viaje programado") is outside the role
  * matrix too: only users flagged with `receivesParkedTripAlerts` see it on "Hoy" and in the nav
  * badge. Closed for anything but `true`.

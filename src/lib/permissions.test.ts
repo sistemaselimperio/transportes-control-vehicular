@@ -11,7 +11,10 @@ import {
   canManageSection,
   canManageTrips,
   canSetKgPerBag,
+  canAdminTurns,
+  canEnturn,
   canUseCoteroPayments,
+  canUseTurns,
   canUsePettyCash,
   canViewSection,
   ForbiddenError,
@@ -339,6 +342,22 @@ describe("canUseCoteroPayments", () => {
     expect(canUseCoteroPayments(null)).toBe(false);
     expect(canUseCoteroPayments("true")).toBe(false);
     expect(canUseCoteroPayments(1)).toBe(false);
+  });
+});
+
+describe("enturnamientos flags", () => {
+  it("are each open only for exactly true", () => {
+    for (const fn of [canAdminTurns, canEnturn]) {
+      expect(fn(true)).toBe(true);
+      for (const closed of [false, undefined, null, "true", 1]) expect(fn(closed)).toBe(false);
+    }
+  });
+
+  it("show the page to whoever has either flag", () => {
+    expect(canUseTurns(true, false)).toBe(true);
+    expect(canUseTurns(false, true)).toBe(true);
+    expect(canUseTurns(false, false)).toBe(false);
+    expect(canUseTurns(undefined, null)).toBe(false);
   });
 });
 

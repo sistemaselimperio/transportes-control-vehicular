@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canDeleteVehicles, canDeliverOrders, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canDeliverOrders, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUseTurns, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -128,5 +128,25 @@ export async function requireCoteroPaymentsAccess() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
   if (!canUseCoteroPayments(session.user.hasCoteroPayments)) redirect(homePath(parseRole(session.user.role)));
+  return session;
+}
+
+/**
+ * Enturnamientos reads and writes: only users flagged with `canAdminTurns` or `canEnturn` (not a role).
+ * The flags are read from the stored session user on every call, so they cannot be skipped by calling an
+ * action directly. What each flag may do (window, ownership) is the domain rules' job. Throws
+ * `ForbiddenError` otherwise.
+ */
+export async function requireTurns() {
+  const session = await requireSession();
+  if (!canUseTurns(session.user.canAdminTurns, session.user.canEnturn)) throw new ForbiddenError();
+  return session;
+}
+
+/** For the enturnamientos page: sends a signed-out user to the login and anyone without a flag to its home. */
+export async function requireTurnsAccess() {
+  const session = await getRequestSession();
+  if (!session) redirect("/login");
+  if (!canUseTurns(session.user.canAdminTurns, session.user.canEnturn)) redirect(homePath(parseRole(session.user.role)));
   return session;
 }
