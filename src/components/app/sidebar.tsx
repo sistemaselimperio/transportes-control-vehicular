@@ -102,6 +102,9 @@ const SECTIONS: ReadonlyArray<NavGroup> = [
   },
 ];
 
+/** Roles whose locked entries are hidden instead of shown disabled with a lock. */
+const HIDES_LOCKED_ENTRIES: ReadonlySet<Role> = new Set<Role>(["staff"]);
+
 /**
  * Whether the user can open at least one entry of the group. A group with no open entry is hidden
  * whole, so a role never sees a block of locked items from another domain.
@@ -190,6 +193,8 @@ function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, hasDaily
               // Inside a visible group, the entries the role cannot open stay in place, disabled.
               // Petty cash is not a role section: its entry only renders for users that have access.
               if (!item.requiresPettyCash && !item.requiresCoteroPayments && !item.requiresDailyCash && !item.requiresTurns && (target == null || !canViewSection(role, target))) {
+                // Staff (Leidy) does not see what she cannot open at all.
+                if (HIDES_LOCKED_ENTRIES.has(role)) return null;
                 return (
                   <div
                     key={item.href}
