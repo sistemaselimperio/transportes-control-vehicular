@@ -69,6 +69,8 @@ async function seedUser(user: {
   hasPettyCash?: boolean;
   /** Sees the cotero payments (pagos a coteros). */
   hasCoteroPayments?: boolean;
+  /** Sees the daily cash box (caja diaria). */
+  hasDailyCash?: boolean;
   /** Administers the enturnamientos (jornadas, window, order, any turn). */
   canAdminTurns?: boolean;
   /** Enturns vehicles while a jornada window is open. */
@@ -94,6 +96,9 @@ async function seedUser(user: {
     if (user.hasCoteroPayments) {
       await db.update(schema.user).set({ hasCoteroPayments: true }).where(eq(schema.user.id, existing.id));
     }
+    if (user.hasDailyCash) {
+      await db.update(schema.user).set({ hasDailyCash: true }).where(eq(schema.user.id, existing.id));
+    }
     if (user.canAdminTurns) {
       await db.update(schema.user).set({ canAdminTurns: true }).where(eq(schema.user.id, existing.id));
     }
@@ -117,6 +122,7 @@ async function seedUser(user: {
     theme: user.theme,
     hasPettyCash: user.hasPettyCash ?? false,
     hasCoteroPayments: user.hasCoteroPayments ?? false,
+    hasDailyCash: user.hasDailyCash ?? false,
     canAdminTurns: user.canAdminTurns ?? false,
     canEnturn: user.canEnturn ?? false,
     receivesParkedTripAlerts: user.receivesParkedTripAlerts ?? false,
@@ -134,7 +140,7 @@ async function seedUser(user: {
 const seedAdmin = () =>
   seedUser({ username: "rocio", name: "Rocío", role: "admin", theme: "yellow", hasPettyCash: true, canEnturn: true, receivesParkedTripAlerts: true, passwordVar: "SEED_ADMIN_PASSWORD" });
 const seedLeidy = () =>
-  seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", hasCoteroPayments: true, canAdminTurns: true, passwordVar: "SEED_LEIDY_PASSWORD" });
+  seedUser({ username: "leidy", name: "Leidy", role: "staff", theme: "sky", hasCoteroPayments: true, hasDailyCash: true, canAdminTurns: true, passwordVar: "SEED_LEIDY_PASSWORD" });
 const seedGabriella = () =>
   seedUser({ username: "gabriella", name: "Gabriella", role: "assistant", theme: "yellow", passwordVar: "SEED_GABRIELLA_PASSWORD" });
 

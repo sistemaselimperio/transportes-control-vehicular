@@ -215,6 +215,15 @@ export function canUseCoteroPayments(flag: unknown): boolean {
 }
 
 /**
+ * The daily cash box (caja diaria) is outside the role matrix too: only users flagged with
+ * `hasDailyCash` see or use it, whatever their role (an admin does not get it implicitly).
+ * Closed for anything but `true`.
+ */
+export function canUseDailyCash(flag: unknown): boolean {
+  return flag === true;
+}
+
+/**
  * The enturnamientos (vehicle turn queue) are outside the role matrix too: two flags on the user
  * decide. `canAdminTurns` administers (jornadas, window, order, any turn) and implies everything an
  * enturnadora does; `canEnturn` enturns and cancels her own turns while the window is open. Each is

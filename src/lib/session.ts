@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { canAssignDrivers, canDeleteVehicles, canDeliverOrders, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUseTurns, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
+import { canAssignDrivers, canDeleteVehicles, canDeliverOrders, canEditVehicleCapacity, canEditVehicles, canManageSection, canManageVehicleFiles, canTransferVehicles, canUseCoteroPayments, canUseDailyCash, canUseTurns, canUsePettyCash, canViewSection, ForbiddenError, homePath, parseRole, type Section } from "@/lib/permissions";
 
 /** The session of this request, read once however many components ask. Reads headers: request time only. */
 export const getRequestSession = cache(async () => auth.api.getSession({ headers: await headers() }));
@@ -128,6 +128,25 @@ export async function requireCoteroPaymentsAccess() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
   if (!canUseCoteroPayments(session.user.hasCoteroPayments)) redirect(homePath(parseRole(session.user.role)));
+  return session;
+}
+
+/**
+ * Daily-cash reads and writes: only users flagged with `hasDailyCash` (not a role, and not implied
+ * by admin). The flag is read from the stored session user on every call, so it cannot be skipped
+ * by calling an action directly. Throws `ForbiddenError` otherwise.
+ */
+export async function requireDailyCash() {
+  const session = await requireSession();
+  if (!canUseDailyCash(session.user.hasDailyCash)) throw new ForbiddenError();
+  return session;
+}
+
+/** For the daily-cash pages: sends a signed-out user to the login and anyone without the flag to its home. */
+export async function requireDailyCashAccess() {
+  const session = await getRequestSession();
+  if (!session) redirect("/login");
+  if (!canUseDailyCash(session.user.hasDailyCash)) redirect(homePath(parseRole(session.user.role)));
   return session;
 }
 

@@ -14,6 +14,7 @@ import {
   jsonb,
   numeric,
   pgSchema,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -813,6 +814,8 @@ export const user = transportes.table("user", {
   hasPettyCash: boolean("has_petty_cash").notNull().default(false),
   /** Only users with this flag see and use the cotero payments (see `src/modules/cotero-payments`). */
   hasCoteroPayments: boolean("has_cotero_payments").notNull().default(false),
+  /** Only users with this flag see and use the daily cash box (see `src/modules/daily-cash`). */
+  hasDailyCash: boolean("has_daily_cash").notNull().default(false),
   /** Administers the enturnamientos: jornadas, window, order and any turn (see `src/modules/turns`). */
   canAdminTurns: boolean("can_admin_turns").notNull().default(false),
   /** Enturns vehicles (and cancels own turns) while a jornada window is open. */
@@ -1121,4 +1124,81 @@ export const turns = transportes.table(
     uniqueIndex("turns_day_vehicle_active_uq").on(t.turnDayId, t.vehicleId).where(sql`${t.cancelledAt} is null`),
     index("turns_day_idx").on(t.turnDayId),
   ],
+);
+
+/* ------------------- Daily cash box (caja diaria) ------------------- */
+
+export const dailyCashStatusEnum = transportes.enum("daily_cash_status", ["open", "closed"]);
+export const dailyCashKindEnum = transportes.enum("daily_cash_kind", ["expense", "income"]);
+/** EC1 = Fabián Páez, EGT = Transportes: the two companies of the accounting software. */
+export const dailyCashCompanyEnum = transportes.enum("daily_cash_company", ["EC1", "EGT"]);
+export const dailyCashSourceEnum = transportes.enum("daily_cash_source", ["import", "manual"]);
+
+/**
+ * One cash box per user per day. Only the earliest box of a user uses `openingBalance` (typed by
+ * hand); every later box opens with the previous box's counted cash, derived when read.
+ */
+export const dailyCashBoxes = transportes.table(
+  "daily_cash_boxes",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    date: date({ mode: "string" }).notNull(),
+    status: dailyCashStatusEnum().notNull().default("open"),
+    /** Whole pesos. */
+    openingBalance: integer("opening_balance"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("daily_cash_boxes_user_date_uq").on(t.userId, t.date)],
+);
+
+/**
+ * An expense (company EC1 or EGT) or an income (no company) of a box. Imported expenses carry the
+ * voucher number of the accounting software (normalized, unique per company across all boxes); manual
+ * ones have none.
+ */
+export const dailyCashEntries = transportes.table(
+  "daily_cash_entries",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    boxId: integer("box_id")
+      .notNull()
+      .references(() => dailyCashBoxes.id, { onDelete: "cascade" }),
+    kind: dailyCashKindEnum().notNull(),
+    company: dailyCashCompanyEnum(),
+    voucherNumber: text("voucher_number"),
+    detail: text().notNull(),
+    /** Whole pesos. */
+    value: integer().notNull(),
+    source: dailyCashSourceEnum().notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("daily_cash_entries_box_idx").on(t.boxId),
+    uniqueIndex("daily_cash_entries_voucher_uq")
+      .on(t.company, t.voucherNumber)
+      .where(sql`${t.voucherNumber} is not null`),
+    check("daily_cash_entries_value_positive", sql`${t.value} > 0`),
+    check(
+      "daily_cash_entries_company_by_kind",
+      sql`(${t.kind} = 'expense' and ${t.company} is not null) or (${t.kind} = 'income' and ${t.company} is null)`,
+    ),
+  ],
+);
+
+/** The arqueo of a box: how many bills or coins of each denomination were counted (zeros are not stored). */
+export const dailyCashCounts = transportes.table(
+  "daily_cash_counts",
+  {
+    boxId: integer("box_id")
+      .notNull()
+      .references(() => dailyCashBoxes.id, { onDelete: "cascade" }),
+    denomination: integer().notNull(),
+    quantity: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.boxId, t.denomination] }), check("daily_cash_counts_quantity_positive", sql`${t.quantity} > 0`)],
 );

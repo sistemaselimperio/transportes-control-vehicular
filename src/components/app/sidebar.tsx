@@ -3,6 +3,7 @@
 import {
   Bell,
   Banknote,
+  Calculator,
   HardHat,
   Hourglass,
   Building2,
@@ -31,7 +32,7 @@ import { BrandMark } from "@/components/app/brand-mark";
 import { SlideOver } from "@/components/app/slide-over";
 import { ThemePicker } from "@/components/app/theme-picker";
 import { authClient } from "@/lib/auth-client";
-import { canUseCoteroPayments, canUsePettyCash, canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
+import { canUseCoteroPayments, canUseDailyCash, canUsePettyCash, canViewSection, sectionOfPath, type Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { ExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 import { parseGroupParam, type OwnerGroup } from "@/modules/dashboard/domain/dashboard-metrics";
@@ -46,12 +47,16 @@ type NavItem = {
   requiresPettyCash?: boolean;
   /** Same for the cotero payments flag. */
   requiresCoteroPayments?: boolean;
+  /** Same for the daily cash flag. */
+  requiresDailyCash?: boolean;
   /** Same for the enturnamientos flags (either one). */
   requiresTurns?: boolean;
 };
 
 const PETTY_CASH_PATH = "/caja";
 const COTERO_PAYMENTS_PATH = "/pagos-coteros";
+// Not /caja-menor: next.config.ts permanently redirects that old path to the petty-cash /caja.
+const DAILY_CASH_PATH = "/caja-diaria";
 const TURNS_PATH = "/enturnamientos";
 /** Enturnamientos is hidden from the menu for everyone until rollout; flag holders still reach it by URL. */
 const SHOW_TURNS_IN_NAV = false;
@@ -79,6 +84,7 @@ const SECTIONS: ReadonlyArray<NavGroup> = [
       { href: "/ventas", label: "Ventas", icon: Receipt },
       { href: PETTY_CASH_PATH, label: "Caja", icon: Banknote, requiresPettyCash: true },
       { href: COTERO_PAYMENTS_PATH, label: "Pagos a coteros", icon: HardHat, requiresCoteroPayments: true },
+      { href: DAILY_CASH_PATH, label: "Caja menor", icon: Calculator, requiresDailyCash: true },
     ],
   },
   {
@@ -100,10 +106,11 @@ const SECTIONS: ReadonlyArray<NavGroup> = [
  * Whether the user can open at least one entry of the group. A group with no open entry is hidden
  * whole, so a role never sees a block of locked items from another domain.
  */
-function groupVisible(group: NavGroup, role: Role, hasPettyCash: boolean, hasCoteroPayments: boolean, hasTurns: boolean): boolean {
+function groupVisible(group: NavGroup, role: Role, hasPettyCash: boolean, hasCoteroPayments: boolean, hasDailyCash: boolean, hasTurns: boolean): boolean {
   return group.items.some((item) => {
     if (item.requiresPettyCash) return canUsePettyCash(hasPettyCash);
     if (item.requiresCoteroPayments) return canUseCoteroPayments(hasCoteroPayments);
+    if (item.requiresDailyCash) return canUseDailyCash(hasDailyCash);
     if (item.requiresTurns) return SHOW_TURNS_IN_NAV && hasTurns;
     const target = sectionOfPath(item.href);
     return target !== null && canViewSection(role, target);
@@ -128,6 +135,7 @@ interface BodyProps {
   role: Role;
   hasPettyCash: boolean;
   hasCoteroPayments: boolean;
+  hasDailyCash: boolean;
   hasTurns: boolean;
   grupo: OwnerGroup | null;
   /** Query string of the current page, kept when only the group changes. */
@@ -152,7 +160,7 @@ function groupHref(pathname: string, currentQuery: string, value: OwnerGroup | n
   return qs ? `${path}?${qs}` : path;
 }
 
-function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, hasTurns, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
+function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, hasDailyCash, hasTurns, grupo, currentQuery, userName, expiredVehicles, onNavigate }: BodyProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {
@@ -173,15 +181,15 @@ function SidebarBody({ pathname, role, hasPettyCash, hasCoteroPayments, hasTurns
   return (
     <>
       <nav aria-label="Principal" className="flex flex-col gap-1 p-3 md:gap-0.5 md:py-2">
-        {SECTIONS.filter((section) => groupVisible(section, role, hasPettyCash, hasCoteroPayments, hasTurns)).map((section) => (
+        {SECTIONS.filter((section) => groupVisible(section, role, hasPettyCash, hasCoteroPayments, hasDailyCash, hasTurns)).map((section) => (
           <div key={section.label} className="flex flex-col gap-1 not-first:mt-3 md:gap-0.5 md:not-first:mt-2">
             <span className="micro-label px-3 pt-1 pb-2 md:pb-1.5">{section.label}</span>
-            {section.items.filter((item) => (!item.requiresPettyCash || canUsePettyCash(hasPettyCash)) && (!item.requiresCoteroPayments || canUseCoteroPayments(hasCoteroPayments)) && (!item.requiresTurns || (SHOW_TURNS_IN_NAV && hasTurns))).map((item) => {
+            {section.items.filter((item) => (!item.requiresPettyCash || canUsePettyCash(hasPettyCash)) && (!item.requiresCoteroPayments || canUseCoteroPayments(hasCoteroPayments)) && (!item.requiresDailyCash || canUseDailyCash(hasDailyCash)) && (!item.requiresTurns || (SHOW_TURNS_IN_NAV && hasTurns))).map((item) => {
               const target = sectionOfPath(item.href);
               const Icon = item.icon;
               // Inside a visible group, the entries the role cannot open stay in place, disabled.
               // Petty cash is not a role section: its entry only renders for users that have access.
-              if (!item.requiresPettyCash && !item.requiresCoteroPayments && !item.requiresTurns && (target == null || !canViewSection(role, target))) {
+              if (!item.requiresPettyCash && !item.requiresCoteroPayments && !item.requiresDailyCash && !item.requiresTurns && (target == null || !canViewSection(role, target))) {
                 return (
                   <div
                     key={item.href}
@@ -332,6 +340,7 @@ export function Sidebar({
   role,
   hasPettyCash,
   hasCoteroPayments,
+  hasDailyCash,
   hasTurns,
   expiredCounts,
 }: {
@@ -339,6 +348,7 @@ export function Sidebar({
   role: Role;
   hasPettyCash: boolean;
   hasCoteroPayments: boolean;
+  hasDailyCash: boolean;
   hasTurns: boolean;
   /** Only the roles that can open the alerts page get the counts. */
   expiredCounts: ExpiredVehicleCounts | null;
@@ -355,6 +365,7 @@ export function Sidebar({
     role,
     hasPettyCash,
     hasCoteroPayments,
+    hasDailyCash,
     hasTurns,
     grupo,
     currentQuery,

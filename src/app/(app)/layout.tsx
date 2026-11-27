@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/app/sidebar";
-import { canUseCoteroPayments, canUsePettyCash, canUseTurns, canViewSection, parseRole, receivesParkedTripAlerts } from "@/lib/permissions";
+import { canUseCoteroPayments, canUseDailyCash, canUsePettyCash, canUseTurns, canViewSection, parseRole, receivesParkedTripAlerts } from "@/lib/permissions";
 import { getRequestSession } from "@/lib/session";
 import { getExpiredVehicleCounts, getParkedTripWarnings } from "@/modules/dashboard/application/dashboard-queries";
 import { addParkedTripCounts } from "@/modules/dashboard/domain/parked-trips";
@@ -87,7 +87,7 @@ async function SessionSidebar() {
     expired && receivesParkedTripAlerts(session.user.receivesParkedTripAlerts)
       ? addParkedTripCounts(expired, await getParkedTripWarnings())
       : expired;
-  return <Sidebar userName={session.user.name} role={role} hasPettyCash={canUsePettyCash(session.user.hasPettyCash)} hasCoteroPayments={canUseCoteroPayments(session.user.hasCoteroPayments)} hasTurns={canUseTurns(session.user.canAdminTurns, session.user.canEnturn)} expiredCounts={expiredCounts} />;
+  return <Sidebar userName={session.user.name} role={role} hasPettyCash={canUsePettyCash(session.user.hasPettyCash)} hasCoteroPayments={canUseCoteroPayments(session.user.hasCoteroPayments)} hasDailyCash={canUseDailyCash(session.user.hasDailyCash)} hasTurns={canUseTurns(session.user.canAdminTurns, session.user.canEnturn)} expiredCounts={expiredCounts} />;
 }
 
 /** Renders the page only once the session is confirmed; the proxy alone just checks the cookie. */

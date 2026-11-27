@@ -1,0 +1,1 @@
+DROP TABLE "transportes"."daily_cash_counts" CASCADE;

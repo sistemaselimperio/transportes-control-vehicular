@@ -14,6 +14,7 @@ import {
   canAdminTurns,
   canEnturn,
   canUseCoteroPayments,
+  canUseDailyCash,
   canUseTurns,
   canUsePettyCash,
   canViewSection,
@@ -328,6 +329,20 @@ describe("canUsePettyCash", () => {
     expect(canUsePettyCash(null)).toBe(false);
     expect(canUsePettyCash("true")).toBe(false);
     expect(canUsePettyCash(1)).toBe(false);
+  });
+});
+
+describe("canUseDailyCash", () => {
+  it("is only for users flagged for it", () => {
+    expect(canUseDailyCash(true)).toBe(true);
+    expect(canUseDailyCash(false)).toBe(false);
+  });
+
+  it("is closed for anything that is not exactly true", () => {
+    expect(canUseDailyCash(undefined)).toBe(false);
+    expect(canUseDailyCash(null)).toBe(false);
+    expect(canUseDailyCash("true")).toBe(false);
+    expect(canUseDailyCash(1)).toBe(false);
   });
 });
 
