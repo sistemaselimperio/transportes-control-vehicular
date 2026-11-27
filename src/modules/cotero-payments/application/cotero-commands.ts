@@ -73,8 +73,8 @@ export interface CoteroPorts {
   loadFleet(): Promise<FleetCandidates>;
   /** Which of `numbers` are already stored, ignoring receipt `exceptId`. */
   findExistingNumbers(numbers: string[], exceptId?: number): Promise<string[]>;
-  /** All or nothing. */
-  insertReceipts(userId: string, rows: NewReceipt[]): Promise<void>;
+  /** All or nothing. Returns the new ids, in the order of `rows`. */
+  insertReceipts(userId: string, rows: NewReceipt[]): Promise<number[]>;
   findReceipt(id: number): Promise<{ id: number; status: ReceiptStatus; filePath: string | null; pageNumber: number | null } | null>;
   updateReceipt(id: number, row: NewReceipt): Promise<void>;
   deleteReceipt(id: number): Promise<void>;
@@ -86,7 +86,7 @@ export interface CoteroPorts {
    * In one transaction: takes the next number, stores the settlement and marks its receipts settled.
    * Null (nothing stored) when one of them stopped being pending meanwhile.
    */
-  createSettlement(userId: string, settlement: NewSettlement): Promise<{ number: number } | null>;
+  createSettlement(userId: string, settlement: NewSettlement): Promise<{ id: number; number: number } | null>;
   findSettlement(id: number): Promise<{ id: number; status: SettlementStatus } | null>;
   /** Open to annulled, receipts back to pending. False (nothing changed) when it was not open. */
   annulSettlement(id: number): Promise<boolean>;
@@ -146,8 +146,8 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
   });
 
   return {
-    /** Validates the whole batch first; stores all of it or none. Returns how many were stored. */
-    async createReceipts(userId: string, items: readonly ReceiptBatchItem[]): Promise<number> {
+    /** Validates the whole batch first; stores all of it or none. Returns how many were stored and their ids. */
+    async createReceipts(userId: string, items: readonly ReceiptBatchItem[]): Promise<{ count: number; ids: number[] }> {
       const parsed = items.map((item, i) => parseOrThrow(item, `Recibo ${i + 1}`));
       const fleet = await ports.loadFleet();
       const valuesList = parsed.map((values, i) => withFleet(values, fleet, `Recibo ${i + 1}`));
@@ -158,11 +158,11 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
       if (existing !== undefined) throw new CoteroError(alreadyRegistered(existing));
 
       const tariffs = await ports.listTariffs();
-      await ports.insertReceipts(
+      const ids = await ports.insertReceipts(
         userId,
         valuesList.map((values, i) => toNewReceipt(values, tariffs, { filePath: items[i].filePath, pageNumber: items[i].pageNumber })),
       );
-      return items.length;
+      return { count: items.length, ids };
     },
 
     /** Only a pending receipt; its file and page stay. The tariff snapshot is taken again for its (new) date. */
@@ -193,7 +193,7 @@ export function createCoteroCommands(ports: CoteroPorts, storage: CoteroStorage)
     },
 
     /** Settles the chosen pending receipts of one cotero; remembers the cotero's cédula and payment details. */
-    async createSettlement(userId: string, input: SettlementInput & { today: string }): Promise<{ number: number }> {
+    async createSettlement(userId: string, input: SettlementInput & { today: string }): Promise<{ id: number; number: number }> {
       const receipts = await ports.findReceiptsForSettlement(input.receiptIds);
       if (receipts.length !== input.receiptIds.length) throw new CoteroError(RECEIPT_GONE);
       assertCanSettle(receipts.map((r) => r.status));

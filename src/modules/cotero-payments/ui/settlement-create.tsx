@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActionForm, Field } from "@/components/app/action-form";
 import { SlideOver } from "@/components/app/slide-over";
 import { Input } from "@/components/ui/input";
@@ -19,23 +19,30 @@ function Form({
   pending,
   profiles,
   presetKey,
+  presetIds,
   onDone,
   onCancel,
 }: {
   pending: readonly ReceiptRow[];
   profiles: readonly CoteroProfileRow[];
   presetKey: string | null;
-  onDone: (message: string) => void;
+  presetIds: readonly number[] | null;
+  onDone: (message: string, settlementId: number | null) => void;
   onCancel: () => void;
 }) {
   const groups = useMemo(() => groupByCotero(pending), [pending]);
+  /** The id of the settlement the last submit created, for the voucher offer. */
+  const createdId = useRef<number | null>(null);
   const profileOf = (key: string) => profiles.find((p) => p.key === key);
   const groupOf = (key: string) => groups.find((g) => g.key === key);
 
   const [coteroKey, setCoteroKey] = useState(() => (presetKey && groupOf(presetKey) ? presetKey : (groups[0]?.key ?? "")));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
+  // With preselected receipts (just saved) only those start checked; the cotero's older ones start unchecked.
+  const [only, setOnly] = useState<ReadonlySet<number> | null>(() => (presetIds ? new Set(presetIds) : null));
+  const [overrides, setOverrides] = useState<ReadonlyMap<number, boolean>>(new Map());
+  const isOn = (id: number) => overrides.get(id) ?? (only ? only.has(id) : true);
   const initialProfile = profileOf(coteroKey);
   const [document, setDocument] = useState(initialProfile?.document ?? groupOf(coteroKey)?.document ?? "");
   const [method, setMethod] = useState<PaymentMethod | "">(initialProfile?.paymentMethod ?? "");
@@ -43,23 +50,21 @@ function Form({
 
   const group = groupOf(coteroKey);
   const inRange = (group?.items ?? []).filter((r) => (!from || r.date >= from) && (!to || r.date <= to)).sort((a, b) => a.date.localeCompare(b.date));
-  const chosen = inRange.filter((r) => !unchecked.has(r.id));
+  const chosen = inRange.filter((r) => isOn(r.id));
   const totals = totalsOfReceipts(chosen);
 
   function pickCotero(key: string) {
     const profile = profileOf(key);
     setCoteroKey(key);
-    setUnchecked(new Set());
+    setOnly(null);
+    setOverrides(new Map());
     setDocument(profile?.document ?? groupOf(key)?.document ?? "");
     setMethod(profile?.paymentMethod ?? "");
     setAccount(profile?.paymentAccount ?? "");
   }
 
   function toggle(id: number, on: boolean) {
-    const next = new Set(unchecked);
-    if (on) next.delete(id);
-    else next.add(id);
-    setUnchecked(next);
+    setOverrides(new Map(overrides).set(id, on));
   }
 
   if (groups.length === 0) {
@@ -68,12 +73,20 @@ function Form({
 
   return (
     <ActionForm
-      action={() =>
-        createSettlementAction({ coteroKey, receiptIds: chosen.map((r) => r.id), document, paymentMethod: method, paymentAccount: account })
-      }
+      action={async () => {
+        const result = await createSettlementAction({
+          coteroKey,
+          receiptIds: chosen.map((r) => r.id),
+          document,
+          paymentMethod: method,
+          paymentAccount: account,
+        });
+        if (result.ok) createdId.current = result.settlementId;
+        return result;
+      }}
       submitLabel={chosen.length === 0 ? "Liquidar" : `Liquidar ${formatCop(totals.amount)}`}
       pendingLabel="Liquidando…"
-      onDone={onDone}
+      onDone={(message) => onDone(message, createdId.current)}
       onCancel={onCancel}
     >
       <Field label="Cotero" htmlFor="settle-cotero" required>
@@ -104,7 +117,7 @@ function Form({
             {inRange.map((r) => (
               <li key={r.id}>
                 <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-sm">
-                  <input type="checkbox" className="size-4 shrink-0 accent-brand" checked={!unchecked.has(r.id)} onChange={(e) => toggle(r.id, e.target.checked)} />
+                  <input type="checkbox" className="size-4 shrink-0 accent-brand" checked={isOn(r.id)} onChange={(e) => toggle(r.id, e.target.checked)} />
                   <span className="min-w-0 flex-1">
                     <span className="num font-medium">{r.receiptNumber}</span>
                     <span className="num text-muted-foreground">
@@ -157,6 +170,7 @@ export function SettlementCreate({
   receipts,
   profiles,
   presetKey,
+  presetIds,
   onDone,
 }: {
   open: boolean;
@@ -165,7 +179,10 @@ export function SettlementCreate({
   profiles: readonly CoteroProfileRow[];
   /** A cotero to start with (from the list's filter). */
   presetKey: string | null;
-  onDone: (message: string) => void;
+  /** Receipts to start checked (the ones just saved); null: all the pending ones of the cotero. */
+  presetIds: readonly number[] | null;
+  /** Called once the settlement exists, with its id so its voucher can be offered. */
+  onDone: (message: string, settlementId: number | null) => void;
 }) {
   const pending = useMemo(() => receipts.filter((r) => r.status === "pending"), [receipts]);
   return (
@@ -174,9 +191,10 @@ export function SettlementCreate({
         pending={pending}
         profiles={profiles}
         presetKey={presetKey}
+        presetIds={presetIds}
         onCancel={() => onOpenChange(false)}
-        onDone={(message) => {
-          onDone(message);
+        onDone={(message, settlementId) => {
+          onDone(message, settlementId);
           onOpenChange(false);
         }}
       />

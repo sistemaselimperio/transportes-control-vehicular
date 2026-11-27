@@ -3,6 +3,7 @@ import {
   draftIssues,
   duplicateNumbers,
   filterReceipts,
+  NO_RECEIPT_FILTERS,
   parseDraft,
   totalsOfReceipts,
   type ReceiptDraft,
@@ -211,7 +212,7 @@ describe("filterReceipts", () => {
     row({ id: 2, date: "2026-11-10", coteroKey: "name:maria", coteroName: "Maria", status: "settled" }),
     row({ id: 3, date: "2026-11-20", vehiclePlate: "XYZ987", destination: "Hacienda El Roble", status: "paid" }),
   ];
-  const all = { from: null, to: null, coteroKey: null, status: null, plate: "", destination: "" };
+  const all = NO_RECEIPT_FILTERS;
 
   it("keeps everything without filters", () => {
     expect(filterReceipts(rows, all)).toHaveLength(3);
@@ -225,6 +226,17 @@ describe("filterReceipts", () => {
   it("filters by cotero key and by status", () => {
     expect(filterReceipts(rows, { ...all, coteroKey: "name:maria" }).map((r) => r.id)).toEqual([2]);
     expect(filterReceipts(rows, { ...all, status: "paid" }).map((r) => r.id)).toEqual([3]);
+  });
+
+  it("searches by cotero name or cédula ignoring accents and case", () => {
+    const people = [
+      row({ id: 1, coteroName: "José Pérez", coteroDocument: "1056507092" }),
+      row({ id: 2, coteroKey: "name:maria", coteroName: "Maria", coteroDocument: null }),
+    ];
+    expect(filterReceipts(people, { ...all, search: "jose perez" }).map((r) => r.id)).toEqual([1]);
+    expect(filterReceipts(people, { ...all, search: "1056507" }).map((r) => r.id)).toEqual([1]);
+    expect(filterReceipts(people, { ...all, search: "MARIA" }).map((r) => r.id)).toEqual([2]);
+    expect(filterReceipts(people, { ...all, search: "   " })).toHaveLength(2);
   });
 
   it("filters by plate ignoring the hyphen and the case", () => {

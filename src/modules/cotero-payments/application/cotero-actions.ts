@@ -114,12 +114,17 @@ export async function checkReceiptNumbersAction(numbers: unknown): Promise<Check
   }
 }
 
-/** Saves the reviewed batch: the server validates everything again; all the receipts or none. */
-export async function createReceiptsAction(batch: unknown): Promise<ActionResult> {
-  return run(async (userId) => {
-    const count = await commands.createReceipts(userId, receiptBatchSchema.parse(batch));
-    return count === 1 ? "Recibo guardado." : `${count} recibos guardados.`;
+export type CreateReceiptsResult = { ok: true; message: string; ids: number[] } | { ok: false; error: string };
+
+/** Saves the reviewed batch: the server validates everything again; all the receipts or none. Returns the new ids. */
+export async function createReceiptsAction(batch: unknown): Promise<CreateReceiptsResult> {
+  let ids: number[] = [];
+  const result = await run(async (userId) => {
+    const created = await commands.createReceipts(userId, receiptBatchSchema.parse(batch));
+    ids = created.ids;
+    return created.count === 1 ? "Recibo guardado." : `${created.count} recibos guardados.`;
   });
+  return result.ok ? { ...result, ids } : result;
 }
 
 /** Removes uploaded files whose review was cancelled, unless a receipt or a settlement already uses them. */
@@ -157,11 +162,17 @@ export async function createTariffAction(fd: FormData): Promise<ActionResult> {
   });
 }
 
-export async function createSettlementAction(input: unknown): Promise<ActionResult> {
-  return run(async (userId) => {
-    const { number } = await commands.createSettlement(userId, { ...settlementSchema.parse(input), today: todayInBogota() });
-    return `Liquidación ${number} creada.`;
+export type CreateSettlementResult = { ok: true; message: string; settlementId: number } | { ok: false; error: string };
+
+/** Settles the chosen receipts. Returns the new settlement's id so its voucher can be printed right away. */
+export async function createSettlementAction(input: unknown): Promise<CreateSettlementResult> {
+  let settlementId = 0;
+  const result = await run(async (userId) => {
+    const created = await commands.createSettlement(userId, { ...settlementSchema.parse(input), today: todayInBogota() });
+    settlementId = created.id;
+    return `Liquidación ${created.number} creada.`;
   });
+  return result.ok ? { ...result, settlementId } : result;
 }
 
 export async function annulSettlementAction(id: number): Promise<ActionResult> {

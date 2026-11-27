@@ -181,7 +181,11 @@ export const coteroRepository: CoteroPorts = {
 
   async insertReceipts(userId, rows) {
     // One statement: all the receipts or none.
-    await db.insert(receipts).values(rows.map((r) => ({ ...toColumns(r), filePath: r.filePath, pageNumber: r.pageNumber, createdBy: userId })));
+    const created = await db
+      .insert(receipts)
+      .values(rows.map((r) => ({ ...toColumns(r), filePath: r.filePath, pageNumber: r.pageNumber, createdBy: userId })))
+      .returning({ id: receipts.id });
+    return created.map((r) => r.id);
   },
 
   async findReceipt(id) {
@@ -277,7 +281,7 @@ export const coteroRepository: CoteroPorts = {
           .where(and(inArray(receipts.id, settlement.receiptIds), eq(receipts.status, "pending")))
           .returning({ id: receipts.id });
         if (taken.length !== settlement.receiptIds.length) throw new ReceiptsNotPending();
-        return { number: created.number };
+        return { id: created.id, number: created.number };
       });
     } catch (e) {
       if (e instanceof ReceiptsNotPending) return null;

@@ -95,7 +95,7 @@ export const DRAFT_FIELD_LABELS: Record<DraftField, string> = {
   amount: "Liquidación",
 };
 
-const isRealIsoDate = (value: string) => {
+export const isRealIsoDate =(value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
@@ -243,13 +243,16 @@ export function draftIssues(
 export interface ReceiptFilters {
   from: string | null;
   to: string | null;
+  /** One exact cotero (the "Ver liquidaciones" shortcut); the list itself searches with `search`. */
   coteroKey: string | null;
+  /** Free text matched against the cotero's name and cédula. */
+  search: string;
   status: ReceiptStatus | null;
   plate: string;
   destination: string;
 }
 
-export const NO_RECEIPT_FILTERS: ReceiptFilters = { from: null, to: null, coteroKey: null, status: null, plate: "", destination: "" };
+export const NO_RECEIPT_FILTERS: ReceiptFilters = { from: null, to: null, coteroKey: null, search: "", status: null, plate: "", destination: "" };
 
 export function filterReceipts(rows: readonly ReceiptRow[], filters: ReceiptFilters): ReceiptRow[] {
   const plate = normalizeVehiclePlate(filters.plate);
@@ -257,6 +260,7 @@ export function filterReceipts(rows: readonly ReceiptRow[], filters: ReceiptFilt
     if (filters.from && r.date < filters.from) return false;
     if (filters.to && r.date > filters.to) return false;
     if (filters.coteroKey && r.coteroKey !== filters.coteroKey) return false;
+    if (filters.search.trim() !== "" && !matchesQuery([r.coteroName, r.coteroDocument], filters.search)) return false;
     if (filters.status && r.status !== filters.status) return false;
     if (plate !== "" && !r.vehiclePlate.includes(plate) && !(r.trailerPlate ?? "").includes(plate)) return false;
     if (filters.destination.trim() !== "" && !matchesQuery([r.destination], filters.destination)) return false;

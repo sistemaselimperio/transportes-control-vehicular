@@ -6,6 +6,7 @@ import { formatVehiclePlate } from "../domain/plates";
 import { totalsOfReceipts, type ReceiptRow } from "../domain/receipt-rules";
 import type { SettlementRow } from "../domain/settlement-rows";
 import { PAYMENT_METHOD_LABELS, RECEIPT_STATUS_LABELS } from "../domain/settlement-rules";
+import { formatVoucherDocument } from "../domain/settlement-voucher";
 import { settlementSheetLines } from "../domain/sheet-format";
 
 const PESOS = '"$"#,##0';
@@ -17,8 +18,7 @@ async function toBuffer(workbook: ExcelJS.Workbook): Promise<Buffer> {
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-/** A cédula with dot grouping: "1.056.507.092". */
-const formatDocument = (document: string) => document.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const formatDocument = formatVoucherDocument;
 
 /**
  * The settlement receipt a cotero gets: "LIQUIDACIÓN DE CARGUE Y DESCARGUE" with one line per receipt

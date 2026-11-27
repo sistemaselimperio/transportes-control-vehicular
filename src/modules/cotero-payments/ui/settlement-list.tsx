@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Banknote, Download, Paperclip, Undo2 } from "lucide-react";
+import { AlertTriangle, Banknote, Download, Paperclip, Printer, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ActionForm } from "@/components/app/action-form";
 import { SlideOver } from "@/components/app/slide-over";
@@ -90,6 +90,17 @@ export function SettlementList({
                     >
                       <Download className="size-4" aria-hidden />
                       Excel
+                    </a>
+                  )}
+                  {s.status !== "annulled" && (
+                    <a
+                      href={`/pagos-coteros/liquidaciones/${s.id}/imprimir`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm text-brand outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/70 md:h-9"
+                    >
+                      <Printer className="size-4" aria-hidden />
+                      Imprimir comprobante
                     </a>
                   )}
                   {s.hasProof && (

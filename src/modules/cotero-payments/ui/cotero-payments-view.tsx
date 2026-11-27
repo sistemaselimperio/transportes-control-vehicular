@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, HandCoins } from "lucide-react";
+import { Download, HandCoins, Printer, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FlashMessage, useFlashMessage } from "@/components/app/flash-message";
 import { PageHeader } from "@/components/app/page-header";
@@ -15,15 +15,17 @@ import { ConfirmDeleteDialog } from "@/modules/petty-cash/ui/confirm-delete-dial
 import { formatDecimal } from "@/modules/shared/domain/decimal";
 import { deleteReceiptAction } from "../application/cotero-actions";
 import { receiptFiltersToParams } from "../application/export-filters";
-import { groupByCotero } from "../domain/cotero-identity";
+import { summarizeCoteros } from "../domain/cotero-summary";
 import type { FleetCandidates } from "../domain/fleet-matching";
+import { filterSettlements } from "../domain/settlement-filter";
 import { filterReceipts, NO_RECEIPT_FILTERS, totalsOfReceipts, type ReceiptFilters, type ReceiptRow } from "../domain/receipt-rules";
 import type { CoteroProfileRow, SettlementRow, TariffRow } from "../domain/settlement-rows";
 import { RECEIPT_STATUS_LABELS, type ReceiptStatus } from "../domain/settlement-rules";
+import { CoteroList } from "./cotero-list";
+import { CoteroPanel } from "./cotero-panel";
 import { formatCop } from "./format";
 import { ReceiptEdit } from "./receipt-edit";
 import { ReceiptImport } from "./receipt-import";
-import { ReceiptList } from "./receipt-list";
 import { SettlementCreate } from "./settlement-create";
 import { SettlementList } from "./settlement-list";
 import { SettlementPay } from "./settlement-pay";
@@ -59,23 +61,35 @@ export function CoteroPaymentsView({
 }) {
   const [tab, setTab] = useState<Tab>("recibos");
   const [filters, setFilters] = useState<ReceiptFilters>(NO_RECEIPT_FILTERS);
+  /** The cotero whose receipts are open in the side panel. */
+  const [openCotero, setOpenCotero] = useState<string | null>(null);
   const [editing, setEditing] = useState<ReceiptRow | undefined>();
   const [deleting, setDeleting] = useState<ReceiptRow | undefined>();
   const [settleOpen, setSettleOpen] = useState(false);
   const [paying, setPaying] = useState<SettlementRow | undefined>();
   const [settlementCotero, setSettlementCotero] = useState<string | null>(null);
+  const [settlementIds, setSettlementIds] = useState<readonly number[] | null>(null);
+  /** The settlement just created, whose voucher is offered for printing. */
+  const [voucherOffer, setVoucherOffer] = useState<{ id: number; message: string } | null>(null);
   const { message, flash } = useFlashMessage();
   const fleetControl = useFleet(fleet);
 
   const shown = useMemo(() => filterReceipts(receipts, filters), [receipts, filters]);
   const totals = useMemo(() => totalsOfReceipts(shown), [shown]);
-  const coteros = useMemo(() => groupByCotero(receipts), [receipts]);
+  const coteros = useMemo(() => summarizeCoteros(shown), [shown]);
+  const openSummary = useMemo(() => coteros.find((c) => c.key === openCotero), [coteros, openCotero]);
   const names = useMemo(() => [...new Set([...profiles.map((p) => p.name), ...receipts.map((r) => r.coteroName)])].sort((a, b) => a.localeCompare(b, "es")), [profiles, receipts]);
   const pendingCount = useMemo(() => receipts.filter((r) => r.status === "pending").length, [receipts]);
-  const shownSettlements = useMemo(
-    () => (filters.coteroKey ? settlements.filter((s) => s.coteroKey === filters.coteroKey) : settlements),
-    [settlements, filters.coteroKey],
-  );
+  const shownSettlements = useMemo(() => filterSettlements(settlements, filters), [settlements, filters]);
+  const chipName = useMemo(() => {
+    if (!filters.coteroKey) return null;
+    return (
+      profiles.find((p) => p.key === filters.coteroKey)?.name ??
+      settlements.find((s) => s.coteroKey === filters.coteroKey)?.coteroName ??
+      receipts.find((r) => r.coteroKey === filters.coteroKey)?.coteroName ??
+      "Cotero"
+    );
+  }, [filters.coteroKey, profiles, settlements, receipts]);
 
   const set = <K extends keyof ReceiptFilters>(key: K, value: ReceiptFilters[K]) => setFilters((f) => ({ ...f, [key]: value }));
   const filtered = JSON.stringify(filters) !== JSON.stringify(NO_RECEIPT_FILTERS);
@@ -88,12 +102,24 @@ export function CoteroPaymentsView({
         description="Recibos de caja menor de los coteros, liquidaciones y pagos."
         actions={
           <>
-            <ReceiptImport tariffs={tariffs} today={today} fleet={fleetControl} onDone={flash} />
+            <ReceiptImport
+              tariffs={tariffs}
+              profiles={profiles}
+              today={today}
+              fleet={fleetControl}
+              onDone={flash}
+              onSettle={(coteroKey, ids) => {
+                setSettlementCotero(coteroKey);
+                setSettlementIds(ids);
+                setSettleOpen(true);
+              }}
+            />
             <Button
               variant="outline"
               className="h-11 px-4 md:h-10"
               onClick={() => {
                 setSettlementCotero(filters.coteroKey);
+                setSettlementIds(null);
                 setSettleOpen(true);
               }}
               disabled={pendingCount === 0}
@@ -105,6 +131,26 @@ export function CoteroPaymentsView({
           </>
         }
       />
+
+      {voucherOffer && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3">
+          <p className="text-sm font-medium">{voucherOffer.message} Imprime el comprobante para que el cotero lo firme.</p>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/pagos-coteros/liquidaciones/${voucherOffer.id}/imprimir`}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants(), "h-11 px-4 md:h-10")}
+            >
+              <Printer aria-hidden />
+              Imprimir comprobante
+            </a>
+            <Button variant="ghost" className="h-11 px-3 md:h-10" onClick={() => setVoucherOffer(null)}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Suggestions for the cotero name field of the receipt forms. */}
       <datalist id="cotero-names">
@@ -142,17 +188,18 @@ export function CoteroPaymentsView({
               <Input id="cotero-to" type="date" className={FILTER_CONTROL} value={filters.to ?? ""} min={filters.from ?? undefined} onChange={(e) => set("to", e.target.value || null)} />
             </div>
             <div>
-              <Label htmlFor="cotero-filter" className="mb-1 block text-xs text-muted-foreground">
+              <Label htmlFor="cotero-search" className="mb-1 block text-xs text-muted-foreground">
                 Cotero
               </Label>
-              <NativeSelect id="cotero-filter" className={FILTER_CONTROL} value={filters.coteroKey ?? ""} onChange={(e) => set("coteroKey", e.target.value || null)}>
-                <option value="">Todos</option>
-                {coteros.map((g) => (
-                  <option key={g.key} value={g.key}>
-                    {g.name}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Input
+                id="cotero-search"
+                type="search"
+                className={FILTER_CONTROL}
+                placeholder="Nombre o cédula"
+                autoComplete="off"
+                value={filters.search}
+                onChange={(e) => set("search", e.target.value)}
+              />
             </div>
             {tab === "recibos" && (
               <>
@@ -191,6 +238,20 @@ export function CoteroPaymentsView({
           </div>
         )}
 
+        {tab !== "tarifas" && chipName !== null && (
+          <div>
+            <button
+              type="button"
+              onClick={() => set("coteroKey", null)}
+              className="inline-flex h-11 items-center gap-2 rounded-full border bg-card px-4 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/70 md:h-9"
+              aria-label={`Quitar el filtro de cotero ${chipName}`}
+            >
+              Cotero: {chipName}
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+        )}
+
         {tab === "recibos" && (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -202,13 +263,13 @@ export function CoteroPaymentsView({
                 Exportar Excel
               </a>
             </div>
-            <ReceiptList rows={shown} onEdit={setEditing} onDelete={setDeleting} />
+            <CoteroList coteros={coteros} onOpen={setOpenCotero} />
           </>
         )}
 
         {tab === "liquidaciones" && (
           <SettlementList
-            rows={shownSettlements.filter((s) => (!filters.from || s.date >= filters.from) && (!filters.to || s.date <= filters.to))}
+            rows={shownSettlements}
             receipts={receipts}
             onPay={setPaying}
             onDone={flash}
@@ -219,6 +280,18 @@ export function CoteroPaymentsView({
       </div>
 
       <FlashMessage message={message} />
+
+      <CoteroPanel
+        cotero={openSummary}
+        onClose={() => setOpenCotero(null)}
+        onEdit={setEditing}
+        onDelete={setDeleting}
+        onSettlements={(c) => {
+          setFilters((f) => ({ ...f, coteroKey: c.key }));
+          setOpenCotero(null);
+          setTab("liquidaciones");
+        }}
+      />
 
       <ReceiptEdit row={editing} fleet={fleetControl} onClose={() => setEditing(undefined)} onDone={flash} />
 
@@ -238,8 +311,10 @@ export function CoteroPaymentsView({
         receipts={receipts}
         profiles={profiles}
         presetKey={settlementCotero}
-        onDone={(created) => {
+        presetIds={settlementIds}
+        onDone={(created, settlementId) => {
           flash(created);
+          setVoucherOffer(settlementId === null ? null : { id: settlementId, message: created });
           setTab("liquidaciones");
         }}
       />

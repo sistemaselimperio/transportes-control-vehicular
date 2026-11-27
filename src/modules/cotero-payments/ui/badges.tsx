@@ -1,4 +1,4 @@
-import { AlertTriangle, Copy, SpellCheck } from "lucide-react";
+import { AlertTriangle, Copy, SpellCheck, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   RECEIPT_STATUS_LABELS,
@@ -54,6 +54,16 @@ export function DuplicateBadge({ where }: { where: "database" | "batch" }) {
     <span className={cn(BADGE, "bg-danger text-danger-foreground")}>
       <Copy className="size-3" aria-hidden />
       {where === "database" ? "Ya está registrado" : "Repetido en esta lista"}
+    </span>
+  );
+}
+
+/** The cédula of an import belongs to a cotero already registered. */
+export function KnownCoteroBadge() {
+  return (
+    <span className={cn(BADGE, "bg-ok text-ok-foreground")}>
+      <UserCheck className="size-3" aria-hidden />
+      Cotero conocido
     </span>
   );
 }

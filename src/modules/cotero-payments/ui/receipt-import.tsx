@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUp, Loader2, PencilLine, X } from "lucide-react";
+import { FileUp, HandCoins, Loader2, PencilLine, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/modules/documents/domain/vehicle-file-rules";
@@ -11,9 +11,18 @@ import {
   discardUploadsAction,
   prepareUploadsAction,
 } from "../application/cotero-actions";
+import { canonicalName, coteroKey } from "../domain/cotero-identity";
 import { normalizeReceiptNumber } from "../domain/receipt-number";
 import { applyFleetMatch, matchReceiptFleet, type FleetCandidates } from "../domain/fleet-matching";
+import {
+  applyImportCotero,
+  EMPTY_IMPORT_COTERO,
+  findProfileByDocument,
+  resolveImportCotero,
+  type ImportCotero,
+} from "../domain/import-cotero";
 import { emptyDraft, type ReceiptDraft } from "../domain/receipt-rules";
+import type { CoteroProfileRow } from "../domain/settlement-rows";
 import type { Tariff } from "../domain/tariff";
 import { reloadIfStaleDeployment } from "@/lib/stale-deployment";
 import { renderForReading } from "./page-renditions";
@@ -54,20 +63,28 @@ const revoke = (items: readonly ReviewItem[]) => items.forEach((i) => i.preview 
 /**
  * "Leer recibos" and "Agregar a mano": photos or PDFs are stored (one shrunk copy) and read by the AI
  * from a separate sharp rendition of each page; the result opens in the review screen. Nothing is saved
- * until the reviewer confirms there.
+ * until the reviewer confirms there. One import is one cotero, whatever the number of files: the review
+ * has a single cotero header that is forced onto every receipt. After saving, the reviewer may go on to
+ * settle exactly those receipts (never done on its own).
  */
 export function ReceiptImport({
   tariffs,
+  profiles,
   today,
   fleet,
   onDone,
+  onSettle,
 }: {
   tariffs: readonly Tariff[];
+  /** The registered coteros: a cédula that belongs to one brings its stored name. */
+  profiles: readonly CoteroProfileRow[];
   /** The active fleet the plates and the driver of each receipt are matched against. */
   fleet: FleetControl;
   /** Colombia's current day: the date a receipt typed by hand starts with. */
   today: string;
   onDone: (message: string) => void;
+  /** Opens the settlement of `coteroKey` with only `receiptIds` (the ones just saved) selected. */
+  onSettle: (coteroKey: string, receiptIds: readonly number[]) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const keys = useRef(0);
@@ -77,6 +94,9 @@ export function ReceiptImport({
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<string[]>([]);
   const [existing, setExisting] = useState<ReadonlySet<string>>(new Set());
+  const [cotero, setCotero] = useState<ImportCotero>(EMPTY_IMPORT_COTERO);
+  /** The receipts just saved, offered for settlement until dismissed. */
+  const [saved, setSaved] = useState<{ coteroKey: string; ids: number[]; name: string } | null>(null);
   // The latest items for handlers and the unmount cleanup, which must not close over stale state.
   const itemsRef = useRef(items);
   useEffect(() => {
@@ -119,11 +139,14 @@ export function ReceiptImport({
     setItems([]);
     setNotes([]);
     setExisting(new Set());
+    setCotero(EMPTY_IMPORT_COTERO);
     setOpen(false);
   }
 
   function startManual() {
     setError(null);
+    setSaved(null);
+    setCotero(EMPTY_IMPORT_COTERO);
     revoke(itemsRef.current);
     uploadedRef.current = [];
     setItems([{ key: nextKey(), draft: emptyDraft(today), filePath: null, pageNumber: null, preview: null, source: "A mano", corrected: {} }]);
@@ -134,6 +157,7 @@ export function ReceiptImport({
 
   async function readFiles(files: File[]) {
     setError(null);
+    setSaved(null);
     const found: ReviewItem[] = [];
     const problems: string[] = [];
     const uploaded: string[] = [];
@@ -232,6 +256,9 @@ export function ReceiptImport({
       setItems(found.map((item) => withFleetMatch(item, fleetRef.current)));
       setNotes(problems);
       setExisting(new Set());
+      // The cotero of the whole import comes from what was read, in file, page and receipt order.
+      const resolved = resolveImportCotero(found.map((i) => i.draft), profiles);
+      setCotero({ name: resolved.name, document: resolved.document });
       setOpen(true);
       await refreshExisting(found.map((i) => i.draft));
     } catch (e) {
@@ -255,11 +282,14 @@ export function ReceiptImport({
 
   async function save(): Promise<string | null> {
     const result = await createReceiptsAction(
-      itemsRef.current.map((i) => ({ ...i.draft, filePath: i.filePath, pageNumber: i.pageNumber })),
+      itemsRef.current.map((i) => ({ ...applyImportCotero(i.draft, cotero), filePath: i.filePath, pageNumber: i.pageNumber })),
     );
     if (!result.ok) return result.error;
+    const name = canonicalName(cotero.name);
+    const key = coteroKey({ name, document: cotero.document });
     close(true);
     onDone(result.message);
+    if (key !== null && result.ids.length > 0) setSaved({ coteroKey: key, ids: result.ids, name });
     return null;
   }
 
@@ -318,6 +348,31 @@ export function ReceiptImport({
         </p>
       )}
 
+      {saved && (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm shadow-soft"
+        >
+          <span className="min-w-0 flex-1">
+            {saved.ids.length === 1 ? "1 recibo guardado" : `${saved.ids.length} recibos guardados`} de {saved.name}.
+          </span>
+          <Button
+            type="button"
+            className="h-11 shrink-0 px-3 md:h-9"
+            onClick={() => {
+              onSettle(saved.coteroKey, saved.ids);
+              setSaved(null);
+            }}
+          >
+            <HandCoins aria-hidden />
+            Liquidar estos recibos
+          </Button>
+          <button type="button" aria-label="Cerrar aviso" className="-m-2 flex size-11 shrink-0 items-center justify-center" onClick={() => setSaved(null)}>
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+      )}
+
       <ReceiptReview
         open={open}
         items={items}
@@ -325,6 +380,9 @@ export function ReceiptImport({
         tariffs={tariffs}
         fleet={reviewFleet}
         notes={notes}
+        cotero={cotero}
+        coteroKnown={findProfileByDocument(cotero.document, profiles) !== null}
+        onCoteroChange={setCotero}
         onChange={setItems}
         onAddManual={() =>
           setItems((current) => [...current, { key: nextKey(), draft: emptyDraft(today), filePath: null, pageNumber: null, preview: null, source: "A mano", corrected: {} }])

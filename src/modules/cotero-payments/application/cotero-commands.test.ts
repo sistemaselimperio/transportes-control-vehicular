@@ -48,7 +48,7 @@ function ports(over: Partial<CoteroPorts> = {}): CoteroPorts {
     loadFleet: vi.fn(async () => FLEET),
     listTariffs: vi.fn(async () => [{ validFrom: "2026-01-01", pricePerTon: 9800 }]),
     findExistingNumbers: vi.fn(async () => [] as string[]),
-    insertReceipts: vi.fn(async () => undefined),
+    insertReceipts: vi.fn(async (_userId: string, rows: unknown[]) => rows.map((_, i) => 100 + i)),
     findReceipt: vi.fn(async () => ({ id: 5, status: "pending" as const, filePath: `recibos/2026/11/${UUID}.jpg` as string | null, pageNumber: 2 as number | null })),
     updateReceipt: vi.fn(async () => undefined),
     deleteReceipt: vi.fn(async () => undefined),
@@ -56,7 +56,7 @@ function ports(over: Partial<CoteroPorts> = {}): CoteroPorts {
     insertTariff: vi.fn(async () => undefined),
     findReceiptsForSettlement: vi.fn(async () => [candidate({ id: 1 }), candidate({ id: 2, amount: 50000 })]),
     upsertProfile: vi.fn(async () => undefined),
-    createSettlement: vi.fn(async () => ({ number: 7 }) as { number: number } | null),
+    createSettlement: vi.fn(async () => ({ id: 70, number: 7 }) as { id: number; number: number } | null),
     findSettlement: vi.fn(async () => ({ id: 3, status: "open" as const })),
     annulSettlement: vi.fn(async () => true),
     paySettlement: vi.fn(async () => true),
@@ -69,8 +69,8 @@ const storage = (): CoteroStorage => ({ remove: vi.fn(async () => undefined) });
 describe("createReceipts", () => {
   it("stores normalized receipts with the tariff snapshot", async () => {
     const p = ports();
-    const count = await createCoteroCommands(p, storage()).createReceipts(USER, [item()]);
-    expect(count).toBe(1);
+    const created = await createCoteroCommands(p, storage()).createReceipts(USER, [item()]);
+    expect(created).toEqual({ count: 1, ids: [100] });
     expect(p.insertReceipts).toHaveBeenCalledWith(USER, [
       expect.objectContaining({
         receiptNumber: "T-0248",
@@ -226,7 +226,7 @@ describe("createSettlement", () => {
   it("settles the pending receipts of one cotero for their written total and remembers the profile", async () => {
     const p = ports();
     const result = await createCoteroCommands(p, storage()).createSettlement(USER, input);
-    expect(result).toEqual({ number: 7 });
+    expect(result).toEqual({ id: 70, number: 7 });
     expect(p.createSettlement).toHaveBeenCalledWith(
       USER,
       expect.objectContaining({

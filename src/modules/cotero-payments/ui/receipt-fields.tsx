@@ -9,8 +9,10 @@ import type { FleetControl } from "./use-fleet";
 
 const CONTROL = "h-10 md:h-9";
 
+export const COTERO_DOCUMENT_HINT = "Junto a la firma; identifica al cotero aunque el nombre cambie.";
+
 /**
- * The eleven fields of a receipt, controlled; a field with an issue is marked and says what is wrong. The
+ * The fields of a receipt (eleven; nine with `hideCotero`), controlled; a field with an issue is marked and says what is wrong. The
  * plates and the driver are tied to the fleet (`fleet`): they suggest while typing and say when one is not
  * in it; `corrected` holds what the AI read for the ones the fleet corrected.
  */
@@ -21,6 +23,7 @@ export function ReceiptFields({
   idPrefix,
   fleet,
   corrected = {},
+  hideCotero = false,
 }: {
   draft: ReceiptDraft;
   onChange: (next: ReceiptDraft) => void;
@@ -28,6 +31,8 @@ export function ReceiptFields({
   idPrefix: string;
   fleet: FleetControl;
   corrected?: CorrectedFields;
+  /** The cotero is set once for the whole import (its header), not per receipt. */
+  hideCotero?: boolean;
 }) {
   const issueOf = (field: DraftField) => issues.find((i) => i.field === field);
 
@@ -87,8 +92,8 @@ export function ReceiptFields({
       {fleetField("vehiclePlate", "Placa del vehículo", "vehicle", true)}
       {fleetField("trailerPlate", "Placa del trailer", "trailer")}
       {fleetField("driverName", "Conductor", "driver", true)}
-      {text("coteroName", "Nombre del cotero", { required: true, className: "sm:col-span-2", list: "cotero-names" })}
-      {text("coteroDocument", "Cédula del cotero", { className: "sm:col-span-2", inputMode: "numeric", hint: "Junto a la firma; identifica al cotero aunque el nombre cambie." })}
+      {!hideCotero && text("coteroName", "Nombre del cotero", { required: true, className: "sm:col-span-2", list: "cotero-names" })}
+      {!hideCotero && text("coteroDocument", "Cédula del cotero", { className: "sm:col-span-2", inputMode: "numeric", hint: COTERO_DOCUMENT_HINT })}
     </div>
   );
 }

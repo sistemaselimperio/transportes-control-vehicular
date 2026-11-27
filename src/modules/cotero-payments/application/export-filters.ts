@@ -17,6 +17,7 @@ export function receiptFiltersFromParams(params: URLSearchParams): ReceiptFilter
     from: isIsoDate(from) ? from : null,
     to: isIsoDate(to) ? to : null,
     coteroKey: params.get("cotero") || null,
+    search: params.get("buscar") ?? NO_RECEIPT_FILTERS.search,
     status: STATUSES.find((s) => s === status) ?? null,
     plate: params.get("placa") ?? NO_RECEIPT_FILTERS.plate,
     destination: params.get("destino") ?? NO_RECEIPT_FILTERS.destination,
@@ -28,6 +29,7 @@ export function receiptFiltersToParams(filters: ReceiptFilters): URLSearchParams
   if (filters.from) params.set("desde", filters.from);
   if (filters.to) params.set("hasta", filters.to);
   if (filters.coteroKey) params.set("cotero", filters.coteroKey);
+  if (filters.search.trim() !== "") params.set("buscar", filters.search.trim());
   if (filters.status) params.set("estado", filters.status);
   if (filters.plate.trim() !== "") params.set("placa", filters.plate.trim());
   if (filters.destination.trim() !== "") params.set("destino", filters.destination.trim());

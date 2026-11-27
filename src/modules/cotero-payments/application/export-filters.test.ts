@@ -8,11 +8,12 @@ describe("receiptFiltersFromParams", () => {
   });
 
   it("reads every filter", () => {
-    const params = new URLSearchParams("desde=2026-11-01&hasta=2026-11-30&cotero=doc%3A111111&estado=paid&placa=ABC-123&destino=Roble");
+    const params = new URLSearchParams("desde=2026-11-01&hasta=2026-11-30&cotero=doc%3A111111&estado=paid&placa=ABC-123&destino=Roble&buscar=Juan");
     expect(receiptFiltersFromParams(params)).toEqual({
       from: "2026-11-01",
       to: "2026-11-30",
       coteroKey: "doc:111111",
+      search: "Juan",
       status: "paid",
       plate: "ABC-123",
       destination: "Roble",
@@ -31,6 +32,11 @@ describe("receiptFiltersToParams", () => {
     const params = receiptFiltersToParams(filters);
     expect(params.toString()).toBe("desde=2026-11-01&estado=pending&placa=ABC");
     expect(receiptFiltersFromParams(params)).toEqual(filters);
+  });
+
+  it("writes the cotero search as buscar", () => {
+    const filters = { ...NO_RECEIPT_FILTERS, search: " Juan " };
+    expect(receiptFiltersToParams(filters).toString()).toBe("buscar=Juan");
   });
 
   it("is empty without filters", () => {

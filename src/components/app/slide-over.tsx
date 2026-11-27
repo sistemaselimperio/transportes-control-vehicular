@@ -26,8 +26,8 @@ export function SlideOver({
   title: string;
   description?: string;
   side?: "right" | "left";
-  /** Wider work panel (36rem from `md`) for long, two-column forms. */
-  wide?: boolean;
+  /** Wider work panel (36rem from `md`) for long, two-column forms; "xl" (54rem) for tables. */
+  wide?: boolean | "xl";
   bodyClassName?: string;
   children: ReactNode;
 }) {
@@ -41,7 +41,8 @@ export function SlideOver({
             side === "right"
               ? "inset-x-0 bottom-0 max-h-[92dvh] translate-y-0 rounded-t-2xl border-t data-ending-style:translate-y-full data-starting-style:translate-y-full md:inset-y-0 md:right-0 md:left-auto md:max-h-none md:w-[28rem] md:translate-x-0 md:rounded-none md:rounded-l-2xl md:border-t-0 md:border-l md:data-ending-style:translate-x-full md:data-ending-style:translate-y-0 md:data-starting-style:translate-x-full md:data-starting-style:translate-y-0"
               : "inset-y-0 left-0 w-[17.5rem] max-w-[85vw] translate-x-0 border-r data-ending-style:-translate-x-full data-starting-style:-translate-x-full",
-            side === "right" && wide && "md:w-[36rem]",
+            side === "right" && wide === true && "md:w-[36rem]",
+            side === "right" && wide === "xl" && "md:w-[min(54rem,100vw)]",
           )}
         >
           <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
