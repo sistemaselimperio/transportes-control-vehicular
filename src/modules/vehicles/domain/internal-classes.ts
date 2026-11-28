@@ -1,6 +1,6 @@
 /**
  * Vehicle classes used only inside the company: motorcycles, trailers and machines. They are never
- * dispatched on their own, so the plate pickers of trips, deliveries and loads leave them out. The
+ * dispatched on their own, so the plate pickers of deliveries and loads leave them out. The
  * public pre-operational form still lists them, because they are inspected too.
  */
 export const INTERNAL_CLASS_NAMES = [

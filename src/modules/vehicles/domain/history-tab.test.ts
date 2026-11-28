@@ -3,13 +3,12 @@ import { HISTORY_TABS, parseHistoryTab } from "./history-tab";
 
 describe("parseHistoryTab", () => {
   it("lists the tabs in display order", () => {
-    expect(HISTORY_TABS.map((t) => t.key)).toEqual(["preoperacionales", "parte-diario", "viajes", "bitacora"]);
+    expect(HISTORY_TABS.map((t) => t.key)).toEqual(["preoperacionales", "parte-diario", "bitacora"]);
   });
 
   it("accepts each known value", () => {
     expect(parseHistoryTab("preoperacionales")).toBe("preoperacionales");
     expect(parseHistoryTab("parte-diario")).toBe("parte-diario");
-    expect(parseHistoryTab("viajes")).toBe("viajes");
     expect(parseHistoryTab("bitacora")).toBe("bitacora");
   });
 
@@ -17,9 +16,10 @@ describe("parseHistoryTab", () => {
     expect(parseHistoryTab(undefined)).toBe("bitacora");
     expect(parseHistoryTab("")).toBe("bitacora");
     expect(parseHistoryTab("nope")).toBe("bitacora");
+    expect(parseHistoryTab("viajes")).toBe("bitacora");
   });
 
   it("reads the first value of a repeated param", () => {
-    expect(parseHistoryTab(["viajes", "bitacora"])).toBe("viajes");
+    expect(parseHistoryTab(["parte-diario", "bitacora"])).toBe("parte-diario");
   });
 });

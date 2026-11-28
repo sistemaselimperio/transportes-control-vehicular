@@ -19,9 +19,7 @@ import { SlideOver } from "@/components/app/slide-over";
 import { KIND_LABELS, useDoneMessage } from "@/modules/alerts/ui/attention-actions";
 import type { DashboardData } from "@/modules/dashboard/application/dashboard-queries";
 import { GROUP_LABELS, type ItemKind } from "@/modules/dashboard/domain/dashboard-metrics";
-import type { ParkedTripWarning } from "@/modules/dashboard/domain/parked-trips";
 import { groupVehicles } from "../domain/vehicle-queue";
-import { ParkedTripAlerts } from "./parked-trip-alerts";
 import { TodayTimeline } from "./today-timeline";
 import { VehicleDetail } from "./vehicle-panel";
 
@@ -115,17 +113,11 @@ function Counter({
 /** "Hoy": vehicles that need attention, most urgent first, with the selected one open beside the list. */
 export function TodayView({
   data,
-  parkedTrips,
-  canEditVehicles,
   initialKind,
   initialStatus,
   initialQuery,
 }: {
   data: DashboardData;
-  /** Trips programmed on a parked vehicle; empty for users who are not warned about them. */
-  parkedTrips: readonly ParkedTripWarning[];
-  /** Whether the user may set a parked vehicle back to active from its warning. */
-  canEditVehicles: boolean;
   initialKind: KindFilter;
   initialStatus: StatusFilter;
   initialQuery: string;
@@ -238,11 +230,9 @@ export function TodayView({
 
       {banner}
 
-      <ParkedTripAlerts warnings={parkedTrips} canEdit={canEditVehicles} onDone={flash} />
-
       {attention.length === 0 ? (
         <div className="panel px-5 py-6 text-sm text-muted-foreground">
-          {parkedTrips.length > 0 ? "Sin alertas de documentos ni de aceite." : "Sin alertas. La flota está al día."}
+          Sin alertas. La flota está al día.
         </div>
       ) : (
         <>

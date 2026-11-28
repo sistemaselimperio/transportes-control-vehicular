@@ -34,9 +34,6 @@ export async function requireOrderDeliverer() {
 /** Driver writes. */
 export const requireDriverManager = () => requireSectionManager("drivers");
 
-/** Trip writes. */
-export const requireTripManager = () => requireSectionManager("trips");
-
 /** Vehicle create and edit (and everything else on a vehicle's file except deleting it). */
 export async function requireVehicleEditor() {
   const session = await requireSession();

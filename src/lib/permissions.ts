@@ -11,7 +11,6 @@
  *   fleet          manage          read (+ driver) read (+ create/edit vehicles, driver and files; no delete, sell or transfer)   manage   locked                  locked
  *   drivers        manage          manage          read                    manage       locked                  locked
  *   inspections    manage          read            read                    manage       locked                  locked
- *   trips          read            manage          read                    manage       locked                  locked
  *   logbook        manage          locked          locked                  manage       locked                  locked
  *   owners         manage          read            locked                  manage       locked                  locked
  *   sales          manage          locked          locked                  manage       locked                  locked
@@ -39,7 +38,6 @@ export type Section =
   | "fleet"
   | "drivers"
   | "inspections"
-  | "trips"
   | "logbook"
   | "owners"
   | "sales"
@@ -56,7 +54,6 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     fleet: "manage",
     drivers: "manage",
     inspections: "manage",
-    trips: "read",
     logbook: "manage",
     owners: "manage",
     sales: "manage",
@@ -65,7 +62,6 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     fleet: "read",
     drivers: "manage",
     inspections: "read",
-    trips: "manage",
     owners: "read",
   },
   assistant: {
@@ -73,14 +69,12 @@ const ACCESS: Readonly<Record<Role, Readonly<Partial<Record<Section, Access>>>>>
     fleet: "read",
     drivers: "read",
     inspections: "read",
-    trips: "read",
   },
   superadmin: {
     today: "manage",
     fleet: "manage",
     drivers: "manage",
     inspections: "manage",
-    trips: "manage",
     logbook: "manage",
     owners: "manage",
     sales: "manage",
@@ -108,7 +102,6 @@ const SECTION_PATHS: ReadonlyArray<readonly [Section, string]> = [
   ["drivers", "/conductores"],
   ["inspections", "/preoperacionales"],
   ["inspections", "/parte-diario"],
-  ["trips", "/viajes"],
   ["logbook", "/bitacora"],
   ["owners", "/propietarios"],
   ["sales", "/ventas"],
@@ -160,11 +153,6 @@ export function canDeliverOrders(role: Role): boolean {
 /** Create, edit and delete drivers. */
 export function canManageDrivers(role: Role): boolean {
   return canManageSection(role, "drivers");
-}
-
-/** Create, edit and delete trips. */
-export function canManageTrips(role: Role): boolean {
-  return canManageSection(role, "trips");
 }
 
 /** Sell or transfer the ownership of a vehicle: admin only. */
@@ -240,15 +228,6 @@ export function canEnturn(flag: unknown): boolean {
 /** Sees the enturnamientos page: administers them or enturns. */
 export function canUseTurns(adminFlag: unknown, enturnFlag: unknown): boolean {
   return canAdminTurns(adminFlag) || canEnturn(enturnFlag);
-}
-
-/**
- * The parked-vehicle trip warning ("Vehículo quieto con viaje programado") is outside the role
- * matrix too: only users flagged with `receivesParkedTripAlerts` see it on "Hoy" and in the nav
- * badge. Closed for anything but `true`.
- */
-export function receivesParkedTripAlerts(flag: unknown): boolean {
-  return flag === true;
 }
 
 /** The first section the role can see: where a redirect from a forbidden page lands. */

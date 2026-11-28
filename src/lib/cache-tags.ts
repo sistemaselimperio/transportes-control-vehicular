@@ -12,7 +12,6 @@ export const CACHE_TAGS = {
   owners: "owners",
   drivers: "drivers",
   sales: "sales",
-  trips: "trips",
   /** Service, tire and fuel records. */
   logbook: "logbook",
   /** Pre-operational inspections; only reads derived from them are cached (who has inspections). */
@@ -38,7 +37,6 @@ type EntityTag =
   | typeof CACHE_TAGS.owners
   | typeof CACHE_TAGS.drivers
   | typeof CACHE_TAGS.sales
-  | typeof CACHE_TAGS.trips
   | typeof CACHE_TAGS.logbook
   | typeof CACHE_TAGS.inspections
   | typeof CACHE_TAGS.clients
@@ -55,7 +53,6 @@ const {
   owners,
   drivers,
   sales,
-  trips,
   logbook,
   inspections,
   dashboard,
@@ -80,8 +77,6 @@ export type ReadName =
   | "driverOptions"
   | "ownerRows"
   | "saleRows"
-  | "tripRows"
-  | "vehicleTrips"
   | "clientRows"
   | "deliveryRows"
   | "loadRows"
@@ -108,10 +103,6 @@ export const READ_DEPENDENCIES: Record<ReadName, readonly string[]> = {
   driverOptions: [drivers],
   ownerRows: [owners, fleet],
   saleRows: [sales, fleet, owners],
-  /** The fleet is a dependency because deleting a vehicle unlinks its trips. */
-  tripRows: [trips, fleet],
-  /** Latest trips of one vehicle; same dependencies as `tripRows`. */
-  vehicleTrips: [trips, fleet],
   /** Each client row carries its fincas and its number of deliveries. */
   clientRows: [clients, deliveries],
   /** Rows show the client name; deleting a vehicle unlinks its deliveries. */
@@ -145,7 +136,6 @@ export type Change =
   | { kind: "owner" }
   | { kind: "driver" }
   | { kind: "sale" }
-  | { kind: "trip" }
   | { kind: "logbook" }
   /** Logbook writes that also change oil changes or the odometer (bulk delete, Excel import). */
   | { kind: "logbook-with-oil" }
@@ -163,7 +153,6 @@ const WRITTEN_ENTITIES: Record<Exclude<Change["kind"], "vehicle-file">, EntityTa
   owner: [owners],
   driver: [drivers],
   sale: [sales],
-  trip: [trips],
   logbook: [logbook],
   "logbook-with-oil": [logbook, fleet],
   inspection: [inspections],

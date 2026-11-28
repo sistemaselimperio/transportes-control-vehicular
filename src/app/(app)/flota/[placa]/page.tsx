@@ -5,8 +5,6 @@ import { requireSectionAccess } from "@/lib/session";
 import { listTrailerTireEvents } from "@/modules/trailer-tires/infrastructure/tire-event-repository";
 import { isTrailerClass } from "@/modules/vehicles/domain/trailer";
 import { listVehicleDailyReports, listVehicleInspections } from "@/modules/inspections/infrastructure/inspection-repository";
-import { listVehicleTrips } from "@/modules/trips/application/trip-queries";
-import { withEffectiveStatus } from "@/modules/trips/domain/trip-row";
 import { getVehicleDetail } from "@/modules/vehicles/application/vehicle-queries";
 import { HISTORY_LIMIT, parseHistoryTab } from "@/modules/vehicles/domain/history-tab";
 import { normalizePlate } from "@/modules/vehicles/domain/plate";
@@ -34,9 +32,8 @@ export default async function Page({
   if (!detail) notFound();
   // Inspections arrive from a public form, so no write path of the app expires them: read per request.
   // Tire events of a trailer are read per request too, so an edit shows up at once.
-  const [inspections, trips, dailyReports, tireEvents] = await Promise.all([
+  const [inspections, dailyReports, tireEvents] = await Promise.all([
     listVehicleInspections(detail.row.id, HISTORY_LIMIT),
-    listVehicleTrips(detail.row.id, HISTORY_LIMIT),
     listVehicleDailyReports(detail.row.id, HISTORY_LIMIT),
     isTrailerClass(detail.row.className ?? "") ? listTrailerTireEvents(detail.row.id) : Promise.resolve([]),
   ]);
@@ -50,7 +47,6 @@ export default async function Page({
       denied={canTransferVehicles(role) ? [] : ["owner", "sell"]}
       inspections={inspections}
       dailyReports={dailyReports}
-      trips={withEffectiveStatus(trips, new Date())}
       historyTab={parseHistoryTab(query.historial)}
       tireEvents={tireEvents}
       canEditTires={canManageSection(role, "logbook")}

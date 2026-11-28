@@ -42,7 +42,7 @@ export async function listFleetPlates(): Promise<string[]> {
   return loadFleetPlates();
 }
 
-/** Plates for the trip, delivery and load pickers: the fleet without its internal classes. */
+/** Plates for the delivery and load pickers: the fleet without its internal classes. */
 export async function listDispatchPlates(): Promise<string[]> {
   "use cache";
   cacheLife("minutes");

@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/app/sidebar";
-import { canUseCoteroPayments, canUseDailyCash, canUsePettyCash, canUseTurns, canViewSection, parseRole, receivesParkedTripAlerts } from "@/lib/permissions";
+import { canUseCoteroPayments, canUseDailyCash, canUsePettyCash, canUseTurns, canViewSection, parseRole } from "@/lib/permissions";
 import { getRequestSession } from "@/lib/session";
-import { getExpiredVehicleCounts, getParkedTripWarnings } from "@/modules/dashboard/application/dashboard-queries";
-import { addParkedTripCounts } from "@/modules/dashboard/domain/parked-trips";
+import { getExpiredVehicleCounts } from "@/modules/dashboard/application/dashboard-queries";
 
 /**
  * The frame (skip link, skeletons) prerenders as the fallback; the themed shell needs the session
@@ -81,12 +80,7 @@ async function SessionSidebar() {
   const role = parseRole(session.user.role);
   // The counts only feed the alerts entry, which only some roles can open.
   const canSeeToday = canViewSection(role, "today");
-  const expired = canSeeToday ? await getExpiredVehicleCounts() : null;
-  // Whoever is warned about trips on parked vehicles sees them in the badge too.
-  const expiredCounts =
-    expired && receivesParkedTripAlerts(session.user.receivesParkedTripAlerts)
-      ? addParkedTripCounts(expired, await getParkedTripWarnings())
-      : expired;
+  const expiredCounts = canSeeToday ? await getExpiredVehicleCounts() : null;
   return <Sidebar userName={session.user.name} role={role} hasPettyCash={canUsePettyCash(session.user.hasPettyCash)} hasCoteroPayments={canUseCoteroPayments(session.user.hasCoteroPayments)} hasDailyCash={canUseDailyCash(session.user.hasDailyCash)} hasTurns={canUseTurns(session.user.canAdminTurns, session.user.canEnturn)} expiredCounts={expiredCounts} />;
 }
 

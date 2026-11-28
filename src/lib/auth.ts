@@ -40,8 +40,6 @@ export const auth = betterAuth({
       // Same for the enturnamientos flags.
       canAdminTurns: { type: "boolean", required: true, defaultValue: false, input: false },
       canEnturn: { type: "boolean", required: true, defaultValue: false, input: false },
-      // Same for the parked-vehicle trip warning flag.
-      receivesParkedTripAlerts: { type: "boolean", required: true, defaultValue: false, input: false },
     },
   },
   plugins: [

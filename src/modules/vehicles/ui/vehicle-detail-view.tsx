@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { StatusMark } from "@/components/app/status-mark";
 import { logbookHref, logbookTabsFor } from "@/modules/logbook/domain/logbook";
 import { VehicleLogbookPanel } from "@/modules/logbook/ui/vehicle-logbook";
-import { VehicleTripsList } from "@/modules/trips/ui/vehicle-trips-list";
-import type { TripRow } from "@/modules/trips/domain/trip-row";
 import { StatusPill } from "@/modules/alerts/ui/status-pill";
 import type { DailyReportRow } from "@/modules/inspections/domain/daily-report";
 import { VehicleInspectionsList } from "@/modules/inspections/ui/vehicle-inspections-list";
@@ -251,7 +249,7 @@ function FileHeader({ r, trailerPlate }: { r: VehicleGridRow; trailerPlate: stri
 /**
  * Vehicle file ordered by what the dispatcher needs first: identity, status and expiries in the
  * header; then the technical sheet that says exactly which vehicle this is; then who runs it and
- * how far it has gone; then its papers; then its history (inspections, trips, logbook); and last the
+ * how far it has gone; then its papers; then its history (inspections, logbook); and last the
  * notes. The only overlays are the action forms, which `readOnly` removes along with every write control.
  */
 export function VehicleDetailView({
@@ -263,7 +261,6 @@ export function VehicleDetailView({
   canOpenLogbook = !readOnly,
   inspections = [],
   dailyReports = [],
-  trips = [],
   historyTab = "bitacora",
   tireEvents = [],
   canEditTires = false,
@@ -273,8 +270,6 @@ export function VehicleDetailView({
   inspections?: readonly VehicleInspectionRow[];
   /** Latest daily reports of this vehicle, newest first. */
   dailyReports?: readonly (DailyReportRow & { createdAt: Date })[];
-  /** Latest trips of this vehicle, newest start first. */
-  trips?: readonly TripRow[];
   /** Tire events by position of a trailer (empty for any other vehicle), newest first. */
   tireEvents?: readonly TireEventRow[];
   /** Whether the user can register, edit and delete a trailer's tire events. */
@@ -399,14 +394,12 @@ export function VehicleDetailView({
           panels={{
             preoperacionales: <VehicleInspectionsList rows={inspections} />,
             "parte-diario": <VehicleDailyReports reports={dailyReports} />,
-            viajes: <VehicleTripsList rows={trips} />,
             bitacora: <VehicleLogbookPanel logbook={detail.logbook} />,
           }}
           links={{
             preoperacionales: { href: `/preoperacionales?vehiculo=${r.id}`, label: "Ver preoperacionales" },
             // The Parte diario page lists one date for every vehicle, not one vehicle's history.
             "parte-diario": null,
-            viajes: { href: `/viajes?${new URLSearchParams({ placa: r.plate })}`, label: "Ver viajes" },
             // Staff cannot open the Bitácora page, so they get no link to it.
             bitacora: canOpenLogbook ? { href: logbookHref(r.plate, "servicios"), label: "Ver bitácora" } : null,
           }}

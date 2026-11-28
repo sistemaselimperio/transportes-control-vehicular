@@ -234,7 +234,7 @@ export async function loadFleetPlates(): Promise<string[]> {
   return rows.map((r) => r.plate);
 }
 
-/** Plates that can be dispatched (not sold, not of an internal class): trips, deliveries and loads. */
+/** Plates that can be dispatched (not sold, not of an internal class): deliveries and loads. */
 export async function loadDispatchPlates(): Promise<string[]> {
   const rows = await db
     .select({ plate: schema.vehicles.plate, className: schema.vehicleClasses.name })

@@ -9,7 +9,6 @@ import {
   canTransferVehicles,
   canManageDrivers,
   canManageSection,
-  canManageTrips,
   canSetKgPerBag,
   canAdminTurns,
   canEnturn,
@@ -53,7 +52,6 @@ const SECTIONS: ReadonlyArray<Section> = [
   "fleet",
   "drivers",
   "inspections",
-  "trips",
   "logbook",
   "owners",
   "sales",
@@ -70,7 +68,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "manage",
     drivers: "manage",
     inspections: "manage",
-    trips: "read",
     logbook: "manage",
     owners: "manage",
     sales: "manage",
@@ -84,7 +81,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "read",
     drivers: "manage",
     inspections: "read",
-    trips: "manage",
     logbook: "locked",
     owners: "read",
     sales: "locked",
@@ -98,7 +94,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "read",
     drivers: "read",
     inspections: "read",
-    trips: "read",
     logbook: "locked",
     owners: "locked",
     sales: "locked",
@@ -112,7 +107,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "manage",
     drivers: "manage",
     inspections: "manage",
-    trips: "manage",
     logbook: "manage",
     owners: "manage",
     sales: "manage",
@@ -126,7 +120,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "locked",
     drivers: "locked",
     inspections: "locked",
-    trips: "locked",
     logbook: "locked",
     owners: "locked",
     sales: "locked",
@@ -140,7 +133,6 @@ const MATRIX: Record<Role, Record<Section, "manage" | "read" | "locked">> = {
     fleet: "locked",
     drivers: "locked",
     inspections: "locked",
-    trips: "locked",
     logbook: "locked",
     owners: "locked",
     sales: "locked",
@@ -230,7 +222,6 @@ describe("vehicle capabilities", () => {
     expect(canManageVehicleFiles("superadmin")).toBe(true);
     expect(canAssignDrivers("superadmin")).toBe(true);
     expect(canManageDrivers("superadmin")).toBe(true);
-    expect(canManageTrips("superadmin")).toBe(true);
   });
 
   it.each<Role>(["dispatcher", "loader"])("gives %s no fleet capability", (role) => {
@@ -270,7 +261,6 @@ describe("sectionOfPath", () => {
     expect(sectionOfPath("/preoperacionales")).toBe("inspections");
     expect(sectionOfPath("/preoperacionales/0b9d2c1e")).toBe("inspections");
     expect(sectionOfPath("/parte-diario")).toBe("inspections");
-    expect(sectionOfPath("/viajes")).toBe("trips");
     expect(sectionOfPath("/propietarios")).toBe("owners");
     expect(sectionOfPath("/ventas")).toBe("sales");
     expect(sectionOfPath("/clientes")).toBe("clients");
@@ -307,14 +297,6 @@ describe("canManageDrivers", () => {
     for (const role of ROLES) {
       expect(canManageDrivers(role)).toBe(canManageSection(role, "drivers"));
     }
-  });
-});
-
-describe("canManageTrips", () => {
-  it("allows only staff to create, edit and delete trips; an admin just reads them", () => {
-    expect(canManageTrips("staff")).toBe(true);
-    expect(canManageTrips("admin")).toBe(false);
-    expect(canManageTrips("assistant")).toBe(false);
   });
 });
 

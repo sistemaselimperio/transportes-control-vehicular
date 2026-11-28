@@ -14,7 +14,6 @@ const CHANGES: Change[] = [
   { kind: "owner" },
   { kind: "driver" },
   { kind: "sale" },
-  { kind: "trip" },
   { kind: "logbook" },
   { kind: "logbook-with-oil" },
   { kind: "inspection" },
@@ -42,10 +41,6 @@ describe("readTags", () => {
   it("scopes the vehicle detail to its plate's files", () => {
     expect(readTags("vehicleDetail", "ABC-123")).toContain(vehicleFilesTag("ABC-123"));
     expect(readTags("vehicleDetail", "ABC-123")).not.toContain(vehicleFilesTag("XYZ-987"));
-  });
-
-  it("expires a vehicle's trips with trip writes and with fleet writes (deleting a vehicle unlinks them)", () => {
-    expect(readTags("vehicleTrips")).toEqual(expect.arrayContaining([CACHE_TAGS.trips, CACHE_TAGS.fleet]));
   });
 
   it("has no duplicates", () => {
@@ -88,10 +83,6 @@ describe("changeTags", () => {
     expect(tags).toContain(CACHE_TAGS.owners);
     expect(tags).toContain(CACHE_TAGS.dashboard);
     expect(tags).toContain(CACHE_TAGS.expiredCounts);
-  });
-
-  it("a trip write only expires the trips", () => {
-    expect(changeTags({ kind: "trip" })).toEqual([CACHE_TAGS.trips]);
   });
 
   it("commercial writes only expire their own entity", () => {
@@ -166,7 +157,6 @@ describe("read / change consistency", () => {
     owner: [CACHE_TAGS.owners],
     driver: [CACHE_TAGS.drivers],
     sale: [CACHE_TAGS.sales],
-    trip: [CACHE_TAGS.trips],
     logbook: [CACHE_TAGS.logbook],
     "logbook-with-oil": [CACHE_TAGS.logbook, CACHE_TAGS.fleet],
     inspection: [CACHE_TAGS.inspections],
