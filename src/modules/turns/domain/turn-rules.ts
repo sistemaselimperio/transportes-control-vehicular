@@ -1,7 +1,9 @@
 /**
- * Rules of the enturnamientos: who may enturn or cancel, when the window allows it and how the queue
- * is ordered. Pure; the commands apply them and the UI uses the same functions to show or hide controls.
+ * Rules of the enturnamientos: a turn is a REQUEST (product, place, needed hour) that an admin later
+ * assigns a vehicle. Who may create, edit or cancel it, when the window allows it and when two requests of
+ * one vehicle are too close. Pure; the commands apply them and the UI uses the same functions.
  */
+import { formatBogotaClock } from "./turn-window";
 
 /** A refusal meant for the user. */
 export class TurnError extends Error {
@@ -14,9 +16,9 @@ export class TurnError extends Error {
 /** The session user as the rules see them: the two flags, never the role. */
 export interface TurnActor {
   userId: string;
-  /** Administers the turns: everything an enturnadora does, plus jornadas and order. */
+  /** Administers the turns: everything an enturnadora does, plus jornadas, assigning vehicles and editing any request. */
   canAdmin: boolean;
-  /** Enturns vehicles while the window is open. */
+  /** Creates requests while the window is open. */
   canEnturn: boolean;
 }
 
@@ -34,7 +36,7 @@ export function windowStatus(day: TurnWindow, now: Date): WindowStatus {
   return "closed";
 }
 
-/** Create and edit jornadas, reorder the queue: admins only. */
+/** Create and edit jornadas, assign vehicles: admins only. */
 export function canManageTurns(actor: TurnActor): boolean {
   return actor.canAdmin;
 }
@@ -45,10 +47,30 @@ export function canCreateTurn(actor: TurnActor, day: TurnWindow, now: Date): boo
   return actor.canEnturn && windowStatus(day, now) === "open";
 }
 
-/** An admin always; an enturnadora only her own turns and only while the window is open. */
-export function canCancelTurn(actor: TurnActor, turn: { createdBy: string | null }, day: TurnWindow, now: Date): boolean {
+export type TurnStatus = "pendiente" | "asignado";
+
+/** A request without a vehicle is pendiente; once an admin assigns one it is asignado. */
+export function turnStatus(turn: { vehicleId: number | null }): TurnStatus {
+  return turn.vehicleId === null ? "pendiente" : "asignado";
+}
+
+interface Authored {
+  createdBy: string | null;
+  vehicleId: number | null;
+}
+
+/** An admin always; an enturnadora only her own request, still pendiente, while the window is open. */
+function canChangeOwnPending(actor: TurnActor, turn: Authored, day: TurnWindow, now: Date): boolean {
   if (actor.canAdmin) return true;
-  return actor.canEnturn && turn.createdBy === actor.userId && windowStatus(day, now) === "open";
+  return actor.canEnturn && turn.createdBy === actor.userId && turnStatus(turn) === "pendiente" && windowStatus(day, now) === "open";
+}
+
+export function canCancelTurn(actor: TurnActor, turn: Authored, day: TurnWindow, now: Date): boolean {
+  return canChangeOwnPending(actor, turn, day, now);
+}
+
+export function canEditTurn(actor: TurnActor, turn: Authored, day: TurnWindow, now: Date): boolean {
+  return canChangeOwnPending(actor, turn, day, now);
 }
 
 /** Hard delete leaves no trace, so only an admin may do it (any turn, any time). */
@@ -63,47 +85,33 @@ export function validateWindow(opensAt: Date, closesAt: Date): string | null {
   return null;
 }
 
-/** Only vehicles in service ("ACTIVE") can be enturned. */
-export function assertVehicleEnturnable(status: string): void {
-  if (status !== "ACTIVE") throw new TurnError("Solo se pueden enturnar vehículos activos.");
+/** Only vehicles in service ("ACTIVE") can be assigned. */
+export function assertVehicleAssignable(status: string): void {
+  if (status !== "ACTIVE") throw new TurnError("Solo se pueden asignar vehículos activos.");
 }
 
-export function duplicateVehicleMessage(enturnedBy: string | null): string {
-  return enturnedBy ? `Ya enturnado por ${enturnedBy}.` : "Ya enturnado.";
+const CLOSE_ASSIGNMENT_MS = 2 * 3_600_000;
+
+/** Whether two needed hours are less than two hours apart. */
+export function isWithinTwoHours(a: Date, b: Date): boolean {
+  return Math.abs(a.getTime() - b.getTime()) < CLOSE_ASSIGNMENT_MS;
 }
 
-export interface Positioned {
+export interface Schedulable {
   id: number;
-  position: number;
+  vehicleId: number | null;
+  neededAt: Date;
 }
 
-/** A new turn goes last. */
-export function nextPosition(active: ReadonlyArray<{ position: number }>): number {
-  return active.reduce((max, t) => Math.max(max, t.position), 0) + 1;
+/** The other active requests of the same vehicle needed less than two hours from this one. */
+export function findCloseAssignments<T extends Schedulable>(target: Schedulable, others: readonly T[]): T[] {
+  if (target.vehicleId === null) return [];
+  return others.filter((o) => o.id !== target.id && o.vehicleId === target.vehicleId && isWithinTwoHours(o.neededAt, target.neededAt));
 }
 
-const byQueueOrder = (a: Positioned, b: Positioned) => a.position - b.position || a.id - b.id;
-
-/** The queue renumbered 1..n in its current order (after a cancellation, or to settle ties). */
-export function compactPositions(turns: ReadonlyArray<Positioned>): Positioned[] {
-  return [...turns].sort(byQueueOrder).map((t, index) => ({ id: t.id, position: index + 1 }));
-}
-
-/** The queue with one turn moved to a (1-based) position, clamped to the queue; renumbered 1..n. */
-export function moveTurnTo(turns: ReadonlyArray<Positioned>, id: number, position: number): Positioned[] {
-  const ordered = [...turns].sort(byQueueOrder);
-  const from = ordered.findIndex((t) => t.id === id);
-  if (from === -1) throw new TurnError("El turno ya no está en la cola.");
-  const [moved] = ordered.splice(from, 1);
-  const to = Math.min(Math.max(position, 1), ordered.length + 1) - 1;
-  ordered.splice(to, 0, moved);
-  return ordered.map((t, index) => ({ id: t.id, position: index + 1 }));
-}
-
-/** One place up or down; at an end the order stays. */
-export function moveTurn(turns: ReadonlyArray<Positioned>, id: number, direction: "up" | "down"): Positioned[] {
-  const ordered = [...turns].sort(byQueueOrder);
-  const from = ordered.findIndex((t) => t.id === id);
-  if (from === -1) throw new TurnError("El turno ya no está en la cola.");
-  return moveTurnTo(turns, id, from + 1 + (direction === "up" ? -1 : 1));
+/** The non-blocking warning for the admin, or null when nothing is close. */
+export function closeAssignmentWarning(conflicts: ReadonlyArray<{ neededAt: Date }>): string | null {
+  if (conflicts.length === 0) return null;
+  const hours = conflicts.map((c) => formatBogotaClock(c.neededAt)).join(", ");
+  return `Atención: ese vehículo ya tiene otra solicitud a menos de 2 horas (${hours}).`;
 }

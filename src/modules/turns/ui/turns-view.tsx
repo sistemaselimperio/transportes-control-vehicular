@@ -47,7 +47,7 @@ export function TurnsView({
     <div className="space-y-5">
       <PageHeader
         title="Enturnamientos"
-        description="Cola de vehículos del día. Se puede enturnar solo mientras la jornada está abierta."
+        description="Solicitudes del día: producto, lugar y hora. Se puede solicitar solo mientras la jornada está abierta; Leidy asigna el vehículo."
         actions={
           <div className="flex items-end gap-2">
             <div className="space-y-1">
@@ -117,7 +117,7 @@ export function TurnsView({
       ) : board.canCreateDay ? (
         <section aria-label="Crear jornada" className="space-y-3 rounded-2xl border bg-card p-4">
           <h2 className="font-semibold">No hay jornada para esta fecha</h2>
-          <p className="text-sm text-muted-foreground">Define el horario en el que las enturnadoras pueden enturnar.</p>
+          <p className="text-sm text-muted-foreground">Define el horario en el que las enturnadoras pueden hacer solicitudes.</p>
           <WindowForm date={date} opensTime={defaultTimes.opensTime} closesTime={defaultTimes.closesTime} onDone={flash} />
         </section>
       ) : (
@@ -125,10 +125,10 @@ export function TurnsView({
       )}
 
       {day && (
-        <section aria-label="Enturnar vehículo" className="space-y-3 rounded-2xl border bg-card p-4">
-          <h2 className="font-semibold">Enturnar vehículo</h2>
+        <section aria-label="Nueva solicitud" className="space-y-3 rounded-2xl border bg-card p-4">
+          <h2 className="font-semibold">Nueva solicitud</h2>
           {board.canEnturn ? (
-            <EnturnForm turnDayId={day.id} vehicles={vehicles} onDone={flash} />
+            <EnturnForm turnDayId={day.id} onDone={flash} />
           ) : (
             <p role="status" className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
               {board.enturnBlockedReason}
@@ -137,7 +137,7 @@ export function TurnsView({
         </section>
       )}
 
-      {day && <TurnQueue turns={board.turns} onDone={flash} />}
+      {day && <TurnQueue turns={board.turns} vehicles={vehicles} onDone={flash} />}
 
       <FlashMessage message={message} />
     </div>

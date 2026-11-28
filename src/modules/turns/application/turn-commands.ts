@@ -1,50 +1,57 @@
 /**
  * Commands of the enturnamientos. Rules live in the domain; this layer re-checks permission and window
  * against the stored jornada on every call (the UI hides controls, it never decides) and talks to the ports.
+ * A turn is a request (product, place, needed hour); an admin assigns the vehicle later.
  */
 import { ForbiddenError } from "@/lib/permissions";
 import type { IsoDate } from "@/modules/shared/domain/dates";
 import {
-  assertVehicleEnturnable,
+  assertVehicleAssignable,
   canCancelTurn,
   canCreateTurn,
   canDeleteTurn,
+  canEditTurn,
   canManageTurns,
-  compactPositions,
-  duplicateVehicleMessage,
-  moveTurn,
-  moveTurnTo,
-  nextPosition,
+  findCloseAssignments,
   TurnError,
   validateWindow,
   windowStatus,
-  type Positioned,
   type TurnActor,
   type TurnWindow,
 } from "../domain/turn-rules";
+import { bogotaInstant, isTimeOfDay } from "../domain/turn-window";
 
 export interface TurnDayRecord extends TurnWindow {
   id: number;
   date: IsoDate;
 }
 
-/** An active (not cancelled) turn with the name of who enturned it. */
+/** An active (not cancelled) request with the name of who made it; without a vehicle it is pendiente. */
 export interface TurnRecord {
   id: number;
   turnDayId: number;
-  vehicleId: number;
-  destination: string | null;
-  position: number;
+  vehicleId: number | null;
+  product: string;
+  /** The place ("Lugar"). */
+  destination: string;
+  neededAt: Date;
   createdBy: string | null;
   createdByName: string | null;
 }
 
 export interface NewTurn {
   turnDayId: number;
-  vehicleId: number;
-  destination: string | null;
-  position: number;
+  vehicleId: number | null;
+  product: string;
+  destination: string;
+  neededAt: Date;
   createdBy: string;
+}
+
+export interface TurnFields {
+  product: string;
+  destination: string;
+  neededAt: Date;
 }
 
 export interface TurnPorts {
@@ -53,16 +60,23 @@ export interface TurnPorts {
   insertDay(input: { date: IsoDate; opensAt: Date; closesAt: Date; createdBy: string }): Promise<TurnDayRecord>;
   updateDayWindow(id: number, opensAt: Date, closesAt: Date): Promise<void>;
   findVehicle(id: number): Promise<{ id: number; status: string } | null>;
-  /** The turns of the jornada that were not cancelled. */
+  /** The requests of the jornada that were not cancelled. */
   listActiveTurns(turnDayId: number): Promise<TurnRecord[]>;
-  /** An active turn; null when it does not exist or was cancelled. */
+  /** An active request; null when it does not exist or was cancelled. */
   findTurn(id: number): Promise<TurnRecord | null>;
   insertTurn(input: NewTurn): Promise<void>;
-  /** Marks the turn cancelled and renumbers the remaining ones, in one transaction. */
-  cancelTurn(id: number, cancelledBy: string, at: Date, renumbered: Positioned[]): Promise<void>;
-  /** Removes the turn for good and renumbers the remaining ones, in one transaction. */
-  deleteTurn(id: number, renumbered: Positioned[]): Promise<void>;
-  savePositions(updates: Positioned[]): Promise<void>;
+  updateTurn(id: number, fields: TurnFields): Promise<void>;
+  /** Sets the vehicle of the request, or null to take it back to pendiente. */
+  assignVehicle(id: number, vehicleId: number | null): Promise<void>;
+  /** Marks the request cancelled (soft). */
+  cancelTurn(id: number, cancelledBy: string, at: Date): Promise<void>;
+  /** Removes the request for good. */
+  deleteTurn(id: number): Promise<void>;
+}
+
+/** What saving a request tells the admin: the other requests of the same vehicle less than 2 hours away. */
+export interface SaveResult {
+  conflicts: TurnRecord[];
 }
 
 export interface WindowInput {
@@ -70,10 +84,25 @@ export interface WindowInput {
   closesAt: Date;
 }
 
-const trimmedOrNull = (value: string | null | undefined): string | null => {
-  const trimmed = value?.trim() ?? "";
-  return trimmed === "" ? null : trimmed;
-};
+export interface RequestInput {
+  product: string;
+  destination: string;
+  /** "HH:mm", Bogotá wall-clock on the date of the jornada. */
+  neededTime: string;
+}
+
+const TEXT_MAX = 200;
+
+/** The request fields cleaned and checked; the needed hour is read as Bogotá wall-clock on the jornada's date. */
+function requestFields(input: RequestInput, day: TurnDayRecord): TurnFields {
+  const product = input.product.trim();
+  const destination = input.destination.trim();
+  if (product === "") throw new TurnError("El producto es obligatorio.");
+  if (destination === "") throw new TurnError("El lugar es obligatorio.");
+  if (product.length > TEXT_MAX || destination.length > TEXT_MAX) throw new TurnError("El producto o el lugar es demasiado largo.");
+  if (!isTimeOfDay(input.neededTime)) throw new TurnError("La hora no es válida.");
+  return { product, destination, neededAt: bogotaInstant(day.date, input.neededTime) };
+}
 
 export function createTurnCommands(ports: TurnPorts, clock: () => Date = () => new Date()) {
   function assertAdmin(actor: TurnActor): void {
@@ -93,8 +122,20 @@ export function createTurnCommands(ports: TurnPorts, clock: () => Date = () => n
 
   async function turnOrFail(id: number): Promise<TurnRecord> {
     const turn = await ports.findTurn(id);
-    if (!turn) throw new TurnError("El turno ya no existe. Recarga la página.");
+    if (!turn) throw new TurnError("La solicitud ya no existe. Recarga la página.");
     return turn;
+  }
+
+  async function assertAssignable(vehicleId: number): Promise<void> {
+    const vehicle = await ports.findVehicle(vehicleId);
+    if (!vehicle) throw new TurnError("El vehículo ya no existe.");
+    assertVehicleAssignable(vehicle.status);
+  }
+
+  /** The other active requests of the jornada that clash with this one, with the target in its new state (its own row is skipped by id). */
+  async function conflictsOf(turnDayId: number, target: { id: number; vehicleId: number | null; neededAt: Date }): Promise<TurnRecord[]> {
+    if (target.vehicleId === null) return [];
+    return findCloseAssignments(target, await ports.listActiveTurns(turnDayId));
   }
 
   return {
@@ -114,61 +155,60 @@ export function createTurnCommands(ports: TurnPorts, clock: () => Date = () => n
       await ports.updateDayWindow(dayId, input.opensAt, input.closesAt);
     },
 
-    /** Puts an active vehicle last in the queue of the jornada. */
-    async enturn(actor: TurnActor, input: { turnDayId: number; vehicleId: number; destination?: string | null }): Promise<void> {
+    /** Creates a request (pendiente). An admin may also assign the vehicle right away. */
+    async enturn(actor: TurnActor, input: RequestInput & { turnDayId: number; vehicleId?: number | null }): Promise<SaveResult> {
       if (!actor.canAdmin && !actor.canEnturn) throw new ForbiddenError();
+      if (input.vehicleId != null && !actor.canAdmin) throw new ForbiddenError();
       const day = await dayOrFail(input.turnDayId);
       const now = clock();
       if (!canCreateTurn(actor, day, now)) {
         throw new TurnError(
-          windowStatus(day, now) === "pending" ? "La jornada todavía no está abierta para enturnar." : "La jornada ya está cerrada.",
+          windowStatus(day, now) === "pending" ? "La jornada todavía no está abierta para solicitar." : "La jornada ya está cerrada.",
         );
       }
-      const vehicle = await ports.findVehicle(input.vehicleId);
-      if (!vehicle) throw new TurnError("El vehículo ya no existe.");
-      assertVehicleEnturnable(vehicle.status);
-      const active = await ports.listActiveTurns(day.id);
-      const duplicate = active.find((t) => t.vehicleId === vehicle.id);
-      if (duplicate) throw new TurnError(duplicateVehicleMessage(duplicate.createdByName));
-      await ports.insertTurn({
-        turnDayId: day.id,
-        vehicleId: vehicle.id,
-        destination: trimmedOrNull(input.destination),
-        position: nextPosition(active),
-        createdBy: actor.userId,
-      });
+      const fields = requestFields(input, day);
+      const vehicleId = input.vehicleId ?? null;
+      if (vehicleId !== null) await assertAssignable(vehicleId);
+      const conflicts = await conflictsOf(day.id, { id: 0, vehicleId, neededAt: fields.neededAt });
+      await ports.insertTurn({ turnDayId: day.id, vehicleId, ...fields, createdBy: actor.userId });
+      return { conflicts };
     },
 
-    /** Cancels a turn; the queue closes the gap. */
+    /** Edits product, place and hour: an admin any time, an enturnadora her own pendiente one while open. */
+    async updateTurn(actor: TurnActor, turnId: number, input: RequestInput): Promise<SaveResult> {
+      const turn = await turnOrFail(turnId);
+      const day = await dayOrFail(turn.turnDayId);
+      if (!canEditTurn(actor, turn, day, clock())) throw new ForbiddenError();
+      const fields = requestFields(input, day);
+      const conflicts = await conflictsOf(day.id, { id: turn.id, vehicleId: turn.vehicleId, neededAt: fields.neededAt });
+      await ports.updateTurn(turn.id, fields);
+      return { conflicts };
+    },
+
+    /** Assigns or changes the vehicle, or null to go back to pendiente (admin, any time). */
+    async assign(actor: TurnActor, turnId: number, vehicleId: number | null): Promise<SaveResult> {
+      assertAdmin(actor);
+      const turn = await turnOrFail(turnId);
+      if (vehicleId !== null) await assertAssignable(vehicleId);
+      const conflicts = await conflictsOf(turn.turnDayId, { id: turn.id, vehicleId, neededAt: turn.neededAt });
+      await ports.assignVehicle(turn.id, vehicleId);
+      return { conflicts };
+    },
+
+    /** Cancels a request (soft): an admin any time, an enturnadora her own pendiente one while open. */
     async cancel(actor: TurnActor, turnId: number): Promise<void> {
       const turn = await turnOrFail(turnId);
       const day = await dayOrFail(turn.turnDayId);
       const now = clock();
       if (!canCancelTurn(actor, turn, day, now)) throw new ForbiddenError();
-      const remaining = (await ports.listActiveTurns(day.id)).filter((t) => t.id !== turn.id);
-      await ports.cancelTurn(turn.id, actor.userId, now, compactPositions(remaining));
+      await ports.cancelTurn(turn.id, actor.userId, now);
     },
 
-    /** Deletes a turn without leaving a record; the queue closes the gap (admin). */
+    /** Deletes a request without leaving a record (admin). */
     async deleteTurn(actor: TurnActor, turnId: number): Promise<void> {
       if (!canDeleteTurn(actor)) throw new ForbiddenError();
       const turn = await turnOrFail(turnId);
-      const remaining = (await ports.listActiveTurns(turn.turnDayId)).filter((t) => t.id !== turn.id);
-      await ports.deleteTurn(turn.id, compactPositions(remaining));
-    },
-
-    /** One place up or down (admin). */
-    async move(actor: TurnActor, turnId: number, direction: "up" | "down"): Promise<void> {
-      assertAdmin(actor);
-      const turn = await turnOrFail(turnId);
-      await ports.savePositions(moveTurn(await ports.listActiveTurns(turn.turnDayId), turn.id, direction));
-    },
-
-    /** To a (1-based) position of the queue (admin). */
-    async moveTo(actor: TurnActor, turnId: number, position: number): Promise<void> {
-      assertAdmin(actor);
-      const turn = await turnOrFail(turnId);
-      await ports.savePositions(moveTurnTo(await ports.listActiveTurns(turn.turnDayId), turn.id, position));
+      await ports.deleteTurn(turn.id);
     },
   };
 }

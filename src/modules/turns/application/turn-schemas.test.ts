@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDaySchema, enturnSchema, idSchema, windowTimesSchema } from "./turn-schemas";
+import { assignSchema, createDaySchema, enturnSchema, idSchema, updateTurnSchema, windowTimesSchema } from "./turn-schemas";
 
 describe("windowTimesSchema", () => {
   it("accepts HH:mm times", () => {
@@ -19,15 +19,44 @@ describe("createDaySchema", () => {
 });
 
 describe("enturnSchema", () => {
-  it("coerces the ids and keeps the destination optional", () => {
-    expect(enturnSchema.parse({ turnDayId: "3", vehicleId: "5", destination: "" })).toEqual({ turnDayId: 3, vehicleId: 5, destination: "" });
-    expect(enturnSchema.parse({ turnDayId: "3", vehicleId: "5" }).destination).toBe("");
+  const valid = { turnDayId: "3", product: "  Cemento ", destination: " Finca La Esperanza ", neededTime: "07:30" };
+
+  it("coerces the id and trims the texts", () => {
+    expect(enturnSchema.parse(valid)).toEqual({ turnDayId: 3, product: "Cemento", destination: "Finca La Esperanza", neededTime: "07:30" });
   });
-  it("requires a vehicle", () => {
-    expect(enturnSchema.safeParse({ turnDayId: "3", vehicleId: "" }).success).toBe(false);
+  it("requires product, place and a valid hour", () => {
+    expect(enturnSchema.safeParse({ ...valid, product: "  " }).success).toBe(false);
+    expect(enturnSchema.safeParse({ ...valid, destination: "" }).success).toBe(false);
+    expect(enturnSchema.safeParse({ ...valid, neededTime: "25:00" }).success).toBe(false);
+    expect(enturnSchema.safeParse({ ...valid, neededTime: undefined }).success).toBe(false);
   });
-  it("caps the destination", () => {
-    expect(enturnSchema.safeParse({ turnDayId: 3, vehicleId: 5, destination: "x".repeat(201) }).success).toBe(false);
+  it("caps product and place", () => {
+    expect(enturnSchema.safeParse({ ...valid, product: "x".repeat(201) }).success).toBe(false);
+    expect(enturnSchema.safeParse({ ...valid, destination: "x".repeat(201) }).success).toBe(false);
+  });
+  it("takes an optional vehicle for admins, blank meaning none", () => {
+    expect(enturnSchema.parse({ ...valid, vehicleId: "5" }).vehicleId).toBe(5);
+    expect(enturnSchema.parse({ ...valid, vehicleId: "" }).vehicleId).toBeUndefined();
+    expect(enturnSchema.safeParse({ ...valid, vehicleId: "abc" }).success).toBe(false);
+  });
+});
+
+describe("updateTurnSchema", () => {
+  it("takes product, place and hour", () => {
+    expect(updateTurnSchema.parse({ product: "Arena", destination: "Obra", neededTime: "14:00" })).toEqual({
+      product: "Arena",
+      destination: "Obra",
+      neededTime: "14:00",
+    });
+    expect(updateTurnSchema.safeParse({ product: "", destination: "Obra", neededTime: "14:00" }).success).toBe(false);
+  });
+});
+
+describe("assignSchema", () => {
+  it("accepts a vehicle id or null to unassign", () => {
+    expect(assignSchema.parse(4)).toBe(4);
+    expect(assignSchema.parse(null)).toBeNull();
+    expect(assignSchema.safeParse(0).success).toBe(false);
   });
 });
 

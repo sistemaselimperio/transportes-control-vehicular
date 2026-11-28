@@ -1,6 +1,18 @@
 /** What the enturnamientos screen shows for one date, with every permission already decided by the rules. */
 import type { IsoDate } from "@/modules/shared/domain/dates";
-import { canCancelTurn, canCreateTurn, canDeleteTurn, canManageTurns, windowStatus, type TurnActor, type WindowStatus } from "./turn-rules";
+import {
+  canCancelTurn,
+  canCreateTurn,
+  canDeleteTurn,
+  canEditTurn,
+  canManageTurns,
+  findCloseAssignments,
+  turnStatus,
+  windowStatus,
+  type TurnActor,
+  type TurnStatus,
+  type WindowStatus,
+} from "./turn-rules";
 
 export interface TurnDayRow {
   id: number;
@@ -9,23 +21,28 @@ export interface TurnDayRow {
   closesAt: Date;
 }
 
-/** An active turn of the queue. */
+/** An active request of the jornada; without a vehicle it is still pendiente. */
 export interface TurnRow {
   id: number;
-  position: number;
-  vehicleId: number;
-  plate: string;
-  destination: string | null;
+  vehicleId: number | null;
+  plate: string | null;
+  product: string;
+  /** The place ("Lugar"). */
+  destination: string;
+  neededAt: Date;
   createdBy: string | null;
   createdByName: string | null;
   createdAt: Date;
 }
 
 export interface TurnView extends TurnRow {
+  status: TurnStatus;
+  canEdit: boolean;
   canCancel: boolean;
   canDelete: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
+  canAssign: boolean;
+  /** The same vehicle has another request less than two hours away. */
+  closeToAnother: boolean;
 }
 
 export interface TurnBoard {
@@ -33,11 +50,11 @@ export interface TurnBoard {
   /** Null when there is no jornada. */
   status: WindowStatus | null;
   turns: TurnView[];
-  /** May enturn a vehicle now. */
+  /** May create a request now. */
   canEnturn: boolean;
   /** Why not, for the screen; null when allowed. */
   enturnBlockedReason: string | null;
-  /** Edits the window and reorders. */
+  /** Edits the window and assigns vehicles. */
   canManage: boolean;
   /** Admin looking at a date with no jornada. */
   canCreateDay: boolean;
@@ -46,24 +63,30 @@ export interface TurnBoard {
 export function buildTurnBoard(input: { actor: TurnActor; day: TurnDayRow | null; turns: readonly TurnRow[]; now: Date }): TurnBoard {
   const { actor, day, now } = input;
   const canManage = canManageTurns(actor);
-  const ordered = [...input.turns].sort((a, b) => a.position - b.position || a.id - b.id);
+  const ordered = [...input.turns].sort(
+    (a, b) => a.neededAt.getTime() - b.neededAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+  );
   const status = day ? windowStatus(day, now) : null;
   const canEnturn = day !== null && canCreateTurn(actor, day, now);
 
   let enturnBlockedReason: string | null = null;
   if (!canEnturn) {
     if (!day) enturnBlockedReason = "No hay jornada para esta fecha.";
-    else if (status === "pending") enturnBlockedReason = "La jornada aún no abre: no se puede enturnar todavía.";
-    else enturnBlockedReason = "La jornada está cerrada: no se puede enturnar.";
+    else if (status === "pending") enturnBlockedReason = "La jornada aún no abre: no se puede solicitar todavía.";
+    else enturnBlockedReason = "La jornada está cerrada: no se puede solicitar.";
   }
 
-  const turns = ordered.map((turn, index): TurnView => ({
-    ...turn,
-    canCancel: day !== null && canCancelTurn(actor, turn, day, now),
-    canDelete: canDeleteTurn(actor),
-    canMoveUp: canManage && index > 0,
-    canMoveDown: canManage && index < ordered.length - 1,
-  }));
+  const turns = ordered.map(
+    (turn): TurnView => ({
+      ...turn,
+      status: turnStatus(turn),
+      canEdit: day !== null && canEditTurn(actor, turn, day, now),
+      canCancel: day !== null && canCancelTurn(actor, turn, day, now),
+      canDelete: canDeleteTurn(actor),
+      canAssign: canManage,
+      closeToAnother: findCloseAssignments(turn, ordered).length > 0,
+    }),
+  );
 
   return { day, status, turns, canEnturn, enturnBlockedReason, canManage, canCreateDay: day === null && canManage };
 }

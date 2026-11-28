@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { isInternalClass } from "@/modules/vehicles/domain/internal-classes";
 import type { IsoDate } from "@/modules/shared/domain/dates";
@@ -15,8 +15,9 @@ const turnRecordColumns = {
   id: turns.id,
   turnDayId: turns.turnDayId,
   vehicleId: turns.vehicleId,
+  product: turns.product,
   destination: turns.destination,
-  position: turns.position,
+  neededAt: turns.neededAt,
   createdBy: turns.createdBy,
   createdByName: user.name,
 };
@@ -53,7 +54,7 @@ export const turnRepository: TurnPorts = {
       .from(turns)
       .leftJoin(user, eq(user.id, turns.createdBy))
       .where(and(eq(turns.turnDayId, turnDayId), activeTurn))
-      .orderBy(asc(turns.position), asc(turns.id));
+      .orderBy(asc(turns.neededAt), asc(turns.createdAt), asc(turns.id));
   },
 
   async findTurn(id) {
@@ -69,30 +70,20 @@ export const turnRepository: TurnPorts = {
     await db.insert(turns).values(input);
   },
 
-  async cancelTurn(id, cancelledBy, at, renumbered) {
-    await db.transaction(async (tx) => {
-      await tx.update(turns).set({ cancelledAt: at, cancelledBy }).where(and(eq(turns.id, id), activeTurn));
-      for (const { id: turnId, position } of renumbered) {
-        await tx.update(turns).set({ position }).where(eq(turns.id, turnId));
-      }
-    });
+  async updateTurn(id, fields) {
+    await db.update(turns).set(fields).where(and(eq(turns.id, id), activeTurn));
   },
 
-  async deleteTurn(id, renumbered) {
-    await db.transaction(async (tx) => {
-      await tx.delete(turns).where(eq(turns.id, id));
-      for (const { id: turnId, position } of renumbered) {
-        await tx.update(turns).set({ position }).where(eq(turns.id, turnId));
-      }
-    });
+  async assignVehicle(id, vehicleId) {
+    await db.update(turns).set({ vehicleId }).where(and(eq(turns.id, id), activeTurn));
   },
 
-  async savePositions(updates) {
-    await db.transaction(async (tx) => {
-      for (const { id, position } of updates) {
-        await tx.update(turns).set({ position }).where(and(eq(turns.id, id), activeTurn));
-      }
-    });
+  async cancelTurn(id, cancelledBy, at) {
+    await db.update(turns).set({ cancelledAt: at, cancelledBy }).where(and(eq(turns.id, id), activeTurn));
+  },
+
+  async deleteTurn(id) {
+    await db.delete(turns).where(eq(turns.id, id));
   },
 };
 
@@ -101,39 +92,34 @@ export async function loadDayByDate(date: IsoDate): Promise<TurnDayRow | null> {
   return turnRepository.findDayByDate(date);
 }
 
-/** The active turns of a jornada with their plate and who enturned them, in queue order. */
+/** The active requests of a jornada with the plate (when assigned) and who made them, by needed hour. */
 export async function loadTurnRows(turnDayId: number): Promise<TurnRow[]> {
   return db
     .select({
       id: turns.id,
-      position: turns.position,
       vehicleId: turns.vehicleId,
       plate: vehicles.plate,
+      product: turns.product,
       destination: turns.destination,
+      neededAt: turns.neededAt,
       createdBy: turns.createdBy,
       createdByName: user.name,
       createdAt: turns.createdAt,
     })
     .from(turns)
-    .innerJoin(vehicles, eq(vehicles.id, turns.vehicleId))
+    .leftJoin(vehicles, eq(vehicles.id, turns.vehicleId))
     .leftJoin(user, eq(user.id, turns.createdBy))
     .where(and(eq(turns.turnDayId, turnDayId), activeTurn))
-    .orderBy(asc(turns.position), asc(turns.id));
+    .orderBy(asc(turns.neededAt), asc(turns.createdAt), asc(turns.id));
 }
 
-/** The active vehicles that are not already in the queue of the jornada (all of them without one). */
-export async function loadEnturnableVehicles(turnDayId: number | null): Promise<Array<{ id: number; plate: string }>> {
-  const queued =
-    turnDayId === null
-      ? []
-      : (await db.select({ vehicleId: turns.vehicleId }).from(turns).where(and(eq(turns.turnDayId, turnDayId), activeTurn))).map(
-          (r) => r.vehicleId,
-        );
+/** The active vehicles an admin can assign (the same vehicle may serve several requests of a jornada). */
+export async function loadAssignableVehicles(): Promise<Array<{ id: number; plate: string }>> {
   const rows = await db
     .select({ id: vehicles.id, plate: vehicles.plate, className: vehicleClasses.name })
     .from(vehicles)
     .innerJoin(vehicleClasses, eq(vehicleClasses.id, vehicles.classId))
-    .where(and(eq(vehicles.status, "ACTIVE"), queued.length > 0 ? notInArray(vehicles.id, queued) : sql`true`))
+    .where(eq(vehicles.status, "ACTIVE"))
     .orderBy(asc(vehicles.plate));
   return rows.filter((r) => !isInternalClass(r.className)).map(({ id, plate }) => ({ id, plate }));
 }

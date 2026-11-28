@@ -20,9 +20,10 @@ const DAY: TurnDayRecord = {
 
 const turn = (over: Partial<TurnRecord> & { id: number }): TurnRecord => ({
   turnDayId: 1,
-  vehicleId: over.id * 100,
-  destination: null,
-  position: over.id,
+  vehicleId: null,
+  product: "Cemento",
+  destination: "Finca",
+  neededAt: new Date("2026-11-27T13:00:00Z"),
   createdBy: "e1",
   createdByName: "Rocío",
   ...over,
@@ -36,9 +37,10 @@ function fakePorts(seed: { days?: TurnDayRecord[]; turns?: TurnRecord[]; vehicle
     insertedDays: [] as unknown[],
     windows: [] as unknown[],
     inserted: [] as unknown[],
+    updated: [] as unknown[],
+    assigned: [] as unknown[],
     cancelled: [] as unknown[],
     deleted: [] as unknown[],
-    positions: [] as unknown[],
   };
   const ports: TurnPorts = {
     findDayByDate: async (date) => days.find((d) => d.date === date) ?? null,
@@ -52,9 +54,10 @@ function fakePorts(seed: { days?: TurnDayRecord[]; turns?: TurnRecord[]; vehicle
     listActiveTurns: async (dayId) => turns.filter((t) => t.turnDayId === dayId),
     findTurn: async (id) => turns.find((t) => t.id === id) ?? null,
     insertTurn: async (input) => void calls.inserted.push(input),
-    cancelTurn: async (id, userId, at, renumbered) => void calls.cancelled.push({ id, userId, at, renumbered }),
-    deleteTurn: async (id, renumbered) => void calls.deleted.push({ id, renumbered }),
-    savePositions: async (updates) => void calls.positions.push(updates),
+    updateTurn: async (id, fields) => void calls.updated.push({ id, ...fields }),
+    assignVehicle: async (id, vehicleId) => void calls.assigned.push({ id, vehicleId }),
+    cancelTurn: async (id, userId, at) => void calls.cancelled.push({ id, userId, at }),
+    deleteTurn: async (id) => void calls.deleted.push({ id }),
   };
   return { ports, calls };
 }
@@ -107,20 +110,25 @@ describe("updateWindow", () => {
   });
 });
 
-describe("enturn", () => {
-  const input = { turnDayId: 1, vehicleId: 5, destination: "  Finca La Esperanza " };
+describe("enturn (create a request)", () => {
+  const input = { turnDayId: 1, product: "  Cemento ", destination: " Finca La Esperanza ", neededTime: "08:30" };
+  // 08:30 Bogotá on 2026-11-27 is 13:30Z.
+  const NEEDED = new Date("2026-11-27T13:30:00Z");
 
-  it("enturns an active vehicle last in the queue while open", async () => {
-    const { ports, calls } = fakePorts({ turns: [turn({ id: 1, position: 1 }), turn({ id: 2, position: 2 })] });
-    await createTurnCommands(ports, () => OPEN).enturn(enturner, input);
-    expect(calls.inserted).toEqual([
-      { turnDayId: 1, vehicleId: 5, destination: "Finca La Esperanza", position: 3, createdBy: "e1" },
-    ]);
-  });
-  it("stores a blank destination as null", async () => {
+  it("creates a pendiente request while open, with the needed instant in Bogotá time", async () => {
     const { ports, calls } = fakePorts();
-    await createTurnCommands(ports, () => OPEN).enturn(enturner, { ...input, destination: "   " });
-    expect(calls.inserted[0]).toMatchObject({ destination: null, position: 1 });
+    const result = await createTurnCommands(ports, () => OPEN).enturn(enturner, input);
+    expect(calls.inserted).toEqual([
+      { turnDayId: 1, vehicleId: null, product: "Cemento", destination: "Finca La Esperanza", neededAt: NEEDED, createdBy: "e1" },
+    ]);
+    expect(result.conflicts).toEqual([]);
+  });
+  it("refuses a blank product, a blank place and a bad hour", async () => {
+    const { ports } = fakePorts();
+    const commands = createTurnCommands(ports, () => OPEN);
+    await expect(commands.enturn(enturner, { ...input, product: "  " })).rejects.toBeInstanceOf(TurnError);
+    await expect(commands.enturn(enturner, { ...input, destination: "" })).rejects.toBeInstanceOf(TurnError);
+    await expect(commands.enturn(enturner, { ...input, neededTime: "8:30pm" })).rejects.toBeInstanceOf(TurnError);
   });
   it("refuses an enturner outside the window", async () => {
     for (const now of [BEFORE, AFTER]) {
@@ -128,7 +136,7 @@ describe("enturn", () => {
       await expect(createTurnCommands(ports, () => now).enturn(enturner, input)).rejects.toBeInstanceOf(TurnError);
     }
   });
-  it("lets an admin enturn outside the window", async () => {
+  it("lets an admin create outside the window", async () => {
     const { ports, calls } = fakePorts();
     await createTurnCommands(ports, () => AFTER).enturn(admin, input);
     expect(calls.inserted).toHaveLength(1);
@@ -137,17 +145,21 @@ describe("enturn", () => {
     const { ports } = fakePorts();
     await expect(createTurnCommands(ports, () => OPEN).enturn(nobody, input)).rejects.toBeInstanceOf(ForbiddenError);
   });
-  it("refuses a vehicle that is not active", async () => {
-    const { ports } = fakePorts();
-    await expect(createTurnCommands(ports, () => OPEN).enturn(enturner, { ...input, vehicleId: 6 })).rejects.toThrow(/activos/);
+  it("refuses a vehicle from an enturner", async () => {
+    const { ports, calls } = fakePorts();
+    await expect(createTurnCommands(ports, () => OPEN).enturn(enturner, { ...input, vehicleId: 5 })).rejects.toBeInstanceOf(ForbiddenError);
+    expect(calls.inserted).toHaveLength(0);
   });
-  it("refuses a vehicle that does not exist", async () => {
-    const { ports } = fakePorts();
-    await expect(createTurnCommands(ports, () => OPEN).enturn(enturner, { ...input, vehicleId: 77 })).rejects.toBeInstanceOf(TurnError);
+  it("lets an admin create it already assigned to an active vehicle", async () => {
+    const { ports, calls } = fakePorts();
+    await createTurnCommands(ports, () => OPEN).enturn(admin, { ...input, vehicleId: 5 });
+    expect(calls.inserted[0]).toMatchObject({ vehicleId: 5 });
   });
-  it("refuses a vehicle already in the queue, naming who enturned it", async () => {
-    const { ports } = fakePorts({ turns: [turn({ id: 1, vehicleId: 5, createdByName: "Rocío" })] });
-    await expect(createTurnCommands(ports, () => OPEN).enturn(enturner, input)).rejects.toThrow("Ya enturnado por Rocío.");
+  it("refuses an inactive or missing vehicle for the admin", async () => {
+    const { ports } = fakePorts();
+    const commands = createTurnCommands(ports, () => OPEN);
+    await expect(commands.enturn(admin, { ...input, vehicleId: 6 })).rejects.toThrow(/activos/);
+    await expect(commands.enturn(admin, { ...input, vehicleId: 77 })).rejects.toBeInstanceOf(TurnError);
   });
   it("fails on a jornada that does not exist", async () => {
     const { ports } = fakePorts();
@@ -155,97 +167,128 @@ describe("enturn", () => {
   });
 });
 
-describe("cancel", () => {
-  const queue = [turn({ id: 1, position: 1 }), turn({ id: 2, position: 2, createdBy: "e2" }), turn({ id: 3, position: 3 })];
+describe("updateTurn", () => {
+  const queue = [turn({ id: 1 }), turn({ id: 2, createdBy: "e2" }), turn({ id: 3, vehicleId: 5 })];
+  const fields = { product: " Arena ", destination: " Obra ", neededTime: "10:00" };
 
-  it("cancels an own turn while open and compacts the rest", async () => {
+  it("lets an enturner edit her own pending request while open", async () => {
+    const { ports, calls } = fakePorts({ turns: queue });
+    await createTurnCommands(ports, () => OPEN).updateTurn(enturner, 1, fields);
+    expect(calls.updated).toEqual([{ id: 1, product: "Arena", destination: "Obra", neededAt: new Date("2026-11-27T15:00:00Z") }]);
+  });
+  it("refuses an enturner on another's request, an assigned one or a closed window", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    const commands = createTurnCommands(ports, () => OPEN);
+    await expect(commands.updateTurn(enturner, 2, fields)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(commands.updateTurn(enturner, 3, fields)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(createTurnCommands(ports, () => AFTER).updateTurn(enturner, 1, fields)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+  it("lets an admin edit any request any time, warning when the new hour clashes with the same vehicle", async () => {
+    // Turn 4 (vehicle 5) is needed at 14:30Z; moving turn 3 (vehicle 5) to 10:00 Bogotá = 15:00Z is 30 minutes away.
+    const other = turn({ id: 4, vehicleId: 5, neededAt: new Date("2026-11-27T14:30:00Z") });
+    const { ports, calls } = fakePorts({ turns: [...queue, other] });
+    const result = await createTurnCommands(ports, () => AFTER).updateTurn(admin, 3, fields);
+    expect(calls.updated).toHaveLength(1);
+    expect(result.conflicts.map((c) => c.id)).toEqual([4]);
+  });
+  it("validates the fields", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    await expect(createTurnCommands(ports, () => OPEN).updateTurn(admin, 1, { ...fields, product: "" })).rejects.toBeInstanceOf(TurnError);
+  });
+  it("fails on a request that does not exist", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    await expect(createTurnCommands(ports, () => OPEN).updateTurn(admin, 99, fields)).rejects.toBeInstanceOf(TurnError);
+  });
+});
+
+describe("assign", () => {
+  const queue = [
+    turn({ id: 1 }),
+    turn({ id: 2, vehicleId: 5, neededAt: new Date("2026-11-27T13:30:00Z") }),
+    turn({ id: 3, vehicleId: 5, neededAt: new Date("2026-11-27T20:00:00Z") }),
+  ];
+
+  it("assigns an active vehicle at any time, even closed", async () => {
+    const { ports, calls } = fakePorts({ turns: queue });
+    const result = await createTurnCommands(ports, () => AFTER).assign(admin, 3, 5);
+    expect(calls.assigned).toEqual([{ id: 3, vehicleId: 5 }]);
+    expect(result.conflicts).toEqual([]);
+  });
+  it("warns, without blocking, when the same vehicle has another request within 2 hours", async () => {
+    const { ports, calls } = fakePorts({ turns: queue });
+    const result = await createTurnCommands(ports, () => OPEN).assign(admin, 1, 5);
+    expect(calls.assigned).toEqual([{ id: 1, vehicleId: 5 }]);
+    expect(result.conflicts.map((c) => c.id)).toEqual([2]);
+  });
+  it("unassigns back to pendiente", async () => {
+    const { ports, calls } = fakePorts({ turns: queue });
+    const result = await createTurnCommands(ports, () => OPEN).assign(admin, 2, null);
+    expect(calls.assigned).toEqual([{ id: 2, vehicleId: null }]);
+    expect(result.conflicts).toEqual([]);
+  });
+  it("refuses a vehicle that is not active or does not exist", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    const commands = createTurnCommands(ports, () => OPEN);
+    await expect(commands.assign(admin, 1, 6)).rejects.toThrow(/activos/);
+    await expect(commands.assign(admin, 1, 77)).rejects.toBeInstanceOf(TurnError);
+  });
+  it("refuses an enturner", async () => {
+    const { ports, calls } = fakePorts({ turns: queue });
+    await expect(createTurnCommands(ports, () => OPEN).assign(enturner, 1, 5)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(calls.assigned).toHaveLength(0);
+  });
+  it("fails on a request that does not exist", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    await expect(createTurnCommands(ports, () => OPEN).assign(admin, 99, 5)).rejects.toBeInstanceOf(TurnError);
+  });
+});
+
+describe("cancel", () => {
+  const queue = [turn({ id: 1 }), turn({ id: 2, createdBy: "e2" }), turn({ id: 3, vehicleId: 5 })];
+
+  it("cancels an own pending request while open", async () => {
     const { ports, calls } = fakePorts({ turns: queue });
     await createTurnCommands(ports, () => OPEN).cancel(enturner, 1);
-    expect(calls.cancelled).toEqual([
-      {
-        id: 1,
-        userId: "e1",
-        at: OPEN,
-        renumbered: [
-          { id: 2, position: 1 },
-          { id: 3, position: 2 },
-        ],
-      },
-    ]);
+    expect(calls.cancelled).toEqual([{ id: 1, userId: "e1", at: OPEN }]);
   });
-  it("refuses another user's turn to an enturner", async () => {
+  it("refuses another user's request to an enturner", async () => {
     const { ports } = fakePorts({ turns: queue });
     await expect(createTurnCommands(ports, () => OPEN).cancel(enturner, 2)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+  it("refuses an enturner on her own request once assigned", async () => {
+    const { ports } = fakePorts({ turns: queue });
+    await expect(createTurnCommands(ports, () => OPEN).cancel(enturner, 3)).rejects.toBeInstanceOf(ForbiddenError);
   });
   it("refuses an enturner once the window closed", async () => {
     const { ports } = fakePorts({ turns: queue });
     await expect(createTurnCommands(ports, () => AFTER).cancel(enturner, 1)).rejects.toBeInstanceOf(ForbiddenError);
   });
-  it("lets an admin cancel any turn any time", async () => {
+  it("lets an admin cancel any request any time", async () => {
     const { ports, calls } = fakePorts({ turns: queue });
-    await createTurnCommands(ports, () => AFTER).cancel(admin, 2);
+    await createTurnCommands(ports, () => AFTER).cancel(admin, 3);
     expect(calls.cancelled).toHaveLength(1);
   });
-  it("fails on a turn that does not exist", async () => {
+  it("fails on a request that does not exist", async () => {
     const { ports } = fakePorts({ turns: queue });
     await expect(createTurnCommands(ports, () => OPEN).cancel(admin, 99)).rejects.toBeInstanceOf(TurnError);
   });
 });
 
 describe("delete", () => {
-  const queue = [turn({ id: 1, position: 1 }), turn({ id: 2, position: 2, createdBy: "e2" }), turn({ id: 3, position: 3 })];
+  const queue = [turn({ id: 1 }), turn({ id: 2, createdBy: "e2" })];
 
-  it("lets an admin delete any turn any time and compacts the rest", async () => {
+  it("lets an admin delete any request any time", async () => {
     const { ports, calls } = fakePorts({ turns: queue });
     await createTurnCommands(ports, () => AFTER).deleteTurn(admin, 1);
-    expect(calls.deleted).toEqual([
-      {
-        id: 1,
-        renumbered: [
-          { id: 2, position: 1 },
-          { id: 3, position: 2 },
-        ],
-      },
-    ]);
+    expect(calls.deleted).toEqual([{ id: 1 }]);
   });
-  it("refuses an enturner, even for her own turn while open", async () => {
+  it("refuses an enturner, even for her own request while open", async () => {
     const { ports, calls } = fakePorts({ turns: queue });
     await expect(createTurnCommands(ports, () => OPEN).deleteTurn(enturner, 1)).rejects.toBeInstanceOf(ForbiddenError);
     expect(calls.deleted).toHaveLength(0);
   });
-  it("fails friendly on a turn that does not exist", async () => {
+  it("fails friendly on a request that does not exist", async () => {
     const { ports } = fakePorts({ turns: queue });
     await expect(createTurnCommands(ports, () => OPEN).deleteTurn(admin, 99)).rejects.toThrow("ya no existe");
-  });
-});
-
-describe("reorder", () => {
-  const queue = [turn({ id: 1, position: 1 }), turn({ id: 2, position: 2 }), turn({ id: 3, position: 3 })];
-
-  it("moves a turn up for an admin", async () => {
-    const { ports, calls } = fakePorts({ turns: queue });
-    await createTurnCommands(ports, () => OPEN).move(admin, 3, "up");
-    expect(calls.positions).toEqual([
-      [
-        { id: 1, position: 1 },
-        { id: 3, position: 2 },
-        { id: 2, position: 3 },
-      ],
-    ]);
-  });
-  it("moves a turn to a position", async () => {
-    const { ports, calls } = fakePorts({ turns: queue });
-    await createTurnCommands(ports, () => OPEN).moveTo(admin, 3, 1);
-    expect(calls.positions[0]).toEqual([
-      { id: 3, position: 1 },
-      { id: 1, position: 2 },
-      { id: 2, position: 3 },
-    ]);
-  });
-  it("refuses an enturner", async () => {
-    const { ports } = fakePorts({ turns: queue });
-    const commands = createTurnCommands(ports, () => OPEN);
-    await expect(commands.move(enturner, 3, "up")).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(commands.moveTo(enturner, 3, 1)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

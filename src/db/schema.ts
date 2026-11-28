@@ -1100,7 +1100,7 @@ export const turnDays = transportes.table(
   (t) => [uniqueIndex("turn_days_date_uq").on(t.date), check("turn_days_window_valid", sql`${t.opensAt} < ${t.closesAt}`)],
 );
 
-/** A vehicle in the queue of a jornada; cancelling keeps the row (soft) and frees the vehicle. */
+/** A request of a jornada (product, place, needed hour); an admin assigns the vehicle later. Cancelling keeps the row (soft). */
 export const turns = transportes.table(
   "turns",
   {
@@ -1108,20 +1108,20 @@ export const turns = transportes.table(
     turnDayId: integer("turn_day_id")
       .notNull()
       .references(() => turnDays.id, { onDelete: "cascade" }),
-    vehicleId: integer("vehicle_id")
-      .notNull()
-      .references(() => vehicles.id, { onDelete: "cascade" }),
-    /** Free text, optional. */
-    destination: text(),
-    /** 1-based place in the queue among the active turns. */
-    position: integer().notNull(),
+    /** Null while the request is pendiente; set when an admin assigns a vehicle (asignado). */
+    vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "cascade" }),
+    /** What is asked for, free text. */
+    product: text().notNull(),
+    /** The place ("Lugar"), free text. */
+    destination: text().notNull(),
+    /** The instant the request is needed (Bogotá wall-clock on the jornada's date). */
+    neededAt: timestamp("needed_at", { withTimezone: true }).notNull(),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
   },
   (t) => [
-    uniqueIndex("turns_day_vehicle_active_uq").on(t.turnDayId, t.vehicleId).where(sql`${t.cancelledAt} is null`),
     index("turns_day_idx").on(t.turnDayId),
   ],
 );
